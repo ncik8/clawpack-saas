@@ -1,0 +1,137 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User accounts
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  businessId    String?
+  business      Business? @relation(fields: [businessId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// Business profiles
+model Business {
+  id              String        @id @default(cuid())
+  name            String
+  type            String        // "plumber", "salon", "gym", etc.
+  location        String?
+  timezone        String        @default("UTC")
+  user            User[]
+  services        Service[]
+  bookings        Booking[]
+  payments        Payment[]
+  socialAccounts  SocialAccount[]
+  posts           SocialPost[]
+  conversations   Conversation[]
+  stripeAccountId String?
+  domain          String?
+  plan            String        @default("free") // free, basic, pro, agency
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+// Services offered
+model Service {
+  id          String    @id @default(cuid())
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id])
+  name        String
+  description String?
+  price       Decimal?
+  duration    Int?     // minutes
+  createdAt   DateTime  @default(now())
+}
+
+// Booking/Calendar
+model Booking {
+  id          String    @id @default(cuid())
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id])
+  customerName String
+  customerEmail String?
+  customerPhone String
+  serviceId   String?
+  dateTime    DateTime
+  status      String    @default("pending") // pending, confirmed, cancelled, completed
+  notes       String?
+  createdAt   DateTime  @default(now())
+}
+
+// Payments via Stripe
+model Payment {
+  id                  String    @id @default(cuid())
+  businessId          String
+  business            Business  @relation(fields: [businessId], references: [id])
+  stripePaymentIntentId String @unique
+  amount              Int       // in cents
+  currency            String    @default("usd")
+  status              String    // pending, succeeded, failed
+  customerEmail       String?
+  createdAt           DateTime  @default(now())
+}
+
+// Social media accounts
+model SocialAccount {
+  id          String    @id @default(cuid())
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id])
+  platform    String    // "instagram", "tiktok", "twitter", "linkedin", "facebook"
+  platformUserId String
+  accessToken String   // encrypted
+  refreshToken String? // encrypted
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Social posts
+model SocialPost {
+  id          String    @id @default(cuid())
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id])
+  platform    String
+  content     String
+  imageUrl    String?
+  scheduledAt DateTime?
+  postedAt    DateTime?
+  status      String    @default("draft") // draft, scheduled, posted, failed
+  postId      String?   // platform's post ID
+  metrics     Json?     // likes, shares, comments
+  createdAt   DateTime  @default(now())
+}
+
+// Conversations (AI chatbot)
+model Conversation {
+  id          String    @id @default(cuid())
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id])
+  platform    String    // "whatsapp", "wechat", "web"
+  sessionId   String?
+  messages    Json     // array of {role, content, timestamp}
+  outcome     String?  // resolved, escalated, conversion
+  createdAt   DateTime  @default(now())
+}
+
+// AI Learning (shared knowledge)
+model SharedKnowledge {
+  id                String    @id @default(cuid())
+  category          String    // "booking", "payment", "scheduling", etc.
+  content           String
+  businessType      String?   // what type of business this applies to
+  effectivenessScore Float    @default(0.5)
+  usageCount        Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
