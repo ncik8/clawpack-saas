@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ReactNode } from 'react'
+import { ReactNode, useEffect } from 'react'
 
 interface Props {
   heading: string
@@ -8,6 +8,14 @@ interface Props {
 }
 
 export default function PromptsLayout({ heading, description, children }: Props) {
+  // Strip WordPress inline background styles so CSS gradient works
+  useEffect(() => {
+    const summaries = document.querySelectorAll('#prompts-content summary')
+    summaries.forEach((el) => {
+      el.removeAttribute('style')
+    })
+  }, [])
+
   return (
     <main className="font-sans bg-white min-h-screen">
       <header className="fixed top-0 left-0 right-0 z-50 p-6 border-b border-slate-200 bg-white/95 backdrop-blur-sm">

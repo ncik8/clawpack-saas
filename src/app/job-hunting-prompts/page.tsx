@@ -61,15 +61,20 @@ function LanguageWrapper({ content }: { content: string }) {
   const [translatedContent, setTranslatedContent] = useState(content)
   const [translating, setTranslating] = useState(false)
 
+  // Strip WordPress inline background styles so our CSS gradient works
+  const cleanContent = content.replace(/style="background:\s*[^"]*"/gi, '')
+
   useEffect(() => {
     if (lang === 'en') {
-      setTranslatedContent(content)
+      setTranslatedContent(cleanContent)
       return
     }
     
     setTranslating(true)
     translateHtml(content, lang).then((translated) => {
-      setTranslatedContent(translated)
+      // Also strip inline styles from translated content
+      const clean = translated.replace(/style="background:\s*[^"]*"/gi, '')
+      setTranslatedContent(clean)
       setTranslating(false)
     })
   }, [lang, content])
