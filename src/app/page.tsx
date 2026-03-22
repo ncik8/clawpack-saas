@@ -37,8 +37,8 @@ export default function Home() {
             alt="ClawPack - Social Media Automation" 
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-gradient-to-r from-[#6344ec] to-[#9a3dda] rounded-3xl px-10 py-8 max-w-2xl mx-4 text-center shadow-2xl">
+          <div className="absolute inset-0 flex items-center">
+            <div className="bg-gradient-to-r from-[#6344ec] to-[#9a3dda] rounded-none px-10 py-8 max-w-lg mx-4 text-left shadow-2xl">
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-3 leading-tight">
                 Post to all social media<br />in one click
               </h2>
