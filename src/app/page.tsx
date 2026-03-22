@@ -1,8 +1,4 @@
 import './globals.css'
-import { Inter, Poppins } from 'next/font/google'
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const poppins = Poppins({ weight: ['400', '500', '600', '700'], subsets: ['latin'], variable: '--font-poppins' })
 
 export const metadata = {
   title: 'ClawPack - Post to All Social Media in One Click',
@@ -11,9 +7,9 @@ export const metadata = {
 
 export default function Home() {
   return (
-    <main className={`${inter.variable} ${poppins.variable} font-sans bg-white min-h-screen`}>
-      {/* Header */}
-      <header className="p-6 border-b border-slate-200">
+    <main className="font-sans bg-white min-h-screen">
+      {/* Header - Fixed */}
+      <header className="fixed top-0 left-0 right-0 z-50 p-6 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold text-slate-900">
             <span className="text-blue-600">🤖</span> ClawPack
@@ -29,6 +25,9 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Spacer for fixed header */}
+      <div className="h-[73px]" />
+
       {/* Hero - Full Width Image */}
       <section className="w-full">
         <div className="w-full h-[500px] relative overflow-hidden">
@@ -38,7 +37,7 @@ export default function Home() {
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 flex items-center">
-            <div className="bg-gradient-to-r from-[#6344ec] to-[#9a3dda] rounded-none px-10 py-8 max-w-lg mx-4 text-left shadow-2xl">
+            <div className="bg-gradient-to-r from-[#6344ec] to-[#9a3dda] rounded-2xl px-10 py-8 max-w-lg mx-4 text-left shadow-2xl">
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-3 leading-tight">
                 Post to all social media<br />in one click
               </h2>
