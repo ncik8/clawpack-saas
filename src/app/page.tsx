@@ -63,11 +63,11 @@ export default function Home() {
             
             {/* Social icons scattered vertically */}
             <div className="relative w-80 h-24">
-              <img src="/tiktok.svg" alt="TikTok" className="absolute" style="top: 8px; left: 20px;" />
-              <img src="/instagram.svg" alt="Instagram" className="absolute" style="top: 28px; left: 75px;" />
-              <img src="/x.svg" alt="X" className="absolute" style="top: 0px; left: 130px;" />
-              <img src="/linkedin.svg" alt="LinkedIn" className="absolute" style="top: 20px; left: 185px;" />
-              <img src="/facebook.svg" alt="Facebook" className="absolute" style="top: 10px; left: 245px;" />
+              <img src="/tiktok.svg" alt="TikTok" className="absolute" style={{ top: '8px', left: '20px' }} />
+              <img src="/instagram.svg" alt="Instagram" className="absolute" style={{ top: '28px', left: '75px' }} />
+              <img src="/x.svg" alt="X" className="absolute" style={{ top: '0px', left: '130px' }} />
+              <img src="/linkedin.svg" alt="LinkedIn" className="absolute" style={{ top: '20px', left: '185px' }} />
+              <img src="/facebook.svg" alt="Facebook" className="absolute" style={{ top: '10px', left: '245px' }} />
             </div>
             
             {/* Right text */}
