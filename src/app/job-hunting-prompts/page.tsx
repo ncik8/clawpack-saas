@@ -1,4 +1,4 @@
-import PromptsContent from './PromptsContent'
+import Link from 'next/link'
 
 export const metadata = {
   title: 'Job Hunting Prompts - ClawPack',
@@ -20,17 +20,17 @@ export default async function JobHuntingPrompts() {
       {/* Header - Fixed */}
       <header className="fixed top-0 left-0 right-0 z-50 p-6 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <img src="/logo.jpg" alt="ClawPack" className="h-10 w-10 object-contain" />
             <span className="text-2xl font-bold text-slate-900">ClawPack</span>
-          </h1>
+          </Link>
           <div className="flex gap-6">
-            <a href="/#prompts" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">
+            <Link href="/#prompts" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">
               Prompts
-            </a>
-            <a href="/" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">
+            </Link>
+            <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">
               Back
-            </a>
+            </Link>
           </div>
         </div>
       </header>
@@ -49,7 +49,9 @@ export default async function JobHuntingPrompts() {
 
       {/* Prompts */}
       <section className="py-16 px-6 bg-slate-50">
-        <PromptsContent html={content} />
+        <div className="max-w-4xl mx-auto">
+          <div id="prompts-content" dangerouslySetInnerHTML={{ __html: content }} />
+        </div>
       </section>
 
       {/* Footer */}
@@ -59,11 +61,35 @@ export default async function JobHuntingPrompts() {
             © 2026 ClawPack. All rights reserved.
           </p>
           <div className="flex gap-6 text-slate-400 text-sm">
-            <a href="/privacy-page" className="hover:text-white transition">Privacy</a>
-            <a href="/terms-of-service" className="hover:text-white transition">Terms</a>
+            <Link href="/privacy-page" className="hover:text-white transition">Privacy</Link>
+            <Link href="/terms-of-service" className="hover:text-white transition">Terms</Link>
           </div>
         </div>
       </footer>
+
+      <script dangerouslySetInnerHTML={{ __html: `
+        document.addEventListener('DOMContentLoaded', function() {
+          document.querySelectorAll('.copy-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+              var sibling = btn.nextElementSibling;
+              while (sibling) {
+                if (sibling.innerText && sibling.innerText.trim()) {
+                  navigator.clipboard.writeText(sibling.innerText).catch(function(){});
+                  var original = btn.innerText;
+                  btn.innerText = '✅ Copied!';
+                  btn.style.background = '#16a34a';
+                  setTimeout(function() {
+                    btn.innerText = original;
+                    btn.style.background = '#28a745';
+                  }, 2000);
+                  break;
+                }
+                sibling = sibling.nextElementSibling;
+              }
+            });
+          });
+        });
+      ` }} />
 
       <style>{`
         #prompts-content h3 {
@@ -89,7 +115,7 @@ export default async function JobHuntingPrompts() {
           border-radius: 12px 12px 0 0;
         }
         #prompts-content summary:hover {
-          background: #083056;
+          filter: brightness(1.1);
         }
         #prompts-content .prompt-inner {
           background: #1e293b;

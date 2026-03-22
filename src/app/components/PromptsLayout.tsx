@@ -1,9 +1,12 @@
 import Link from 'next/link'
+import { ReactNode } from 'react'
+
 interface Props {
   heading: string
   description: string
-  children: React.ReactNode
+  children?: ReactNode
 }
+
 export default function PromptsLayout({ heading, description, children }: Props) {
   return (
     <main className="font-sans bg-white min-h-screen">
@@ -38,11 +41,34 @@ export default function PromptsLayout({ heading, description, children }: Props)
           </div>
         </div>
       </footer>
+      <script dangerouslySetInnerHTML={{ __html: `
+        document.addEventListener('DOMContentLoaded', function() {
+          document.querySelectorAll('.copy-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+              var sibling = btn.nextElementSibling;
+              while (sibling) {
+                if (sibling.innerText && sibling.innerText.trim()) {
+                  navigator.clipboard.writeText(sibling.innerText).catch(function(){});
+                  var original = btn.innerText;
+                  btn.innerText = '✅ Copied!';
+                  btn.style.background = '#16a34a';
+                  setTimeout(function() {
+                    btn.innerText = original;
+                    btn.style.background = '#28a745';
+                  }, 2000);
+                  break;
+                }
+                sibling = sibling.nextElementSibling;
+              }
+            });
+          });
+        });
+      ` }} />
       <style>{`
         #prompts-content h3 { font-size: 1.5rem; font-weight: bold; color: #1e293b; margin: 2rem 0 1rem 0; }
         #prompts-content details { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin: 15px 0; overflow: hidden; }
         #prompts-content summary { background: linear-gradient(to right, #6344ec, #9a3dda); color: white; padding: 15px; cursor: pointer; font-weight: bold; font-size: 16px; border-radius: 12px 12px 0 0; }
-        #prompts-content summary:hover { background: #083056; }
+        #prompts-content summary:hover { filter: brightness(1.1); }
         #prompts-content .prompt-inner { background: #1e293b; color: #fff; padding: 20px; border-radius: 0 0 12px 12px; font-size: 13px; white-space: pre-wrap; line-height: 1.6; max-height: 500px; overflow-y: auto; font-family: Arial, sans-serif; }
         #prompts-content .copy-btn { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
         #prompts-content .copy-btn:hover { background: #218838; }
