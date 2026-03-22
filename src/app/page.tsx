@@ -28,8 +28,11 @@ export default function Home() {
       </header>
 
       {/* Hero */}
-      <section className="text-center py-20 px-6">
-        <div className="max-w-3xl mx-auto">
+      <section className="text-center py-12 px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8 rounded-2xl overflow-hidden border border-slate-700">
+            <img src="/hero.jpg" alt="ClawPack - Social Media Automation" className="w-full" />
+          </div>
           <h2 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
             Post to all social media
             <br />
