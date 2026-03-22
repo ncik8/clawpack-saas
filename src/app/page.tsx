@@ -3,209 +3,274 @@
 import { useState } from 'react'
 
 export default function Home() {
-  const [step, setStep] = useState(1)
-  const [businessType, setBusinessType] = useState('')
-  const [businessName, setBusinessName] = useState('')
+  const [email, setEmail] = useState('')
+  const [submitted, setSubmitted] = useState(false)
 
-  const businessTypes = [
-    { id: 'plumber', name: 'Plumber', emoji: '🔧' },
-    { id: 'salon', name: 'Beauty Salon', emoji: '💅' },
-    { id: 'gym', name: 'Gym / Trainer', emoji: '💪' },
-    { id: 'dentist', name: 'Dentist', emoji: '🦷' },
-    { id: 'restaurant', name: 'Restaurant', emoji: '🍽️' },
-    { id: 'limo', name: 'Limo / Transport', emoji: '🚗' },
-    { id: 'realtor', name: 'Real Estate', emoji: '🏠' },
-    { id: 'other', name: 'Other', emoji: '✨' },
-  ]
-
-  const handleSubmit = () => {
-    if (!businessType || !businessName) return
-    // TODO: Connect to backend
-    alert(`Setting up ${businessName} as a ${businessType} business!`)
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (email) {
+      setSubmitted(true)
+    }
   }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
-      <header className="p-6 border-b border-slate-700">
+      <header className="p-6 border-b border-slate-700/50">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-blue-400">🤖 ClawPack AI</h1>
-          <button className="px-4 py-2 text-sm text-slate-300 hover:text-white">
-            Login
-          </button>
+          <h1 className="text-2xl font-bold text-white">
+            <span className="text-blue-400">🤖</span> ClawPack
+          </h1>
+          <a href="#pricing" className="px-4 py-2 text-sm text-slate-300 hover:text-white transition">
+            Pricing
+          </a>
         </div>
       </header>
 
       {/* Hero */}
       <section className="text-center py-20 px-6">
-        <h2 className="text-5xl font-bold text-white mb-6">
-          Your AI Business Assistant
-        </h2>
-        <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-          One platform that builds your website, books appointments, 
-          posts to social media, and talks to your customers.
-        </p>
-        <div className="flex gap-4 justify-center">
-          <button className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-lg">
-            Start Free Trial
-          </button>
-          <button className="px-8 py-4 border border-slate-600 hover:border-slate-500 text-white rounded-xl font-semibold text-lg">
-            Watch Demo
-          </button>
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
+            Post to all social media
+            <br />
+            <span className="text-blue-400">in one click</span>
+          </h2>
+          <p className="text-xl text-slate-400 mb-10 max-w-xl mx-auto">
+            Connect your accounts. Create once. We post everywhere.
+            <br />
+            TikTok, Instagram, X, LinkedIn, Facebook - done.
+          </p>
+          
+          {!submitted ? (
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="flex-1 px-6 py-4 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                required
+              />
+              <button
+                type="submit"
+                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition whitespace-nowrap"
+              >
+                Get Early Access
+              </button>
+            </form>
+          ) : (
+            <div className="bg-green-500/20 border border-green-500/50 rounded-xl px-6 py-4 max-w-md mx-auto">
+              <p className="text-green-400 font-semibold">✓ You're on the list!</p>
+              <p className="text-slate-400 text-sm mt-1">We'll notify you when we launch.</p>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Setup Wizard */}
-      <section className="max-w-xl mx-auto px-6 pb-20">
-        <div className="bg-slate-800 rounded-2xl p-8 border border-slate-700">
-          <div className="flex gap-2 mb-8">
-            {[1, 2, 3].map((s) => (
-              <div
-                key={s}
-                className={`h-2 flex-1 rounded-full ${
-                  s <= step ? 'bg-blue-500' : 'bg-slate-700'
-                }`}
-              />
-            ))}
+      {/* Platforms */}
+      <section className="py-16 px-6 border-y border-slate-800">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-slate-500 text-sm uppercase tracking-wider mb-8">Supported Platforms</p>
+          <div className="flex flex-wrap justify-center gap-8 text-4xl">
+            <span title="TikTok">📱</span>
+            <span title="Instagram">📸</span>
+            <span title="X (Twitter)">𝕏</span>
+            <span title="LinkedIn">💼</span>
+            <span title="Facebook">📘</span>
           </div>
-
-          {step === 1 && (
-            <div>
-              <h3 className="text-2xl font-bold text-white mb-6">
-                What type of business do you have?
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                {businessTypes.map((type) => (
-                  <button
-                    key={type.id}
-                    onClick={() => setBusinessType(type.id)}
-                    className={`p-4 rounded-xl border text-left transition-all ${
-                      businessType === type.id
-                        ? 'border-blue-500 bg-blue-500/20 text-white'
-                        : 'border-slate-600 text-slate-300 hover:border-slate-500'
-                    }`}
-                  >
-                    <span className="text-2xl mr-3">{type.emoji}</span>
-                    {type.name}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => setStep(2)}
-                disabled={!businessType}
-                className="mt-8 w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl font-semibold"
-              >
-                Continue
-              </button>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div>
-              <h3 className="text-2xl font-bold text-white mb-6">
-                What's your business name?
-              </h3>
-              <input
-                type="text"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                placeholder="e.g., Austin Plumbing Co."
-                className="w-full px-4 py-4 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-              />
-              <div className="flex gap-4 mt-6">
-                <button
-                  onClick={() => setStep(1)}
-                  className="flex-1 py-4 border border-slate-600 text-slate-300 rounded-xl font-semibold"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={() => setStep(3)}
-                  disabled={!businessName}
-                  className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl font-semibold"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div>
-              <h3 className="text-2xl font-bold text-white mb-6">
-                Your AI assistant is ready! 🚀
-              </h3>
-              <div className="space-y-4 text-slate-300">
-                <p>For <span className="text-white font-semibold">{businessName}</span>, I'll set up:</p>
-                <ul className="space-y-3">
-                  <li className="flex items-center gap-3">
-                    <span className="text-green-400">✓</span>
-                    Professional website
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <span className="text-green-400">✓</span>
-                    Booking system
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <span className="text-green-400">✓</span>
-                    Social media auto-posting
-                  </li>
-                  <li className="flex items-center gap-3">
-                    <span className="text-green-400">✓</span>
-                    AI chatbot for customers
-                  </li>
-                </ul>
-              </div>
-              <button
-                onClick={handleSubmit}
-                className="mt-8 w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-lg"
-              >
-                Create My Business →
-              </button>
-            </div>
-          )}
         </div>
       </section>
 
       {/* Features */}
-      <section className="max-w-6xl mx-auto px-6 pb-20">
-        <h3 className="text-3xl font-bold text-white text-center mb-12">
-          Everything your business needs
-        </h3>
-        <div className="grid md:grid-cols-3 gap-6">
-          {[
-            { 
-              title: '🌐 AI Website Builder', 
-              desc: 'Describe your business and AI builds a professional website in minutes'
-            },
-            { 
-              title: '📅 Smart Booking', 
-              desc: 'Customers book appointments online, AI manages your calendar'
-            },
-            { 
-              title: '📱 Social Auto-Post', 
-              desc: 'AI posts to TikTok, Instagram, Facebook, LinkedIn automatically'
-            },
-            { 
-              title: '💬 AI Chatbot', 
-              desc: 'AI talks to customers 24/7 on WhatsApp, WeChat, or your website'
-            },
-            { 
-              title: '💳 Easy Payments', 
-              desc: 'Accept payments online, no complicated setup'
-            },
-            { 
-              title: '📊 Learn & Improve', 
-              desc: 'AI learns from every customer interaction and gets smarter'
-            },
-          ].map((feature, i) => (
-            <div key={i} className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-              <h4 className="text-xl font-semibold text-white mb-2">{feature.title}</h4>
-              <p className="text-slate-400">{feature.desc}</p>
-            </div>
-          ))}
+      <section className="py-20 px-6">
+        <div className="max-w-6xl mx-auto">
+          <h3 className="text-3xl font-bold text-white text-center mb-4">
+            Everything you need
+          </h3>
+          <p className="text-slate-400 text-center mb-12 max-w-xl mx-auto">
+            Simple, powerful social media management. No complicated setup.
+          </p>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                emoji: '🚀',
+                title: 'One Post, Everywhere',
+                desc: 'Write once. We post to all your connected accounts automatically.'
+              },
+              {
+                emoji: '🤖',
+                title: 'AI Content Generator',
+                desc: 'Tell us your business. We generate engaging posts for you.'
+              },
+              {
+                emoji: '📊',
+                title: 'Analytics Dashboard',
+                desc: 'See what works. Track likes, shares, and engagement.'
+              },
+              {
+                emoji: '📅',
+                title: 'Smart Scheduling',
+                desc: 'Post at the best times for your audience.'
+              },
+              {
+                emoji: '🔄',
+                title: 'Auto-Post Forever',
+                desc: 'Set it once. We post every day, week, or month.'
+              },
+              {
+                emoji: '💰',
+                title: 'Affordable Pricing',
+                desc: 'A fraction of what agencies charge. Free to start.'
+              },
+            ].map((feature, i) => (
+              <div key={i} className="bg-slate-800/50 border border-slate-700/50 p-6 rounded-2xl hover:border-slate-600 transition">
+                <span className="text-4xl mb-4 block">{feature.emoji}</span>
+                <h4 className="text-xl font-semibold text-white mb-2">{feature.title}</h4>
+                <p className="text-slate-400">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
+
+      {/* How it works */}
+      <section className="py-20 px-6 bg-slate-800/30">
+        <div className="max-w-4xl mx-auto">
+          <h3 className="text-3xl font-bold text-white text-center mb-12">
+            How it works
+          </h3>
+          
+          <div className="space-y-8">
+            {[
+              { step: '1', title: 'Connect your accounts', desc: 'Link TikTok, Instagram, X, LinkedIn, Facebook with one click.' },
+              { step: '2', title: 'Create or generate', desc: 'Write your post or let AI generate one for you.' },
+              { step: '3', title: 'Post everywhere', desc: 'Click once. We post to all platforms instantly.' },
+            ].map((item, i) => (
+              <div key={i} className="flex gap-6 items-start">
+                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
+                  {item.step}
+                </div>
+                <div>
+                  <h4 className="text-xl font-semibold text-white mb-1">{item.title}</h4>
+                  <p className="text-slate-400">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="py-20 px-6">
+        <div className="max-w-6xl mx-auto">
+          <h3 className="text-3xl font-bold text-white text-center mb-4">
+            Simple Pricing
+          </h3>
+          <p className="text-slate-400 text-center mb-12">
+            Start free. Upgrade when you need more.
+          </p>
+          
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {/* Free */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8">
+              <h4 className="text-xl font-semibold text-white mb-2">Free</h4>
+              <p className="text-4xl font-bold text-white mb-6">$0<span className="text-lg text-slate-400 font-normal">/mo</span></p>
+              <ul className="space-y-3 text-slate-400 mb-8">
+                <li>✓ 3 social accounts</li>
+                <li>✓ 10 posts per month</li>
+                <li>✓ Basic scheduling</li>
+                <li>✓ Manual posting</li>
+              </ul>
+              <button className="w-full py-3 border border-slate-600 text-slate-300 rounded-xl hover:border-slate-500 transition">
+                Get Started
+              </button>
+            </div>
+            
+            {/* Pro */}
+            <div className="bg-blue-600/10 border-2 border-blue-500 rounded-2xl p-8 relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-sm px-3 py-1 rounded-full">
+                Popular
+              </div>
+              <h4 className="text-xl font-semibold text-white mb-2">Pro</h4>
+              <p className="text-4xl font-bold text-white mb-6">$19<span className="text-lg text-slate-400 font-normal">/mo</span></p>
+              <ul className="space-y-3 text-slate-400 mb-8">
+                <li>✓ 10 social accounts</li>
+                <li>✓ Unlimited posts</li>
+                <li>✓ AI content generation</li>
+                <li>✓ Smart scheduling</li>
+                <li>✓ Analytics</li>
+                <li>✓ Priority support</li>
+              </ul>
+              <button className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition">
+                Start Free Trial
+              </button>
+            </div>
+            
+            {/* Agency */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8">
+              <h4 className="text-xl font-semibold text-white mb-2">Agency</h4>
+              <p className="text-4xl font-bold text-white mb-6">$49<span className="text-lg text-slate-400 font-normal">/mo</span></p>
+              <ul className="space-y-3 text-slate-400 mb-8">
+                <li>✓ Unlimited accounts</li>
+                <li>✓ Unlimited posts</li>
+                <li>✓ White-label</li>
+                <li>✓ Client management</li>
+                <li>✓ API access</li>
+                <li>✓ Dedicated support</li>
+              </ul>
+              <button className="w-full py-3 border border-slate-600 text-slate-300 rounded-xl hover:border-slate-500 transition">
+                Contact Sales
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-20 px-6 border-t border-slate-800">
+        <div className="max-w-2xl mx-auto text-center">
+          <h3 className="text-3xl font-bold text-white mb-4">
+            Ready to simplify your social media?
+          </h3>
+          <p className="text-slate-400 mb-8">
+            Join the waitlist and get early access.
+          </p>
+          {!submitted ? (
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 justify-center">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="flex-1 px-6 py-4 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 max-w-sm"
+                required
+              />
+              <button
+                type="submit"
+                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition"
+              >
+                Join Waitlist
+              </button>
+            </form>
+          ) : (
+            <p className="text-green-400 font-semibold">✓ You're on the list!</p>
+          )}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 px-6 border-t border-slate-800">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-slate-500 text-sm">
+            © 2026 ClawPack. All rights reserved.
+          </p>
+          <div className="flex gap-6 text-slate-400 text-sm">
+            <a href="#" className="hover:text-white transition">Privacy</a>
+            <a href="#" className="hover:text-white transition">Terms</a>
+          </div>
+        </div>
+      </footer>
     </main>
   )
 }
