@@ -56,12 +56,12 @@ export default function Home() {
       <section className="py-16 px-6 border-b border-slate-200">
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-slate-500 text-sm uppercase tracking-wider mb-8">Supported Platforms</p>
-          <div className="flex flex-wrap justify-center gap-8 text-4xl">
-            <span title="TikTok">📱</span>
-            <span title="Instagram">📸</span>
-            <span title="X (Twitter)">𝕏</span>
-            <span title="LinkedIn">💼</span>
-            <span title="Facebook">📘</span>
+          <div className="flex flex-wrap justify-center gap-10 items-center">
+            <img src="/tiktok.svg" alt="TikTok" className="h-10 w-10" title="TikTok" />
+            <img src="/instagram.svg" alt="Instagram" className="h-10 w-10" title="Instagram" />
+            <img src="/x.svg" alt="X" className="h-10 w-10" title="X (Twitter)" />
+            <img src="/linkedin.svg" alt="LinkedIn" className="h-10 w-10" title="LinkedIn" />
+            <img src="/facebook.svg" alt="Facebook" className="h-10 w-10" title="Facebook" />
           </div>
         </div>
       </section>
