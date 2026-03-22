@@ -11,8 +11,9 @@ export default function Home() {
       {/* Header - Fixed */}
       <header className="fixed top-0 left-0 right-0 z-50 p-6 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-slate-900">
-            <span className="text-blue-600">🤖</span> ClawPack
+          <h1 className="flex items-center gap-3">
+            <img src="/logo.jpg" alt="ClawPack" className="h-10 w-10 object-contain" />
+            <span className="text-2xl font-bold text-slate-900">ClawPack</span>
           </h1>
           <div className="flex gap-6">
             <a href="#features" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">
