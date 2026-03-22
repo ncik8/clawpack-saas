@@ -57,21 +57,16 @@ export default function Home() {
       <section className="py-20 px-6 border-b border-slate-200">
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-slate-500 text-sm uppercase tracking-wider mb-12">Supported Platforms</p>
-          <div className="flex items-center justify-center gap-0">
-            {/* Left text */}
-            <p className="text-slate-400 text-sm mr-12 whitespace-nowrap">Post to all</p>
-            
-            {/* Social icons scattered vertically */}
-            <div className="relative w-80 h-24">
-              <img src="/tiktok.svg" alt="TikTok" className="absolute" style={{ top: '8px', left: '20px' }} />
-              <img src="/instagram.svg" alt="Instagram" className="absolute" style={{ top: '28px', left: '75px' }} />
-              <img src="/x.svg" alt="X" className="absolute" style={{ top: '0px', left: '130px' }} />
-              <img src="/linkedin.svg" alt="LinkedIn" className="absolute" style={{ top: '20px', left: '185px' }} />
-              <img src="/facebook.svg" alt="Facebook" className="absolute" style={{ top: '10px', left: '245px' }} />
+          <div className="flex items-center justify-center gap-8">
+            <span className="text-slate-500 text-sm whitespace-nowrap">Post to all</span>
+            <div className="flex items-center gap-6">
+              <img src="/tiktok.svg" alt="TikTok" className="h-12 w-12" />
+              <img src="/instagram.svg" alt="Instagram" className="h-12 w-12" />
+              <img src="/x.svg" alt="X" className="h-12 w-12" />
+              <img src="/linkedin.svg" alt="LinkedIn" className="h-12 w-12" />
+              <img src="/facebook.svg" alt="Facebook" className="h-12 w-12" />
             </div>
-            
-            {/* Right text */}
-            <p className="text-slate-400 text-sm ml-12 whitespace-nowrap">in one click</p>
+            <span className="text-slate-500 text-sm whitespace-nowrap">in one click</span>
           </div>
         </div>
       </section>
