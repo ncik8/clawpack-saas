@@ -17,20 +17,8 @@ export default function PromptsLayout({ heading, description, children }: Props)
             <span className="text-2xl font-bold text-slate-900">ClawPack</span>
           </Link>
           <div className="flex items-center gap-4">
-            {/* Language Dropdown */}
-            <div className="relative">
-              <select id="lang-select" className="appearance-none bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold pl-3 pr-8 py-2 rounded-lg cursor-pointer hover:bg-slate-200 transition">
-                <option value="en">EN</option>
-                <option value="yue">ZH (Cantonese)</option>
-                <option value="zh-CN">ZH (Simplified)</option>
-                <option value="zh-TW">ZH (Traditional)</option>
-              </select>
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
+            {/* Google Translate - compact dropdown */}
+            <div id="google_translate_element" className="inline-block" />
             <a href="/#prompts" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Prompts</a>
             <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Back</Link>
           </div>
@@ -56,22 +44,20 @@ export default function PromptsLayout({ heading, description, children }: Props)
         </div>
       </footer>
 
-      {/* Google Translate - hidden, triggered by dropdown */}
-      <div id="google_translate_element" style={{ display: 'none' }} />
       <script dangerouslySetInnerHTML={{ __html: `
         function googleTranslateElementInit() {
           new google.translate.TranslateElement({
             pageLanguage: 'en',
             includedLanguages: 'en,yue,zh-CN,zh-TW',
-            layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+            layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+            autoDisplay: false
           }, 'google_translate_element');
         }
       ` }} />
-      <script id="google-translate-script" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer />
+      <script id="google-translate-script" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" defer />
 
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('DOMContentLoaded', function() {
-          // Copy buttons
           document.querySelectorAll('.copy-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
               var sibling = btn.nextElementSibling;
@@ -91,44 +77,6 @@ export default function PromptsLayout({ heading, description, children }: Props)
               }
             });
           });
-
-          // Language dropdown - reload with lang param
-          var langSelect = document.getElementById('lang-select');
-          if (langSelect) {
-            langSelect.addEventListener('change', function() {
-              var lang = this.value;
-              if (lang === 'en') {
-                // Reload original page (translation cookie will clear)
-                var url = new URL(window.location.href);
-                url.searchParams.delete('lang');
-                window.location.href = url.toString();
-              } else {
-                // Set Google Translate cookie and reload
-                var url = new URL(window.location.href);
-                url.searchParams.set('lang', lang);
-                window.location.href = url.toString();
-              }
-            });
-          }
-
-          // On page load with ?lang= param, apply translation
-          (function() {
-            var params = new URLSearchParams(window.location.search);
-            var lang = params.get('lang');
-            if (lang && lang !== 'en') {
-              var checkCount = 0;
-              var checkInterval = setInterval(function() {
-                var sel = document.querySelector('.goog-te-combo');
-                if (sel) {
-                  clearInterval(checkInterval);
-                  sel.value = lang;
-                  sel.dispatchEvent(new Event('change'));
-                }
-                checkCount++;
-                if (checkCount > 100) clearInterval(checkInterval);
-              }, 100);
-            }
-          })();
         });
       ` }} />
 
@@ -141,9 +89,18 @@ export default function PromptsLayout({ heading, description, children }: Props)
         #prompts-content .copy-btn { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
         #prompts-content .copy-btn:hover { background: #218838; }
         #prompts-content .prompt-inner p { margin: 0 0 1rem 0; }
-        .goog-te-gadget { display: none !important; }
+        #google_translate_element { vertical-align: middle; }
+        #google_translate_element .goog-te-gadget { font-family: Arial, sans-serif !important; font-size: 12px !important; color: #334155 !important; }
+        #google_translate_element .goog-te-gadget-simple { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; padding: 5px 8px !important; display: inline-block !important; }
+        #google_translate_element .goog-te-gadget-simple span { color: #334155 !important; font-size: 12px !important; vertical-align: middle; }
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value { color: #334155 !important; font-size: 12px !important; }
+        #google_translate_element .goog-te-gadget-simple .goog-te-menu-value span { border-left-color: #ccc !important; }
+        #google_translate_element select { padding: 3px 6px !important; border: 1px solid #e2e8f0 !important; border-radius: 4px !important; background: white !important; font-size: 12px !important; color: #334155 !important; cursor: pointer; }
         .goog-te-banner-frame { display: none !important; }
+        .goog-te-flash { display: none !important; }
         body { top: 0 !important; }
+        .skiptranslate { display: none !important; }
+        .goog-te-spinner { display: none !important; }
       `}</style>
     </main>
   )
