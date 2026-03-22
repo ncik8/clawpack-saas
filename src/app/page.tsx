@@ -124,9 +124,12 @@ export default function Home() {
       {/* How it works */}
       <section id="how-it-works" className="py-20 px-6 bg-slate-50">
         <div className="max-w-4xl mx-auto">
-          <h3 className="text-3xl font-bold text-slate-900 text-center mb-12">
-            How it works
-          </h3>
+          <div className="flex items-center justify-center gap-4 mb-12">
+            <img src="/how-it-works-icon.jpg" alt="" className="w-10 h-10 object-contain" />
+            <h3 className="text-3xl font-bold text-slate-900">
+              How it works
+            </h3>
+          </div>
           
           <div className="space-y-8">
             {[
