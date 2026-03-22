@@ -17,8 +17,11 @@ export default function PromptsLayout({ heading, description, children }: Props)
             <span className="text-2xl font-bold text-slate-900">ClawPack</span>
           </Link>
           <div className="flex items-center gap-4">
-            {/* Google Translate */}
-            <div id="google_translate_element" />
+            {/* Language Toggle */}
+            <div className="flex items-center gap-1 bg-slate-100 rounded-full p-1">
+              <a href="#" className="lang-en px-3 py-1.5 rounded-full text-xs font-bold text-slate-500 hover:text-slate-700 transition">EN</a>
+              <a href="#" className="lang-zh px-3 py-1.5 rounded-full text-xs font-bold text-slate-500 hover:text-slate-700 transition">中文</a>
+            </div>
             <a href="/#prompts" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Prompts</a>
             <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Back</Link>
           </div>
@@ -44,15 +47,20 @@ export default function PromptsLayout({ heading, description, children }: Props)
         </div>
       </footer>
 
-      {/* Google Translate */}
       <script dangerouslySetInnerHTML={{ __html: `
+        // Active language styling
+        var langEn = document.querySelector('.lang-en');
+        var langZh = document.querySelector('.lang-zh');
+        langEn.style.background = '#1780e3';
+        langEn.style.color = 'white';
+
+        // Google Translate
         function googleTranslateElementInit() {
           new google.translate.TranslateElement({
             pageLanguage: 'en',
             includedLanguages: 'zh-CN,zh-TW,yue',
             layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-            gaTrack: false,
-            gaId: 'UA'
+            gaTrack: false
           }, 'google_translate_element');
         }
       ` }} />
@@ -79,6 +87,33 @@ export default function PromptsLayout({ heading, description, children }: Props)
               }
             });
           });
+
+          // Language toggle buttons
+          document.querySelector('.lang-en').addEventListener('click', function(e) {
+            e.preventDefault();
+            var sel = document.querySelector('.goog-te-combo');
+            if (sel) {
+              sel.value = 'en';
+              sel.dispatchEvent(new Event('change'));
+            }
+            document.querySelector('.lang-en').style.background = '#1780e3';
+            document.querySelector('.lang-en').style.color = 'white';
+            document.querySelector('.lang-zh').style.background = 'transparent';
+            document.querySelector('.lang-zh').style.color = '#6b7280';
+          });
+
+          document.querySelector('.lang-zh').addEventListener('click', function(e) {
+            e.preventDefault();
+            var sel = document.querySelector('.goog-te-combo');
+            if (sel) {
+              sel.value = 'zh-CN';
+              sel.dispatchEvent(new Event('change'));
+            }
+            document.querySelector('.lang-zh').style.background = '#1780e3';
+            document.querySelector('.lang-zh').style.color = 'white';
+            document.querySelector('.lang-en').style.background = 'transparent';
+            document.querySelector('.lang-en').style.color = '#6b7280';
+          });
         });
       ` }} />
 
@@ -91,12 +126,8 @@ export default function PromptsLayout({ heading, description, children }: Props)
         #prompts-content .copy-btn { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
         #prompts-content .copy-btn:hover { background: #218838; }
         #prompts-content .prompt-inner p { margin: 0 0 1rem 0; }
-        #google_translate_element { display: inline-block; vertical-align: middle; }
-        #google_translate_element select { padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 6px; background: white; font-size: 13px; }
-        .goog-te-gadget { font-family: Arial, sans-serif !important; font-size: 13px !important; color: #334155 !important; }
-        .goog-te-gadget-simple { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; padding: 6px 10px !important; }
-        .goog-te-gadget-simple span { color: #334155 !important; }
-        .goog-te-menu-value span { color: #334155 !important; }
+        #google_translate_element { display: none !important; }
+        .goog-te-gadget { display: none !important; }
         .goog-te-banner-frame { display: none !important; }
         body { top: 0 !important; }
       `}</style>
