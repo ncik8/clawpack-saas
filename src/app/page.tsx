@@ -67,7 +67,7 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section id="features" className="py-20 px-6 bg-slate-50">
+      <section id="features" className="py-20 px-6 bg-white">
         <div className="max-w-6xl mx-auto">
           <h3 className="text-3xl font-bold text-slate-900 text-center mb-4">
             All the tools you need in one place
@@ -122,7 +122,7 @@ export default function Home() {
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="py-20 px-6 bg-slate-50">
+      <section id="how-it-works" className="py-20 px-6 bg-white">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-center gap-4 mb-12">
             <img src="/how-it-works-icon.jpg" alt="" className="w-10 h-10 object-contain" />
