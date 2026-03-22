@@ -37,16 +37,15 @@ export default function Home() {
             alt="ClawPack - Social Media Automation" 
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end">
-            <div className="max-w-6xl mx-auto w-full px-6 pb-16">
-              <h2 className="text-5xl md:text-6xl font-bold text-white mb-4 leading-tight">
-                Post to all social media
-                <br />
-                <span className="text-blue-400">in one click</span>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="bg-gradient-to-r from-[#6344ec] to-[#9a3dda] rounded-3xl px-10 py-8 max-w-2xl mx-4 text-center shadow-2xl">
+              <h2 className="text-4xl md:text-5xl font-bold text-white mb-3 leading-tight">
+                Post to all social media<br />in one click
               </h2>
-              <p className="text-xl text-slate-200 max-w-xl">
+              <p className="text-lg text-white/90 mb-2">
                 Connect your accounts. Create once. We post everywhere.
-                <br />
+              </p>
+              <p className="text-base text-white/70">
                 TikTok, Instagram, X, LinkedIn, Facebook - done.
               </p>
             </div>
