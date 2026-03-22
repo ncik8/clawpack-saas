@@ -17,10 +17,19 @@ export default function PromptsLayout({ heading, description, children }: Props)
             <span className="text-2xl font-bold text-slate-900">ClawPack</span>
           </Link>
           <div className="flex items-center gap-4">
-            {/* Language Toggle */}
-            <div className="flex items-center gap-1 bg-slate-100 rounded-full p-1">
-              <a href="#" className="lang-en px-3 py-1.5 rounded-full text-xs font-bold text-slate-500 hover:text-slate-700 transition">EN</a>
-              <a href="#" className="lang-zh px-3 py-1.5 rounded-full text-xs font-bold text-slate-500 hover:text-slate-700 transition">中文</a>
+            {/* Language Dropdown */}
+            <div className="relative">
+              <select id="lang-select" className="appearance-none bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold pl-3 pr-8 py-2 rounded-lg cursor-pointer hover:bg-slate-200 transition">
+                <option value="en">EN</option>
+                <option value="yue">ZH (Cantonese)</option>
+                <option value="zh-CN">ZH (Simplified)</option>
+                <option value="zh-TW">ZH (Traditional)</option>
+              </select>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
             <a href="/#prompts" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Prompts</a>
             <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Back</Link>
@@ -47,27 +56,22 @@ export default function PromptsLayout({ heading, description, children }: Props)
         </div>
       </footer>
 
+      {/* Google Translate - hidden, triggered by dropdown */}
+      <div id="google_translate_element" style={{ display: 'none' }} />
       <script dangerouslySetInnerHTML={{ __html: `
-        // Active language styling
-        var langEn = document.querySelector('.lang-en');
-        var langZh = document.querySelector('.lang-zh');
-        langEn.style.background = '#1780e3';
-        langEn.style.color = 'white';
-
-        // Google Translate
         function googleTranslateElementInit() {
           new google.translate.TranslateElement({
             pageLanguage: 'en',
-            includedLanguages: 'zh-CN,zh-TW,yue',
-            layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-            gaTrack: false
+            includedLanguages: 'en,yue,zh-CN,zh-TW',
+            layout: google.translate.TranslateElement.InlineLayout.SIMPLE
           }, 'google_translate_element');
         }
       ` }} />
-      <script id="google-translate" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer />
+      <script id="google-translate-script" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer />
 
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('DOMContentLoaded', function() {
+          // Copy buttons
           document.querySelectorAll('.copy-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
               var sibling = btn.nextElementSibling;
@@ -88,32 +92,30 @@ export default function PromptsLayout({ heading, description, children }: Props)
             });
           });
 
-          // Language toggle buttons
-          document.querySelector('.lang-en').addEventListener('click', function(e) {
-            e.preventDefault();
-            var sel = document.querySelector('.goog-te-combo');
-            if (sel) {
-              sel.value = 'en';
-              sel.dispatchEvent(new Event('change'));
-            }
-            document.querySelector('.lang-en').style.background = '#1780e3';
-            document.querySelector('.lang-en').style.color = 'white';
-            document.querySelector('.lang-zh').style.background = 'transparent';
-            document.querySelector('.lang-zh').style.color = '#6b7280';
-          });
-
-          document.querySelector('.lang-zh').addEventListener('click', function(e) {
-            e.preventDefault();
-            var sel = document.querySelector('.goog-te-combo');
-            if (sel) {
-              sel.value = 'zh-CN';
-              sel.dispatchEvent(new Event('change'));
-            }
-            document.querySelector('.lang-zh').style.background = '#1780e3';
-            document.querySelector('.lang-zh').style.color = 'white';
-            document.querySelector('.lang-en').style.background = 'transparent';
-            document.querySelector('.lang-en').style.color = '#6b7280';
-          });
+          // Language dropdown
+          var langSelect = document.getElementById('lang-select');
+          if (langSelect) {
+            langSelect.addEventListener('change', function() {
+              var lang = this.value;
+              if (lang === 'en') {
+                // Reload to remove translation
+                window.location.reload();
+              } else {
+                // Find Google Translate combobox and set value
+                var checkCount = 0;
+                var checkInterval = setInterval(function() {
+                  var sel = document.querySelector('.goog-te-combo');
+                  if (sel) {
+                    clearInterval(checkInterval);
+                    sel.value = lang;
+                    sel.dispatchEvent(new Event('change'));
+                  }
+                  checkCount++;
+                  if (checkCount > 50) clearInterval(checkInterval);
+                }, 100);
+              }
+            });
+          }
         });
       ` }} />
 
@@ -126,7 +128,6 @@ export default function PromptsLayout({ heading, description, children }: Props)
         #prompts-content .copy-btn { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
         #prompts-content .copy-btn:hover { background: #218838; }
         #prompts-content .prompt-inner p { margin: 0 0 1rem 0; }
-        #google_translate_element { display: none !important; }
         .goog-te-gadget { display: none !important; }
         .goog-te-banner-frame { display: none !important; }
         body { top: 0 !important; }
