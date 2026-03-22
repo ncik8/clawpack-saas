@@ -80,7 +80,7 @@ export default async function JobHuntingPrompts() {
           overflow: hidden;
         }
         #prompts-content summary {
-          background: #1780e3;
+          background: linear-gradient(to right, #6344ec, #9a3dda);
           color: white;
           padding: 15px;
           cursor: pointer;
