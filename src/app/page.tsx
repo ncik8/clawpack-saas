@@ -1,82 +1,61 @@
-'use client'
+import './globals.css'
+import { Inter, Poppins } from 'next/font/google'
 
-import { useState } from 'react'
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+const poppins = Poppins({ weight: ['400', '500', '600', '700'], subsets: ['latin'], variable: '--font-poppins' })
+
+export const metadata = {
+  title: 'ClawPack - Post to All Social Media in One Click',
+  description: 'Connect your accounts. Create once. We post everywhere. TikTok, Instagram, X, LinkedIn, Facebook - done.',
+}
 
 export default function Home() {
-  const [email, setEmail] = useState('')
-  const [submitted, setSubmitted] = useState(false)
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (email) {
-      setSubmitted(true)
-    }
-  }
-
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <main className={`${inter.variable} ${poppins.variable} font-sans bg-white min-h-screen`}>
       {/* Header */}
-      <header className="p-6 border-b border-slate-700/50">
+      <header className="p-6 border-b border-slate-200">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-white">
-            <span className="text-blue-400">🤖</span> ClawPack
+          <h1 className="text-2xl font-bold text-slate-900">
+            <span className="text-blue-600">🤖</span> ClawPack
           </h1>
-          <div className="flex gap-4">
-            <a href="#features" className="px-4 py-2 text-sm text-slate-300 hover:text-white transition">
+          <div className="flex gap-6">
+            <a href="#features" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">
               Features
             </a>
-            <a href="#how-it-works" className="px-4 py-2 text-sm text-slate-300 hover:text-white transition">
+            <a href="#how-it-works" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">
               How it Works
             </a>
           </div>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="text-center py-12 px-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-8 rounded-2xl overflow-hidden border border-slate-700">
-            <img src="/hero.jpg" alt="ClawPack - Social Media Automation" className="w-full" />
-          </div>
-          <h2 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
-            Post to all social media
-            <br />
-            <span className="text-blue-400">in one click</span>
-          </h2>
-          <p className="text-xl text-slate-400 mb-10 max-w-xl mx-auto">
-            Connect your accounts. Create once. We post everywhere.
-            <br />
-            TikTok, Instagram, X, LinkedIn, Facebook - done.
-          </p>
-          
-          {!submitted ? (
-            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                className="flex-1 px-6 py-4 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                required
-              />
-              <button
-                type="submit"
-                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition whitespace-nowrap"
-              >
-                Get Early Access
-              </button>
-            </form>
-          ) : (
-            <div className="bg-green-500/20 border border-green-500/50 rounded-xl px-6 py-4 max-w-md mx-auto">
-              <p className="text-green-400 font-semibold">✓ You're on the list!</p>
-              <p className="text-slate-400 text-sm mt-1">We'll notify you when we launch.</p>
+      {/* Hero - Full Width Image */}
+      <section className="w-full">
+        <div className="w-full h-[500px] relative overflow-hidden">
+          <img 
+            src="/hero-full.jpg" 
+            alt="ClawPack - Social Media Automation" 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end">
+            <div className="max-w-6xl mx-auto w-full px-6 pb-16">
+              <h2 className="text-5xl md:text-6xl font-bold text-white mb-4 leading-tight">
+                Post to all social media
+                <br />
+                <span className="text-blue-400">in one click</span>
+              </h2>
+              <p className="text-xl text-slate-200 max-w-xl">
+                Connect your accounts. Create once. We post everywhere.
+                <br />
+                TikTok, Instagram, X, LinkedIn, Facebook - done.
+              </p>
             </div>
-          )}
+          </div>
         </div>
       </section>
 
       {/* Platforms */}
-      <section className="py-16 px-6 border-y border-slate-800">
+      <section className="py-16 px-6 border-b border-slate-200">
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-slate-500 text-sm uppercase tracking-wider mb-8">Supported Platforms</p>
           <div className="flex flex-wrap justify-center gap-8 text-4xl">
@@ -92,10 +71,10 @@ export default function Home() {
       {/* Features */}
       <section id="features" className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
-          <h3 className="text-3xl font-bold text-white text-center mb-4">
+          <h3 className="text-3xl font-bold text-slate-900 text-center mb-4">
             Everything you need
           </h3>
-          <p className="text-slate-400 text-center mb-12 max-w-xl mx-auto">
+          <p className="text-slate-600 text-center mb-12 max-w-xl mx-auto">
             Simple, powerful social media management. No complicated setup.
           </p>
           
@@ -132,10 +111,10 @@ export default function Home() {
                 desc: 'A fraction of what agencies charge. Free to start.'
               },
             ].map((feature, i) => (
-              <div key={i} className="bg-slate-800/50 border border-slate-700/50 p-6 rounded-2xl hover:border-slate-600 transition">
+              <div key={i} className="bg-slate-50 border border-slate-200 p-6 rounded-2xl hover:border-blue-300 hover:shadow-lg transition">
                 <span className="text-4xl mb-4 block">{feature.emoji}</span>
-                <h4 className="text-xl font-semibold text-white mb-2">{feature.title}</h4>
-                <p className="text-slate-400">{feature.desc}</p>
+                <h4 className="text-xl font-semibold text-slate-900 mb-2">{feature.title}</h4>
+                <p className="text-slate-600">{feature.desc}</p>
               </div>
             ))}
           </div>
@@ -143,9 +122,9 @@ export default function Home() {
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="py-20 px-6 bg-slate-800/30">
+      <section id="how-it-works" className="py-20 px-6 bg-slate-50">
         <div className="max-w-4xl mx-auto">
-          <h3 className="text-3xl font-bold text-white text-center mb-12">
+          <h3 className="text-3xl font-bold text-slate-900 text-center mb-12">
             How it works
           </h3>
           
@@ -160,8 +139,8 @@ export default function Home() {
                   {item.step}
                 </div>
                 <div>
-                  <h4 className="text-xl font-semibold text-white mb-1">{item.title}</h4>
-                  <p className="text-slate-400">{item.desc}</p>
+                  <h4 className="text-xl font-semibold text-slate-900 mb-1">{item.title}</h4>
+                  <p className="text-slate-600">{item.desc}</p>
                 </div>
               </div>
             ))}
@@ -170,41 +149,35 @@ export default function Home() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 px-6 border-t border-slate-800">
+      <section className="py-20 px-6 bg-blue-600">
         <div className="max-w-2xl mx-auto text-center">
           <h3 className="text-3xl font-bold text-white mb-4">
             Ready to simplify your social media?
           </h3>
-          <p className="text-slate-400 mb-8">
+          <p className="text-blue-100 mb-8">
             Join the waitlist and get early access.
           </p>
-          {!submitted ? (
-            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 justify-center">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                className="flex-1 px-6 py-4 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 max-w-sm"
-                required
-              />
-              <button
-                type="submit"
-                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition"
-              >
-                Join Waitlist
-              </button>
-            </form>
-          ) : (
-            <p className="text-green-400 font-semibold">✓ You're on the list!</p>
-          )}
+          <form className="flex flex-col sm:flex-row gap-4 justify-center">
+            <input
+              type="email"
+              placeholder="Enter your email"
+              className="px-6 py-4 bg-white rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 max-w-sm w-full"
+              required
+            />
+            <button
+              type="submit"
+              className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold transition whitespace-nowrap"
+            >
+              Join Waitlist
+            </button>
+          </form>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-8 px-6 border-t border-slate-800">
+      <footer className="py-8 px-6 bg-slate-900">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-slate-500 text-sm">
+          <p className="text-slate-400 text-sm">
             © 2026 ClawPack. All rights reserved.
           </p>
           <div className="flex gap-6 text-slate-400 text-sm">
