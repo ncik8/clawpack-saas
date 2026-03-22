@@ -16,7 +16,9 @@ export default function PromptsLayout({ heading, description, children }: Props)
             <img src="/logo.jpg" alt="ClawPack" className="h-10 w-10 object-contain" />
             <span className="text-2xl font-bold text-slate-900">ClawPack</span>
           </Link>
-          <div className="flex gap-6">
+          <div className="flex items-center gap-4">
+            {/* Google Translate */}
+            <div id="google_translate_element" />
             <a href="/#prompts" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Prompts</a>
             <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Back</Link>
           </div>
@@ -41,6 +43,21 @@ export default function PromptsLayout({ heading, description, children }: Props)
           </div>
         </div>
       </footer>
+
+      {/* Google Translate */}
+      <script dangerouslySetInnerHTML={{ __html: `
+        function googleTranslateElementInit() {
+          new google.translate.TranslateElement({
+            pageLanguage: 'en',
+            includedLanguages: 'zh-CN,zh-TW,yue',
+            layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+            gaTrack: false,
+            gaId: 'UA'
+          }, 'google_translate_element');
+        }
+      ` }} />
+      <script id="google-translate" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer />
+
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('DOMContentLoaded', function() {
           document.querySelectorAll('.copy-btn').forEach(function(btn) {
@@ -64,6 +81,7 @@ export default function PromptsLayout({ heading, description, children }: Props)
           });
         });
       ` }} />
+
       <style>{`
         #prompts-content h3 { font-size: 1.5rem; font-weight: bold; color: #1e293b; margin: 2rem 0 1rem 0; }
         #prompts-content details { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin: 15px 0; overflow: hidden; }
@@ -73,6 +91,14 @@ export default function PromptsLayout({ heading, description, children }: Props)
         #prompts-content .copy-btn { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
         #prompts-content .copy-btn:hover { background: #218838; }
         #prompts-content .prompt-inner p { margin: 0 0 1rem 0; }
+        #google_translate_element { display: inline-block; vertical-align: middle; }
+        #google_translate_element select { padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 6px; background: white; font-size: 13px; }
+        .goog-te-gadget { font-family: Arial, sans-serif !important; font-size: 13px !important; color: #334155 !important; }
+        .goog-te-gadget-simple { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; padding: 6px 10px !important; }
+        .goog-te-gadget-simple span { color: #334155 !important; }
+        .goog-te-menu-value span { color: #334155 !important; }
+        .goog-te-banner-frame { display: none !important; }
+        body { top: 0 !important; }
       `}</style>
     </main>
   )
