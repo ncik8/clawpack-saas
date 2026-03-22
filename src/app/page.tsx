@@ -79,50 +79,38 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                icon: 'share-all',
-                color: 'text-blue-600',
-                bg: 'bg-blue-50',
+                icon: 'share-handdrawn',
                 title: 'One Post, Everywhere',
                 desc: 'Write once. We automatically post to all your connected accounts across every platform.'
               },
               {
-                icon: 'create-handdrawn',
-                color: 'text-purple-600',
-                bg: 'bg-purple-50',
+                icon: 'ai-handdrawn',
                 title: 'AI Content Generator',
                 desc: 'Tell us your business. Our AI creates engaging posts tailored to your audience.'
               },
               {
                 icon: 'calendar-handdrawn',
-                color: 'text-green-600',
-                bg: 'bg-green-50',
                 title: 'Smart Scheduling',
                 desc: 'Post at the perfect time. We analyze your audience and find the best moments.'
               },
               {
                 icon: 'repeat-handdrawn',
-                color: 'text-orange-600',
-                bg: 'bg-orange-50',
                 title: 'Auto-Post Forever',
                 desc: 'Set it once. We post every day, week, or month automatically. Just sit back.'
               },
               {
                 icon: 'analytics-handdrawn',
-                color: 'text-pink-600',
-                bg: 'bg-pink-50',
                 title: 'Analytics Dashboard',
                 desc: 'See what works. Track likes, shares, comments, and grow your audience.'
               },
               {
                 icon: 'pricing-handdrawn',
-                color: 'text-indigo-600',
-                bg: 'bg-indigo-50',
                 title: 'Affordable Pricing',
                 desc: 'A fraction of what agencies charge. Start free, upgrade when you need more.'
               },
             ].map((feature) => (
               <div key={feature.title} className="bg-white border border-slate-200 p-8 rounded-2xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                <div className={`w-14 h-14 ${feature.bg} rounded-xl flex items-center justify-center mb-6 overflow-hidden`}>
+                <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center mb-6 overflow-hidden">
                   <img src={`/${feature.icon}.jpg`} alt={feature.title} className="w-9 h-9 object-contain" />
                 </div>
                 <h4 className="text-xl font-semibold text-slate-900 mb-3">{feature.title}</h4>
