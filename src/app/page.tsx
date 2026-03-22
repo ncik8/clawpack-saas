@@ -86,35 +86,35 @@ export default function Home() {
                 desc: 'Write once. We automatically post to all your connected accounts across every platform.'
               },
               {
-                icon: 'ai',
+                icon: 'create-handdrawn',
                 color: 'text-purple-600',
                 bg: 'bg-purple-50',
                 title: 'AI Content Generator',
                 desc: 'Tell us your business. Our AI creates engaging posts tailored to your audience.'
               },
               {
-                icon: 'calendar-time',
+                icon: 'calendar-handdrawn',
                 color: 'text-green-600',
                 bg: 'bg-green-50',
                 title: 'Smart Scheduling',
                 desc: 'Post at the perfect time. We analyze your audience and find the best moments.'
               },
               {
-                icon: 'repeat',
+                icon: 'repeat-handdrawn',
                 color: 'text-orange-600',
                 bg: 'bg-orange-50',
                 title: 'Auto-Post Forever',
                 desc: 'Set it once. We post every day, week, or month automatically. Just sit back.'
               },
               {
-                icon: 'chart',
+                icon: 'analytics-handdrawn',
                 color: 'text-pink-600',
                 bg: 'bg-pink-50',
                 title: 'Analytics Dashboard',
                 desc: 'See what works. Track likes, shares, comments, and grow your audience.'
               },
               {
-                icon: 'coin',
+                icon: 'pricing-handdrawn',
                 color: 'text-indigo-600',
                 bg: 'bg-indigo-50',
                 title: 'Affordable Pricing',
@@ -122,8 +122,8 @@ export default function Home() {
               },
             ].map((feature) => (
               <div key={feature.title} className="bg-white border border-slate-200 p-8 rounded-2xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                <div className={`w-14 h-14 ${feature.bg} ${feature.color} rounded-xl flex items-center justify-center mb-6`}>
-                  <img src={`/${feature.icon}.svg`} alt={feature.title} className="w-7 h-7" />
+                <div className={`w-14 h-14 ${feature.bg} rounded-xl flex items-center justify-center mb-6 overflow-hidden`}>
+                  <img src={`/${feature.icon}.jpg`} alt={feature.title} className="w-9 h-9 object-contain" />
                 </div>
                 <h4 className="text-xl font-semibold text-slate-900 mb-3">{feature.title}</h4>
                 <p className="text-slate-600 leading-relaxed">{feature.desc}</p>
