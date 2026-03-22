@@ -56,17 +56,13 @@ export default function Home() {
       {/* Platforms */}
       <section className="py-20 px-6 border-b border-slate-200">
         <div className="max-w-4xl mx-auto text-center">
-          <p className="text-slate-500 text-sm uppercase tracking-wider mb-12">Supported Platforms</p>
+          <p className="text-slate-500 text-sm uppercase tracking-wider mb-8">Supported Platforms</p>
           <div className="flex items-center justify-center gap-8">
-            <span className="text-slate-500 text-sm whitespace-nowrap">Post to all</span>
-            <div className="flex items-center gap-6">
-              <img src="/tiktok.svg" alt="TikTok" className="h-12 w-12" />
-              <img src="/instagram.svg" alt="Instagram" className="h-12 w-12" />
-              <img src="/x.svg" alt="X" className="h-12 w-12" />
-              <img src="/linkedin.svg" alt="LinkedIn" className="h-12 w-12" />
-              <img src="/facebook.svg" alt="Facebook" className="h-12 w-12" />
-            </div>
-            <span className="text-slate-500 text-sm whitespace-nowrap">in one click</span>
+            <img src="/tiktok.svg" alt="TikTok" className="h-12 w-12" />
+            <img src="/instagram.svg" alt="Instagram" className="h-12 w-12" />
+            <img src="/x.svg" alt="X" className="h-12 w-12" />
+            <img src="/linkedin.svg" alt="LinkedIn" className="h-12 w-12" />
+            <img src="/facebook.svg" alt="Facebook" className="h-12 w-12" />
           </div>
         </div>
       </section>
