@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { useState, useEffect } from 'react'
 
 export const metadata = {
   title: 'Job Hunting Prompts - ClawPack',
@@ -12,12 +13,69 @@ async function getPrompts() {
   return page.content.rendered
 }
 
+async function translateText(text: string, lang: string): Promise<string> {
+  if (lang === 'en' || !text.trim()) return text
+  
+  try {
+    const encoded = encodeURIComponent(text)
+    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encoded}&langpair=en|${lang}`)
+    const data = await res.json()
+    if (data.responseStatus === 200 && data.responseData?.translatedText) {
+      return data.responseData.translatedText
+    }
+  } catch {}
+  return text
+}
+
+async function translateHtml(html: string, lang: string): Promise<string> {
+  if (lang === 'en') return html
+  
+  // Simple HTML translator - translates text nodes, preserves structure
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+  
+  // Translate summary (prompt titles) and h3 (section headers)
+  const summaries = doc.querySelectorAll('summary, h3')
+  for (const el of Array.from(summaries)) {
+    const original = el.textContent || ''
+    if (original.trim()) {
+      el.textContent = await translateText(original, lang)
+    }
+  }
+  
+  return doc.body.innerHTML
+}
+
 export default async function JobHuntingPrompts() {
   const content = await getPrompts()
 
   return (
     <main className="font-sans bg-white min-h-screen">
-      {/* Header - Fixed */}
+      <LanguageWrapper content={content} />
+    </main>
+  )
+}
+
+function LanguageWrapper({ content }: { content: string }) {
+  const [lang, setLang] = useState('en')
+  const [translatedContent, setTranslatedContent] = useState(content)
+  const [translating, setTranslating] = useState(false)
+
+  useEffect(() => {
+    if (lang === 'en') {
+      setTranslatedContent(content)
+      return
+    }
+    
+    setTranslating(true)
+    translateHtml(content, lang).then((translated) => {
+      setTranslatedContent(translated)
+      setTranslating(false)
+    })
+  }, [lang, content])
+
+  return (
+    <>
       <header className="fixed top-0 left-0 right-0 z-50 p-6 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <Link href="/" className="flex items-center gap-3">
@@ -25,7 +83,23 @@ export default async function JobHuntingPrompts() {
             <span className="text-2xl font-bold text-slate-900">ClawPack</span>
           </Link>
           <div className="flex items-center gap-4">
-            <div id="google_translate_element" />
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+              className="appearance-none bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold pl-3 pr-8 py-2 rounded-lg cursor-pointer hover:bg-slate-200 transition"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 8px center',
+                backgroundSize: '12px',
+              }}
+            >
+              <option value="en">🇬🇧 English</option>
+              <option value="yue">🇭🇰 粵語 (Cantonese)</option>
+              <option value="zh-CN">🇨🇳 简体 (Simplified)</option>
+              <option value="zh-TW">🇹🇼 繁體 (Traditional)</option>
+            </select>
+            {translating && <span className="text-xs text-slate-500">Translating...</span>}
             <Link href="/#prompts" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Prompts</Link>
             <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Back</Link>
           </div>
@@ -34,24 +108,26 @@ export default async function JobHuntingPrompts() {
 
       <div className="h-[73px]" />
 
-      {/* Hero */}
       <section className="py-16 px-6 bg-white border-b border-slate-200">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-slate-900 mb-4">Job Hunting Prompts</h2>
+          <h2 className="text-4xl font-bold text-slate-900 mb-4">
+            {lang === 'en' ? 'Job Hunting Prompts' : lang === 'yue' ? '求職提示' : lang === 'zh-CN' ? '求职提示' : '求職提示'}
+          </h2>
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-            AI prompts to supercharge your job search. From salary negotiation to LinkedIn optimization — get hired faster.
+            {lang === 'en' ? 'AI prompts to supercharge your job search. From salary negotiation to LinkedIn optimization — get hired faster.' 
+              : lang === 'yue' ? 'AI提示助您求職更順利。薪酬談判、LinkedIn優化 — 更快搵到心水工作。'
+              : lang === 'zh-CN' ? 'AI提示助您求职更顺利。薪酬谈判、LinkedIn优化 — 更快找到好工作。'
+              : 'AI提示助您求職更順利。薪酬談判、LinkedIn優化 — 更快搵到心水工作。'}
           </p>
         </div>
       </section>
 
-      {/* Prompts */}
       <section className="py-16 px-6 bg-slate-50">
         <div className="max-w-4xl mx-auto">
-          <div id="prompts-content" dangerouslySetInnerHTML={{ __html: content }} />
+          <div id="prompts-content" dangerouslySetInnerHTML={{ __html: translatedContent }} />
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="py-8 px-6 bg-slate-900">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-slate-400 text-sm">© 2026 ClawPack. All rights reserved.</p>
@@ -61,19 +137,6 @@ export default async function JobHuntingPrompts() {
           </div>
         </div>
       </footer>
-
-      {/* Google Translate */}
-      <script dangerouslySetInnerHTML={{ __html: `
-        function googleTranslateElementInit() {
-          new google.translate.TranslateElement({
-            pageLanguage: 'en',
-            includedLanguages: 'en,yue,zh-CN,zh-TW',
-            layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-            autoDisplay: false
-          }, 'google_translate_element');
-        }
-      ` }} />
-      <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" defer />
 
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('DOMContentLoaded', function() {
@@ -108,14 +171,7 @@ export default async function JobHuntingPrompts() {
         #prompts-content .copy-btn { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
         #prompts-content .copy-btn:hover { background: #218838; }
         #prompts-content .prompt-inner p { margin: 0 0 1rem 0; }
-        #google_translate_element { vertical-align: middle; }
-        #google_translate_element .goog-te-gadget { font-family: Arial, sans-serif !important; font-size: 12px !important; }
-        #google_translate_element .goog-te-gadget-simple { background: #f8fafc !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; padding: 5px 8px !important; display: inline-block !important; }
-        #google_translate_element .goog-te-gadget-simple span { color: #334155 !important; }
-        #google_translate_element select { padding: 3px 6px !important; border: 1px solid #e2e8f0 !important; border-radius: 4px !important; background: white !important; font-size: 12px !important; }
-        .goog-te-banner-frame { display: none !important; }
-        body { top: 0 !important; }
       `}</style>
-    </main>
+    </>
   )
 }
