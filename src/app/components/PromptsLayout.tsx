@@ -92,30 +92,43 @@ export default function PromptsLayout({ heading, description, children }: Props)
             });
           });
 
-          // Language dropdown
+          // Language dropdown - reload with lang param
           var langSelect = document.getElementById('lang-select');
           if (langSelect) {
             langSelect.addEventListener('change', function() {
               var lang = this.value;
               if (lang === 'en') {
-                // Reload to remove translation
-                window.location.reload();
+                // Reload original page (translation cookie will clear)
+                var url = new URL(window.location.href);
+                url.searchParams.delete('lang');
+                window.location.href = url.toString();
               } else {
-                // Find Google Translate combobox and set value
-                var checkCount = 0;
-                var checkInterval = setInterval(function() {
-                  var sel = document.querySelector('.goog-te-combo');
-                  if (sel) {
-                    clearInterval(checkInterval);
-                    sel.value = lang;
-                    sel.dispatchEvent(new Event('change'));
-                  }
-                  checkCount++;
-                  if (checkCount > 50) clearInterval(checkInterval);
-                }, 100);
+                // Set Google Translate cookie and reload
+                var url = new URL(window.location.href);
+                url.searchParams.set('lang', lang);
+                window.location.href = url.toString();
               }
             });
           }
+
+          // On page load with ?lang= param, apply translation
+          (function() {
+            var params = new URLSearchParams(window.location.search);
+            var lang = params.get('lang');
+            if (lang && lang !== 'en') {
+              var checkCount = 0;
+              var checkInterval = setInterval(function() {
+                var sel = document.querySelector('.goog-te-combo');
+                if (sel) {
+                  clearInterval(checkInterval);
+                  sel.value = lang;
+                  sel.dispatchEvent(new Event('change'));
+                }
+                checkCount++;
+                if (checkCount > 100) clearInterval(checkInterval);
+              }, 100);
+            }
+          })();
         });
       ` }} />
 
