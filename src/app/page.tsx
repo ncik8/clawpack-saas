@@ -53,15 +53,24 @@ export default function Home() {
       </section>
 
       {/* Platforms */}
-      <section className="py-16 px-6 border-b border-slate-200">
+      <section className="py-20 px-6 border-b border-slate-200">
         <div className="max-w-4xl mx-auto text-center">
-          <p className="text-slate-500 text-sm uppercase tracking-wider mb-8">Supported Platforms</p>
-          <div className="flex flex-wrap justify-center gap-10 items-center">
-            <img src="/tiktok.svg" alt="TikTok" className="h-10 w-10" title="TikTok" />
-            <img src="/instagram.svg" alt="Instagram" className="h-10 w-10" title="Instagram" />
-            <img src="/x.svg" alt="X" className="h-10 w-10" title="X (Twitter)" />
-            <img src="/linkedin.svg" alt="LinkedIn" className="h-10 w-10" title="LinkedIn" />
-            <img src="/facebook.svg" alt="Facebook" className="h-10 w-10" title="Facebook" />
+          <p className="text-slate-500 text-sm uppercase tracking-wider mb-12">Supported Platforms</p>
+          <div className="flex items-center justify-center gap-0">
+            {/* Left text */}
+            <p className="text-slate-400 text-sm mr-12 whitespace-nowrap">Post to all</p>
+            
+            {/* Social icons scattered vertically */}
+            <div className="relative w-80 h-24">
+              <img src="/tiktok.svg" alt="TikTok" className="absolute" style="top: 8px; left: 20px;" />
+              <img src="/instagram.svg" alt="Instagram" className="absolute" style="top: 28px; left: 75px;" />
+              <img src="/x.svg" alt="X" className="absolute" style="top: 0px; left: 130px;" />
+              <img src="/linkedin.svg" alt="LinkedIn" className="absolute" style="top: 20px; left: 185px;" />
+              <img src="/facebook.svg" alt="Facebook" className="absolute" style="top: 10px; left: 245px;" />
+            </div>
+            
+            {/* Right text */}
+            <p className="text-slate-400 text-sm ml-12 whitespace-nowrap">in one click</p>
           </div>
         </div>
       </section>
