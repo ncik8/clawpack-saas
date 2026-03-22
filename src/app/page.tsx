@@ -21,9 +21,14 @@ export default function Home() {
           <h1 className="text-2xl font-bold text-white">
             <span className="text-blue-400">🤖</span> ClawPack
           </h1>
-          <a href="#pricing" className="px-4 py-2 text-sm text-slate-300 hover:text-white transition">
-            Pricing
-          </a>
+          <div className="flex gap-4">
+            <a href="#features" className="px-4 py-2 text-sm text-slate-300 hover:text-white transition">
+              Features
+            </a>
+            <a href="#how-it-works" className="px-4 py-2 text-sm text-slate-300 hover:text-white transition">
+              How it Works
+            </a>
+          </div>
         </div>
       </header>
 
@@ -85,7 +90,7 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section className="py-20 px-6">
+      <section id="features" className="py-20 px-6">
         <div className="max-w-6xl mx-auto">
           <h3 className="text-3xl font-bold text-white text-center mb-4">
             Everything you need
@@ -138,7 +143,7 @@ export default function Home() {
       </section>
 
       {/* How it works */}
-      <section className="py-20 px-6 bg-slate-800/30">
+      <section id="how-it-works" className="py-20 px-6 bg-slate-800/30">
         <div className="max-w-4xl mx-auto">
           <h3 className="text-3xl font-bold text-white text-center mb-12">
             How it works
@@ -160,72 +165,6 @@ export default function Home() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section id="pricing" className="py-20 px-6">
-        <div className="max-w-6xl mx-auto">
-          <h3 className="text-3xl font-bold text-white text-center mb-4">
-            Simple Pricing
-          </h3>
-          <p className="text-slate-400 text-center mb-12">
-            Start free. Upgrade when you need more.
-          </p>
-          
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Free */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8">
-              <h4 className="text-xl font-semibold text-white mb-2">Free</h4>
-              <p className="text-4xl font-bold text-white mb-6">$0<span className="text-lg text-slate-400 font-normal">/mo</span></p>
-              <ul className="space-y-3 text-slate-400 mb-8">
-                <li>✓ 3 social accounts</li>
-                <li>✓ 10 posts per month</li>
-                <li>✓ Basic scheduling</li>
-                <li>✓ Manual posting</li>
-              </ul>
-              <button className="w-full py-3 border border-slate-600 text-slate-300 rounded-xl hover:border-slate-500 transition">
-                Get Started
-              </button>
-            </div>
-            
-            {/* Pro */}
-            <div className="bg-blue-600/10 border-2 border-blue-500 rounded-2xl p-8 relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-sm px-3 py-1 rounded-full">
-                Popular
-              </div>
-              <h4 className="text-xl font-semibold text-white mb-2">Pro</h4>
-              <p className="text-4xl font-bold text-white mb-6">$19<span className="text-lg text-slate-400 font-normal">/mo</span></p>
-              <ul className="space-y-3 text-slate-400 mb-8">
-                <li>✓ 10 social accounts</li>
-                <li>✓ Unlimited posts</li>
-                <li>✓ AI content generation</li>
-                <li>✓ Smart scheduling</li>
-                <li>✓ Analytics</li>
-                <li>✓ Priority support</li>
-              </ul>
-              <button className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition">
-                Start Free Trial
-              </button>
-            </div>
-            
-            {/* Agency */}
-            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8">
-              <h4 className="text-xl font-semibold text-white mb-2">Agency</h4>
-              <p className="text-4xl font-bold text-white mb-6">$49<span className="text-lg text-slate-400 font-normal">/mo</span></p>
-              <ul className="space-y-3 text-slate-400 mb-8">
-                <li>✓ Unlimited accounts</li>
-                <li>✓ Unlimited posts</li>
-                <li>✓ White-label</li>
-                <li>✓ Client management</li>
-                <li>✓ API access</li>
-                <li>✓ Dedicated support</li>
-              </ul>
-              <button className="w-full py-3 border border-slate-600 text-slate-300 rounded-xl hover:border-slate-500 transition">
-                Contact Sales
-              </button>
-            </div>
           </div>
         </div>
       </section>
