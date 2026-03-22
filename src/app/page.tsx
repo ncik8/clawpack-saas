@@ -133,10 +133,10 @@ export default function Home() {
               { step: '1', title: 'Connect your accounts', desc: 'Link TikTok, Instagram, X, LinkedIn, Facebook with one click.' },
               { step: '2', title: 'Create or generate', desc: 'Write your post or let AI generate one for you.' },
               { step: '3', title: 'Post everywhere', desc: 'Click once. We post to all platforms instantly.' },
-            ].map((item, i) => (
-              <div key={i} className="flex gap-6 items-start">
-                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
-                  {item.step}
+            ].map((item) => (
+              <div key={item.step} className="flex gap-6 items-start">
+                <div className="w-14 h-14 flex-shrink-0">
+                  <img src={`/step${item.step}.jpg`} alt={`Step ${item.step}`} className="w-full h-full object-contain" />
                 </div>
                 <div>
                   <h4 className="text-xl font-semibold text-slate-900 mb-1">{item.title}</h4>
