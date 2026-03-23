@@ -1,7 +1,171 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Colors */
+  --color-bg-primary: #0a0f1a;
+  --color-bg-secondary: #111827;
+  --color-bg-card: #1f2937;
+  --color-border: #374151;
+  
+  --color-primary: #1780e3;
+  --color-primary-hover: #0d66c7;
+  
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #9ca3af;
+  --color-text-muted: #6b7280;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 body {
-  font-family: Arial, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Button base */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-primary {
+  @apply bg-[#1780e3] text-white hover:bg-[#0d66c7] active:scale-[0.98];
+}
+
+.btn-secondary {
+  @apply bg-transparent border border-[#374151] text-[#f9fafb] hover:border-[#1780e3] hover:text-[#1780e3];
+}
+
+.btn-ghost {
+  @apply bg-transparent text-[#9ca3af] hover:text-[#f9fafb] hover:bg-white/5;
+}
+
+.btn-danger {
+  @apply bg-[#ef4444] text-white hover:bg-red-600;
+}
+
+/* Input base */
+.input {
+  @apply w-full bg-[#111827] border border-[#374151] rounded-md px-3 py-2 text-[#f9fafb] placeholder-[#6b7280] transition-all duration-200;
+}
+
+.input:focus {
+  @apply border-[#1780e3] ring-2 ring-[#1780e3]/20 outline-none;
+}
+
+/* Card base */
+.card {
+  @apply bg-[#1f2937] border border-[#374151] rounded-lg p-5;
+}
+
+.card-hover {
+  @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg;
+}
+
+/* Skeleton loading */
+.skeleton {
+  @apply bg-gradient-to-r from-[#1f2937] via-[#374151] to-[#1f2937] bg-[length:200%_100%] animate-shimmer rounded;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s infinite;
+}
+
+/* Toast animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Spinner */
+.spinner {
+  @apply w-5 h-5 border-2 border-[#374151] border-t-[#1780e3] rounded-full animate-spin;
+}
+
+/* Platform colors */
+.platform-x { @apply text-[#1DA1F2]; }
+.platform-linkedin { @apply text-[#0A66C2]; }
+.platform-facebook { @apply text-[#1877F2]; }
+.platform-instagram { @apply text-[#E4405F]; }
+.platform-tiktok { @apply text-white; }
+.platform-youtube { @apply text-[#FF0000]; }
+.platform-pinterest { @apply text-[#E60023]; }
+.platform-reddit { @apply text-[#FF4500]; }
+.platform-discord { @apply text-[#5865F2]; }
+.platform-telegram { @apply text-[#0088cc]; }
+
+/* Badge */
+.badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-success {
+  @apply bg-[#10b981]/20 text-[#10b981];
+}
+
+.badge-warning {
+  @apply bg-[#f59e0b]/20 text-[#f59e0b];
+}
+
+.badge-error {
+  @apply bg-[#ef4444]/20 text-[#ef4444];
+}
+
+.badge-info {
+  @apply bg-[#1780e3]/20 text-[#1780e3];
 }
