@@ -5,20 +5,14 @@ import { supabase } from '@/lib/supabase';
 
 export default function AuthCallback() {
   useEffect(() => {
-    const checkSessionAndRedirect = async () => {
-      // Wait for Supabase to set cookies
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      
+    // Immediately try to get session and redirect
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         window.location.href = '/dashboard';
       } else {
         window.location.href = '/login';
       }
-    };
-    
-    checkSessionAndRedirect();
+    });
   }, []);
 
   return (
