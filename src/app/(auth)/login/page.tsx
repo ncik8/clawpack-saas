@@ -42,7 +42,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: 'https://clawpack-saas.vercel.app/auth/callback',
+        redirectTo: 'https://clawpack-saas.vercel.app/callback',
       },
     });
     if (error) {
