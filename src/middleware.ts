@@ -30,8 +30,8 @@ export async function middleware(request: NextRequest) {
   );
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
   // Protected routes
   const protectedRoutes = ['/dashboard', '/settings', '/analytics'];
@@ -40,20 +40,20 @@ export async function middleware(request: NextRequest) {
   );
 
   // Auth routes
-  const authRoutes = ['/login', '/signup'];
+  const authRoutes = ['/login', '/signup', '/auth/callback'];
   const isAuthRoute = authRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   );
 
   // If trying to access protected route without auth, redirect to login
-  if (isProtectedRoute && !user) {
+  if (isProtectedRoute && !session) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
   // If already logged in and trying to access auth routes, redirect to dashboard
-  if (isAuthRoute && user) {
+  if (isAuthRoute && session) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
