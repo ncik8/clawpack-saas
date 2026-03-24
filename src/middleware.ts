@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
 
   // Allow Supabase OAuth callback to pass through without auth check
   if (request.nextUrl.pathname.startsWith('/callback')) {
-    return NextResponse.next();
+    return supabaseResponse;
   }
 
   const {
