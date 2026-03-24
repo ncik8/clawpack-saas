@@ -29,6 +29,11 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Allow Supabase OAuth callback to pass through without auth check
+  if (request.nextUrl.pathname.startsWith('/callback')) {
+    return NextResponse.next();
+  }
+
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -40,7 +45,7 @@ export async function middleware(request: NextRequest) {
   );
 
   // Auth routes
-  const authRoutes = ['/login', '/signup', '/auth/callback'];
+  const authRoutes = ['/login', '/signup'];
   const isAuthRoute = authRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   );
