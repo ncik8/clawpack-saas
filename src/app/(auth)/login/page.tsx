@@ -1,4 +1,4 @@
-/* eslint-disable */
+'use client';
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -138,7 +138,7 @@ export default function LoginPage() {
 
         {/* Sign up link */}
         <p className="text-center text-sm text-[#9ca3af] mt-6">
-          Don't have an account?{' '}
+          Do not have an account?{' '}
           <Link href="/signup" className="text-[#1780e3] hover:underline font-medium">
             Sign up
           </Link>

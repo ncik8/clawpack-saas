@@ -1,4 +1,4 @@
-/* eslint-disable */
+'use client';
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -69,7 +69,7 @@ export default function SignupPage() {
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Check your email</h2>
           <p className="text-[#9ca3af] mb-6">
-            We've sent a confirmation link to <strong>{email}</strong>. Click the link to activate your account.
+            We have sent a confirmation link to <strong>{email}</strong>. Click the link to activate your account.
           </p>
           <Link href="/login" className="btn btn-primary">
             Back to Sign in
