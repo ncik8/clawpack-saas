@@ -8,9 +8,10 @@ export async function GET(request: Request) {
   const error = requestUrl.searchParams.get("error")
 
   if (error) {
-    console.error("OAuth error:", error)
     return NextResponse.redirect(new URL("/login?error=" + error, request.url))
   }
+
+  let supabaseResponse = NextResponse.redirect(new URL("/dashboard", request.url))
 
   if (code) {
     const cookieStore = await cookies()
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
                   httpOnly: options?.httpOnly ?? true,
                   secure: options?.secure ?? true,
                   sameSite: (options?.sameSite as any) ?? 'lax',
-                  path: options?.path ?? '/',
+                  path: '/',
                   maxAge: options?.maxAge,
                 })
               )
@@ -42,16 +43,14 @@ export async function GET(request: Request) {
       }
     )
 
-    const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(code)
+    const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (sessionError) {
-      console.error("Session error:", sessionError)
-    } else {
-      console.log("Session exchanged for:", data.user?.email)
-      // Wait for cookies to be set
-      await new Promise(resolve => setTimeout(resolve, 500))
+    if (!sessionError) {
+      console.log("Session exchanged successfully")
+      // Create new response with redirect and ensure cookies are carried
+      supabaseResponse = NextResponse.redirect(new URL("/dashboard", request.url))
     }
   }
 
-  return NextResponse.redirect(new URL("/dashboard", request.url))
+  return supabaseResponse
 }
