@@ -26,10 +26,16 @@ export async function GET(request: Request) {
           setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
+                cookieStore.set(name, value, {
+                  httpOnly: options?.httpOnly ?? true,
+                  secure: options?.secure ?? true,
+                  sameSite: (options?.sameSite as any) ?? 'lax',
+                  path: options?.path ?? '/',
+                  maxAge: options?.maxAge,
+                })
               )
             } catch {
-              // Ignore errors in setAll
+              // Ignore errors
             }
           },
         },
@@ -45,5 +51,6 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(new URL("/dashboard", request.url))
+  const response = NextResponse.redirect(new URL("/dashboard", request.url))
+  return response
 }
