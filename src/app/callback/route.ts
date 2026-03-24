@@ -48,9 +48,10 @@ export async function GET(request: Request) {
       console.error("Session error:", sessionError)
     } else {
       console.log("Session exchanged for:", data.user?.email)
+      // Wait for cookies to be set
+      await new Promise(resolve => setTimeout(resolve, 500))
     }
   }
 
-  const response = NextResponse.redirect(new URL("/dashboard", request.url))
-  return response
+  return NextResponse.redirect(new URL("/dashboard", request.url))
 }
