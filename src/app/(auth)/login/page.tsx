@@ -15,7 +15,7 @@ export default function LoginPage() {
     const hash = window.location.hash;
     if (hash && hash.includes('access_token')) {
       // OAuth callback detected - reload the page to let middleware handle auth
-      window.location.href = '/dashboard';
+      window.location.replace('/dashboard');
     }
   }, []);
 
@@ -33,7 +33,8 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      window.location.href = '/dashboard';
+      // Use replace for cleaner redirect
+      window.location.replace('/dashboard');
     }
   };
 
