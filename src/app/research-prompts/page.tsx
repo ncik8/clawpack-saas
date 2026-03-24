@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import PromptsLayout from '../components/PromptsLayout'
 import PromptsContent from '../components/PromptsContent'
 export const metadata = { title: 'Research Prompts - ClawPack', description: 'AI prompts for market research, competitor analysis, and data gathering.' }
