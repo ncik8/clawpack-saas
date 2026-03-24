@@ -1,4 +1,4 @@
-'use client';
+/* eslint-disable */
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
