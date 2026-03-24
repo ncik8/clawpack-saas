@@ -3,11 +3,6 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 
-export const metadata = {
-  title: 'Job Hunting Prompts - ClawPack',
-  description: 'AI prompts to help with job hunting, salary negotiation, LinkedIn optimization, and more.',
-}
-
 async function getPrompts() {
   const res = await fetch('https://clawpack.net/wp-json/wp/v2/pages/2053', { next: { revalidate: 3600 } })
   if (!res.ok) return ''
