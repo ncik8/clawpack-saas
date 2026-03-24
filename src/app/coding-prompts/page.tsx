@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic';
 import PromptsLayout from '../components/PromptsLayout'
 import PromptsContent from '../components/PromptsContent'
 export const metadata = { title: 'Coding Prompts - ClawPack', description: 'AI prompts for coding, debugging, code review, and technical documentation.' }

@@ -1,8 +1,7 @@
-export const dynamic = 'force-dynamic';
 'use client';
 
-import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 
 async function getPrompts() {
   const res = await fetch('https://clawpack.net/wp-json/wp/v2/pages/2053', { next: { revalidate: 3600 } })
@@ -28,11 +27,11 @@ async function translateText(text: string, lang: string): Promise<string> {
 async function translateHtml(html: string, lang: string): Promise<string> {
   if (lang === 'en') return html
   
-  // Simple HTML translator - translates text nodes, preserves structure
+  if (typeof window === 'undefined') return html
+  
   const parser = new DOMParser()
   const doc = parser.parseFromString(html, 'text/html')
   
-  // Translate summary (prompt titles) and h3 (section headers)
   const summaries = doc.querySelectorAll('summary, h3')
   for (const el of Array.from(summaries)) {
     const original = el.textContent || ''
@@ -44,137 +43,82 @@ async function translateHtml(html: string, lang: string): Promise<string> {
   return doc.body.innerHTML
 }
 
-export default async function JobHuntingPrompts() {
-  const content = await getPrompts()
-
-  return (
-    <main className="font-sans bg-white min-h-screen">
-      <LanguageWrapper content={content} />
-    </main>
-  )
-}
-
-function LanguageWrapper({ content }: { content: string }) {
+export default function JobHuntingPrompts() {
+  const [content, setContent] = useState('')
   const [lang, setLang] = useState('en')
-  const [translatedContent, setTranslatedContent] = useState(content)
+  const [translatedContent, setTranslatedContent] = useState('')
   const [translating, setTranslating] = useState(false)
-
-  // Strip WordPress inline background styles so our CSS gradient works
-  const cleanContent = content.replace(/style="background:\s*[^"]*"/gi, '')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    getPrompts().then((data) => {
+      const clean = data.replace(/style="background:\s*[^"]*"/gi, '')
+      setContent(data)
+      setTranslatedContent(clean)
+      setLoading(false)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (loading) return
     if (lang === 'en') {
-      setTranslatedContent(cleanContent)
+      const clean = content.replace(/style="background:\s*[^"]*"/gi, '')
+      setTranslatedContent(clean)
       return
     }
     
     setTranslating(true)
     translateHtml(content, lang).then((translated) => {
-      // Also strip inline styles from translated content
       const clean = translated.replace(/style="background:\s*[^"]*"/gi, '')
       setTranslatedContent(clean)
       setTranslating(false)
     })
-  }, [lang, content])
+  }, [lang, content, loading])
 
   return (
-    <>
-      <header className="fixed top-0 left-0 right-0 z-50 p-6 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-3">
-            <img src="/logo.jpg" alt="ClawPack" className="h-10 w-10 object-contain" />
-            <span className="text-2xl font-bold text-slate-900">ClawPack</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value)}
-              className="appearance-none bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold pl-3 pr-8 py-2 rounded-lg cursor-pointer hover:bg-slate-200 transition"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 8px center',
-                backgroundSize: '12px',
-              }}
-            >
-              <option value="en">🇬🇧 English</option>
-              <option value="yue">🇭🇰 粵語 (Cantonese)</option>
-              <option value="zh-CN">🇨🇳 简体 (Simplified)</option>
-              <option value="zh-TW">🇹🇼 繁體 (Traditional)</option>
-            </select>
-            {translating && <span className="text-xs text-slate-500">Translating...</span>}
-            <Link href="/#prompts" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Prompts</Link>
-            <Link href="/" className="text-sm text-slate-600 hover:text-slate-900 transition font-medium">Back</Link>
-          </div>
+    <main className="font-sans bg-white min-h-screen">
+      {/* Header */}
+      <header className="bg-gradient-to-r from-[#083056] to-[#1780e3] text-white py-16 px-8">
+        <div className="max-w-4xl mx-auto">
+          <Link href="/job-hunting-prompts" className="text-white/80 hover:text-white text-sm mb-4 inline-block">← Back to Prompts</Link>
+          <h1 className="text-4xl font-bold mb-4">Job Hunting Prompts</h1>
+          <p className="text-xl text-white/90">AI prompts to help with job hunting, salary negotiation, LinkedIn optimization, and more.</p>
         </div>
       </header>
 
-      <div className="h-[73px]" />
+      {/* Language selector */}
+      <div className="max-w-4xl mx-auto px-8 py-4 flex justify-end">
+        <select 
+          value={lang} 
+          onChange={(e) => setLang(e.target.value)}
+          className="input w-auto"
+        >
+          <option value="en">🇬🇧 English</option>
+          <option value="zh-CN">🇨🇳 简体中文</option>
+          <option value="zh-TW">🇹🇼 繁體中文</option>
+          <option value="yue">🇭🇰 粤语</option>
+        </select>
+      </div>
 
-      <section className="py-16 px-6 bg-white border-b border-slate-200">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-slate-900 mb-4">
-            {lang === 'en' ? 'Job Hunting Prompts' : lang === 'yue' ? '求職提示' : lang === 'zh-CN' ? '求职提示' : '求職提示'}
-          </h2>
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-            {lang === 'en' ? 'AI prompts to supercharge your job search. From salary negotiation to LinkedIn optimization — get hired faster.' 
-              : lang === 'yue' ? 'AI提示助您求職更順利。薪酬談判、LinkedIn優化 — 更快搵到心水工作。'
-              : lang === 'zh-CN' ? 'AI提示助您求职更顺利。薪酬谈判、LinkedIn优化 — 更快找到好工作。'
-              : 'AI提示助您求職更順利。薪酬談判、LinkedIn優化 — 更快搵到心水工作。'}
-          </p>
-        </div>
-      </section>
-
-      <section className="py-16 px-6 bg-slate-50">
-        <div className="max-w-4xl mx-auto">
-          <div id="prompts-content" dangerouslySetInnerHTML={{ __html: translatedContent }} />
-        </div>
-      </section>
-
-      <footer className="py-8 px-6 bg-slate-900">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-slate-400 text-sm">© 2026 ClawPack. All rights reserved.</p>
-          <div className="flex gap-6 text-slate-400 text-sm">
-            <Link href="/privacy-page" className="hover:text-white transition">Privacy</Link>
-            <Link href="/terms-of-service" className="hover:text-white transition">Terms</Link>
+      {/* Content */}
+      <article className="max-w-4xl mx-auto px-8 py-8">
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="spinner mx-auto mb-4" />
+            <p className="text-gray-500">Loading prompts...</p>
           </div>
-        </div>
-      </footer>
-
-      <script dangerouslySetInnerHTML={{ __html: `
-        document.addEventListener('DOMContentLoaded', function() {
-          document.querySelectorAll('.copy-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-              var sibling = btn.nextElementSibling;
-              while (sibling) {
-                if (sibling.innerText && sibling.innerText.trim()) {
-                  navigator.clipboard.writeText(sibling.innerText).catch(function(){});
-                  var original = btn.innerText;
-                  btn.innerText = '✅ Copied!';
-                  btn.style.background = '#16a34a';
-                  setTimeout(function() {
-                    btn.innerText = original;
-                    btn.style.background = '#28a745';
-                  }, 2000);
-                  break;
-                }
-                sibling = sibling.nextElementSibling;
-              }
-            });
-          });
-        });
-      ` }} />
-
-      <style>{`
-        #prompts-content h3 { font-size: 1.5rem; font-weight: bold; color: #1e293b; margin: 2rem 0 1rem 0; }
-        #prompts-content details { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin: 15px 0; overflow: hidden; }
-        #prompts-content summary { background: linear-gradient(to right, #6344ec, #9a3dda); color: white; padding: 15px; cursor: pointer; font-weight: bold; font-size: 16px; border-radius: 12px 12px 0 0; }
-        #prompts-content summary:hover { filter: brightness(1.1); }
-        #prompts-content .prompt-inner { background: #1e293b; color: #fff; padding: 20px; border-radius: 0 0 12px 12px; font-size: 13px; white-space: pre-wrap; line-height: 1.6; max-height: 500px; overflow-y: auto; font-family: Arial, sans-serif; }
-        #prompts-content .copy-btn { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-bottom: 10px; }
-        #prompts-content .copy-btn:hover { background: #218838; }
-        #prompts-content .prompt-inner p { margin: 0 0 1rem 0; }
-      `}</style>
-    </>
+        ) : translating ? (
+          <div className="text-center py-12">
+            <div className="spinner mx-auto mb-4" />
+            <p className="text-gray-500">Translating...</p>
+          </div>
+        ) : (
+          <div 
+            className="prose max-w-none"
+            dangerouslySetInnerHTML={{ __html: translatedContent }}
+          />
+        )}
+      </article>
+    </main>
   )
 }
