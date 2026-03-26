@@ -132,7 +132,7 @@ export default function SchedulerPage() {
         </div>
 
         <p className="text-xs text-[#9ca3af] mt-4">
-          You'll be redirected to Postiz to preview and confirm your post before scheduling.
+          You&apos;ll be redirected to Postiz to preview and confirm your post before scheduling.
         </p>
       </div>
 
