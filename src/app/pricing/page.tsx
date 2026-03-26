@@ -9,10 +9,11 @@ export default function Pricing() {
   // Monthly = yearly * 1.33, so yearly = monthly / 1.33
   // $5/mo monthly -> $3.76/mo yearly (~$45/year)
   // $15/mo monthly -> $11.28/mo yearly (~$135/year)
+  // Yearly prices (base), monthly = yearly * 1.33
   const plans = [
     {
       name: 'Free',
-      monthly: 0,
+      yearlyPrice: 0,
       features: [
         '5 posts per month',
         'All platforms (except X)',
@@ -24,7 +25,7 @@ export default function Pricing() {
     },
     {
       name: 'Starter',
-      monthly: 5,
+      yearlyPrice: 5,
       features: [
         '100 X posts/month',
         'Unlimited posts (other platforms)',
@@ -37,7 +38,7 @@ export default function Pricing() {
     },
     {
       name: 'Pro',
-      monthly: 15,
+      yearlyPrice: 15,
       features: [
         '500 X posts/month',
         'Unlimited posts (other platforms)',
@@ -51,10 +52,7 @@ export default function Pricing() {
     },
   ];
 
-  const yearlyPrice = (monthly: number) => {
-    if (monthly === 0) return 0;
-    return Math.round((monthly / 1.33) * 100) / 100;
-  };
+  const getMonthlyPrice = (yearly: number) => Math.round(yearly * 1.33 * 100) / 100;
 
   return (
     <div className="min-h-screen bg-[#0a0f1a]">
@@ -65,29 +63,29 @@ export default function Pricing() {
             Simple, Transparent Pricing
           </h1>
           <p className="text-xl text-white/90 mb-8">
-            Save up to 25% with yearly billing
+            Yearly billing saves you 25%
           </p>
           
           {/* Toggle */}
           <div className="inline-flex items-center gap-4 bg-white/10 backdrop-blur rounded-full p-1">
             <button
               onClick={() => setIsYearly(false)}
-              className={`px-6 py-2 rounded-full font-medium transition-colors ${
+              className={`px-6 py-2 rounded-full font-medium transition-colors flex items-center gap-2 ${
                 !isYearly ? 'bg-white text-[#1780e3]' : 'text-white hover:bg-white/10'
               }`}
             >
               Monthly
+              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                +33%
+              </span>
             </button>
             <button
               onClick={() => setIsYearly(true)}
-              className={`px-6 py-2 rounded-full font-medium transition-colors flex items-center gap-2 ${
+              className={`px-6 py-2 rounded-full font-medium transition-colors ${
                 isYearly ? 'bg-white text-[#1780e3]' : 'text-white hover:bg-white/10'
               }`}
             >
               Yearly
-              <span className="text-xs bg-[#22c55e] text-white px-2 py-0.5 rounded-full">
-                -25%
-              </span>
             </button>
           </div>
         </div>
@@ -116,16 +114,16 @@ export default function Pricing() {
               
               <div className="mb-6">
                 <span className="text-4xl font-bold text-white">
-                  {isYearly ? `$${yearlyPrice(plan.monthly)}` : `$${plan.monthly}`}
+                  ${isYearly ? plan.yearlyPrice : getMonthlyPrice(plan.yearlyPrice)}
                 </span>
                 <span className="text-[#9ca3af]">
-                  /month{isYearly && plan.monthly > 0 ? ' (billed yearly)' : ''}
+                  /month{isYearly && plan.yearlyPrice > 0 ? ' (billed yearly)' : ''}
                 </span>
               </div>
               
-              {isYearly && plan.monthly > 0 && (
-                <p className="text-sm text-[#22c55e] mb-4">
-                  Save ${Math.round((plan.monthly - yearlyPrice(plan.monthly)) * 12)}/year
+              {!isYearly && plan.yearlyPrice > 0 && (
+                <p className="text-sm text-[#9ca3af] mb-4">
+                  Yearly: ${plan.yearlyPrice}/mo (save 25%)
                 </p>
               )}
               
