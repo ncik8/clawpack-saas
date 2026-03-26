@@ -30,7 +30,7 @@ export default function Pricing() {
             <ul className="space-y-3 mb-8">
               {[
                 '5 posts per month',
-                'All platforms',
+                'All platforms (except X)',
                 'Basic analytics',
                 'Email support',
               ].map((feature) => (
