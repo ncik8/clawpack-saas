@@ -3,140 +3,165 @@ import Link from 'next/link';
 export default function Home() {
   return (
     <div className="min-h-screen bg-[#0a0f1a]">
-      {/* Hero Section */}
-      <header className="bg-gradient-to-br from-[#083056] to-[#1780e3] text-white py-20 px-8">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/10 backdrop-blur mb-6">
-            <span className="text-3xl font-bold">CP</span>
+      {/* Nav */}
+      <nav className="flex items-center justify-between px-8 py-4 border-b border-[#1f2937]">
+        <div className="flex items-center gap-2">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1780e3] to-[#76afe5] flex items-center justify-center">
+            <span className="text-white font-bold">CP</span>
           </div>
-          <h1 className="text-5xl md:text-6xl font-bold mb-6">
-            ClawPack AI
-          </h1>
-          <p className="text-xl md:text-2xl text-white/90 mb-8 max-w-2xl mx-auto">
-            Schedule and publish social media posts across 15+ platforms from one place. 
-            X, LinkedIn, Instagram, Facebook, Bluesky, Mastodon, Nostr, and more.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link 
-              href="/login" 
-              className="px-8 py-4 bg-white text-[#1780e3] rounded-xl font-semibold text-lg hover:bg-white/90 transition-colors"
-            >
-              Get Started Free
-            </Link>
-            <Link 
-              href="/pricing" 
-              className="px-8 py-4 bg-white/10 backdrop-blur text-white rounded-xl font-semibold text-lg hover:bg-white/20 transition-colors"
-            >
-              View Pricing
-            </Link>
-          </div>
+          <span className="text-white font-semibold text-xl">ClawPack</span>
         </div>
-      </header>
+        <div className="flex items-center gap-6">
+          <Link href="/pricing" className="text-[#9ca3af] hover:text-white transition-colors">
+            Pricing
+          </Link>
+          <Link 
+            href="/login" 
+            className="px-5 py-2 bg-[#1780e3] text-white rounded-lg font-medium hover:bg-[#166bc7] transition-colors"
+          >
+            Login
+          </Link>
+        </div>
+      </nav>
 
-      {/* Supported Platforms */}
-      <section className="py-16 px-8">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-white text-center mb-12">
-            Supported Platforms
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+      {/* Hero */}
+      <section className="px-8 py-20">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
+            Social media&apos;s most powerful<br />automation platform
+          </h1>
+          <p className="text-xl text-[#9ca3af] mb-10 max-w-2xl mx-auto">
+            Schedule posts, generate AI content, and manage all your social accounts from one dashboard.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto mb-16">
+            <input 
+              type="email" 
+              placeholder="Enter your email" 
+              className="flex-1 px-4 py-3 bg-[#1f2937] border border-[#374151] rounded-lg text-white placeholder-[#6b7280] focus:outline-none focus:border-[#1780e3]"
+            />
+            <button className="px-6 py-3 bg-[#1780e3] text-white rounded-lg font-medium hover:bg-[#166bc7] transition-colors whitespace-nowrap">
+              Get Started
+            </button>
+          </div>
+
+          {/* Platform icons */}
+          <div className="flex flex-wrap justify-center gap-4 mb-16">
             {[
-              { name: 'X / Twitter', icon: '🐦', color: '#1DA1F2' },
+              { name: 'X', icon: '🐦', color: '#1DA1F2' },
               { name: 'LinkedIn', icon: '💼', color: '#0A66C2' },
               { name: 'Facebook', icon: '📘', color: '#1877F2' },
               { name: 'Instagram', icon: '📷', color: '#E4405F' },
-              { name: 'Bluesky', icon: '☁️', color: '#1185FE' },
-              { name: 'Mastodon', icon: '🐘', color: '#6364FF' },
-              { name: 'Nostr', icon: '⚡', color: '#黄金色' },
               { name: 'TikTok', icon: '🎵', color: '#000000' },
-              { name: 'YouTube', icon: '▶️', color: '#FF0000' },
+              { name: 'Bluesky', icon: '☁️', color: '#1185FE' },
               { name: 'Discord', icon: '🎮', color: '#5865F2' },
               { name: 'Telegram', icon: '✈️', color: '#0088CC' },
-              { name: 'WordPress', icon: '📝', color: '#21759B' },
-              { name: 'Dribbble', icon: '🏀', color: '#EA4C89' },
-              { name: 'Pinterest', icon: '📌', color: '#BD081C' },
-              { name: 'Threads', icon: '🧵', color: '#000000' },
-              { name: 'Mighty Networks', icon: '🌐', color: '#4C4C9D' },
             ].map((platform) => (
               <div 
                 key={platform.name}
-                className="bg-[#1f2937] rounded-xl p-4 flex items-center gap-3 hover:bg-[#374151] transition-colors"
+                className="w-12 h-12 rounded-xl bg-[#1f2937] border border-[#374151] flex items-center justify-center hover:border-[#1780e3] transition-colors"
+                title={platform.name}
               >
-                <span className="text-2xl">{platform.icon}</span>
-                <span className="text-white font-medium">{platform.name}</span>
+                <span className="text-xl">{platform.icon}</span>
               </div>
             ))}
+          </div>
+
+          {/* Hero image placeholder */}
+          <div className="bg-[#1f2937] rounded-2xl border border-[#374151] p-8 max-w-3xl mx-auto">
+            <div className="bg-[#111827] rounded-xl h-64 flex items-center justify-center">
+              <span className="text-[#6b7280]">Dashboard Preview</span>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="py-16 px-8 bg-[#1f2937]">
+      {/* Features - on grey background */}
+      <section className="px-8 py-20 bg-[#111827]">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-white text-center mb-12">
-            Features
+          <h2 className="text-3xl font-bold text-white text-center mb-4">
+            Everything you need to dominate social media
           </h2>
+          <p className="text-[#9ca3af] text-center mb-12 max-w-2xl mx-auto">
+            Powerful features that save you time and grow your audience.
+          </p>
+          
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
-                title: 'AI-Powered Prompts',
-                description: 'Access 100+ expert-crafted prompts for content creation, coding, marketing, and research.',
-                icon: '🤖'
+                icon: '🤖',
+                title: 'AI Content Generation',
+                description: 'Generate engaging posts with AI. Never stare at a blank composer again.'
               },
               {
+                icon: '📅',
                 title: 'Smart Scheduling',
-                description: 'Schedule posts across all platforms from one dashboard. Set it and forget it.',
-                icon: '📅'
+                description: 'Schedule posts at the best times. AI finds optimal posting times for your audience.'
               },
               {
-                title: 'Analytics',
-                description: 'Track your social media performance with detailed analytics.',
-                icon: '📊'
+                icon: '📊',
+                title: 'Analytics Dashboard',
+                description: 'Track performance across all platforms in one place. Know what works.'
+              },
+              {
+                icon: '🔗',
+                title: '15+ Platforms',
+                description: 'Connect all your accounts. X, LinkedIn, Facebook, Instagram, TikTok, and more.'
+              },
+              {
+                icon: '✍️',
+                title: 'Content Templates',
+                description: 'Start fast with proven templates. Customize for your brand voice.'
+              },
+              {
+                icon: '⚡',
+                title: 'Bulk Scheduling',
+                description: 'Upload a month of content in minutes. CSV import makes it easy.'
               },
             ].map((feature) => (
-              <div key={feature.title} className="bg-[#0a0f1a] rounded-xl p-6">
-                <span className="text-4xl mb-4 block">{feature.icon}</span>
-                <h3 className="text-xl font-semibold text-white mb-2">{feature.title}</h3>
-                <p className="text-[#9ca3af]">{feature.description}</p>
+              <div key={feature.title} className="bg-[#1f2937] rounded-xl p-6 border border-[#374151]">
+                <span className="text-3xl mb-4 block">{feature.icon}</span>
+                <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
+                <p className="text-[#9ca3af] text-sm">{feature.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing Preview */}
-      <section className="py-16 px-8">
+      {/* CTA */}
+      <section className="px-8 py-20">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl font-bold text-white mb-4">
-            Simple, Transparent Pricing
+            Ready to transform your social media?
           </h2>
           <p className="text-[#9ca3af] mb-8">
-            Pay only for what you use. No monthly fees, no commitments.
+            Start free. No credit card required.
           </p>
           <Link 
-            href="/pricing" 
+            href="/signup" 
             className="inline-block px-8 py-4 bg-[#1780e3] text-white rounded-xl font-semibold text-lg hover:bg-[#166bc7] transition-colors"
           >
-            View All Plans
+            Get Started Free
           </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-8 border-t border-[#374151]">
+      <footer className="px-8 py-8 border-t border-[#1f2937]">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1780e3] to-[#76afe5] flex items-center justify-center">
               <span className="text-white font-bold text-sm">CP</span>
             </div>
-            <span className="text-white font-semibold">ClawPack AI</span>
+            <span className="text-white font-semibold">ClawPack</span>
           </div>
           <div className="flex gap-6 text-sm text-[#9ca3af]">
             <Link href="/privacy" className="hover:text-white">Privacy</Link>
             <Link href="/terms" className="hover:text-white">Terms</Link>
           </div>
           <p className="text-sm text-[#6b7280]">
-            © 2026 ClawPack AI. All rights reserved.
+            © 2026 ClawPack. All rights reserved.
           </p>
         </div>
       </footer>
