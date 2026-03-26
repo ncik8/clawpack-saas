@@ -194,10 +194,11 @@ export default function ConnectedAccountsPage() {
                 {isConnected ? (
                   <>
                     <button 
-                      className="btn btn-secondary flex-1"
-                      onClick={() => window.open(`${POSTIZ_URL}/channels`, '_blank')}
+                      className="btn flex-1"
+                      style={{ backgroundColor: '#22c55e', color: 'white', cursor: 'default' }}
+                      disabled
                     >
-                      Manage in Postiz
+                      ✓ Connected
                     </button>
                     <button 
                       className="btn btn-ghost text-[#ef4444]"
