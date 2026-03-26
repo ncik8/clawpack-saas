@@ -157,7 +157,7 @@ export default function Pricing() {
       <section className="py-8 px-8 bg-[#1f2937]">
         <div className="max-w-3xl mx-auto text-center">
           <p className="text-[#9ca3af]">
-            <strong className="text-white">X posts cost $0.02 each.</strong> Your plan includes a monthly allowance. 
+            <strong className="text-white">X posts cost $0.05 each.</strong> Your plan includes a monthly allowance. 
             Additional posts are billed at cost. Other platforms (LinkedIn, Facebook, Bluesky, Mastodon, etc.) are always free and unlimited.
           </p>
         </div>
