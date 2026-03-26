@@ -33,7 +33,7 @@ export default function ConnectedAccountsPage() {
 
   const fetchChannels = async () => {
     try {
-      const res = await fetch(`${POSTIZ_URL}/api/v1/channels`, {
+      const res = await fetch(`${POSTIZ_URL}/api/channels`, {
         headers: {
           Authorization: `Bearer ${POSTIZ_API_KEY}`,
         },
@@ -65,7 +65,7 @@ export default function ConnectedAccountsPage() {
     if (!confirm('Are you sure you want to disconnect this channel?')) return;
     
     try {
-      const res = await fetch(`${POSTIZ_URL}/api/v1/channels/${channelId}`, {
+      const res = await fetch(`${POSTIZ_URL}/api/channels/${channelId}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${POSTIZ_API_KEY}`,
