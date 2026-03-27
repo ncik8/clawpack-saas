@@ -36,10 +36,37 @@ export default function ConnectedAccountsPage() {
     setLoading(false);
   }, []);
 
+  // Map frontend platform IDs to Postiz OAuth paths
+  const getOAuthPath = (platform: string): string => {
+    const pathMap: Record<string, string> = {
+      'x': 'twitter',
+      'linkedin': 'linkedin-oauth2',
+      'linkedin-page': 'linkedin',
+      'facebook': 'facebook',
+      'instagram': 'instagram',
+      'instagram-standalone': 'instagram',
+      'tiktok': 'tiktok',
+      'youtube': 'youtube',
+      'bluesky': 'bluesky',
+      'mastodon': 'mastodon',
+      'threads': 'threads',
+      'pinterest': 'pinterest',
+      'dribbble': 'dribbble',
+      'discord': 'discord',
+      'telegram': 'telegram',
+      'wordpress': 'wordpress',
+      'reddit': 'reddit',
+      'slack': 'slack',
+      'nostr': 'nostr',
+    };
+    return pathMap[platform] || platform;
+  };
+
   const handleConnect = (platform: string) => {
     setConnecting(platform);
     // Redirect to Postiz OAuth via our proxy
-    window.open(`${API_PROXY_URL}/connect/${platform}`, '_blank');
+    const oauthPath = getOAuthPath(platform);
+    window.open(`${API_PROXY_URL}/connect/${oauthPath}`, '_blank');
     
     // After OAuth, user returns - give them a moment to complete
     setTimeout(() => {
