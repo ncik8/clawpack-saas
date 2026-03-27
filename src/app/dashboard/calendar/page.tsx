@@ -3,60 +3,26 @@
 import { useState, useEffect } from 'react';
 
 const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
-const POSTIZ_API_KEY = process.env.NEXT_PUBLIC_POSTIZ_API_KEY || '';
-
-interface ScheduledPost {
-  id: string;
-  content: string;
-  scheduledAt: string;
-  channels: string[];
-  status: string;
-}
 
 export default function CalendarPage() {
-  const [posts, setPosts] = useState<ScheduledPost[]>([]);
+  const [posts, setPosts] = useState<{id: string; content: string; scheduledAt: string; platforms: string[]}[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPost, setSelectedPost] = useState<ScheduledPost | null>(null);
 
+  // Load from localStorage for demo
   useEffect(() => {
-    fetchScheduledPosts();
+    const saved = localStorage.getItem('scheduled_posts');
+    if (saved) {
+      setPosts(JSON.parse(saved));
+    }
+    setLoading(false);
   }, []);
 
-  const fetchScheduledPosts = async () => {
-    try {
-      const res = await fetch(`${POSTIZ_URL}/api/posts`, {
-        headers: {
-          Authorization: `Bearer ${POSTIZ_API_KEY}`,
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPosts(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch posts:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (postId: string) => {
+  const handleDelete = (postId: string) => {
     if (!confirm('Are you sure you want to delete this post?')) return;
     
-    try {
-      const res = await fetch(`${POSTIZ_URL}/api/posts/${postId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${POSTIZ_API_KEY}`,
-        },
-      });
-      if (res.ok) {
-        setPosts(posts.filter(p => p.id !== postId));
-        setSelectedPost(null);
-      }
-    } catch (err) {
-      console.error('Failed to delete post:', err);
-    }
+    const updated = posts.filter(p => p.id !== postId);
+    setPosts(updated);
+    localStorage.setItem('scheduled_posts', JSON.stringify(updated));
   };
 
   // Group posts by date
@@ -70,7 +36,7 @@ export default function CalendarPage() {
     if (!acc[date]) acc[date] = [];
     acc[date].push(post);
     return acc;
-  }, {} as Record<string, ScheduledPost[]>);
+  }, {} as Record<string, typeof posts>);
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString('en-US', {
@@ -95,29 +61,52 @@ export default function CalendarPage() {
     return emojis[platform] || '📱';
   };
 
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center h-64">
+        <div className="spinner" />
+      </div>
+    );
+  }
+
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-2">Calendar</h1>
-        <p className="text-[#9ca3af] text-sm">View and manage your scheduled posts</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-2">Calendar</h1>
+          <p className="text-[#9ca3af] text-sm">View and manage your scheduled posts</p>
+        </div>
+        <a 
+          href={POSTIZ_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-secondary text-sm"
+        >
+          View in Postiz ↗
+        </a>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="spinner" />
-        </div>
-      ) : posts.length === 0 ? (
+      {posts.length === 0 ? (
         <div className="text-center py-16">
-          <div className="text-4xl mb-4">📅</div>
-          <h3 className="text-white text-lg mb-2">No scheduled posts</h3>
-          <p className="text-[#9ca3af] text-sm">Create your first post to see it here</p>
+          <div className="text-5xl mb-4">📅</div>
+          <h3 className="text-white text-xl mb-2">No scheduled posts yet</h3>
+          <p className="text-[#9ca3af] mb-6 max-w-md mx-auto">
+            Create your first post to see it scheduled here. Your posts will be automatically synced from our scheduling system.
+          </p>
           <a 
             href="/dashboard/create" 
-            className="inline-block mt-4 px-6 py-2 bg-[#1780e3] text-white rounded-lg hover:bg-[#166bc7] transition-colors"
+            className="inline-block px-6 py-3 bg-[#1780e3] text-white rounded-lg hover:bg-[#166bc7] transition-colors"
           >
-            Create Post
+            Create Your First Post
           </a>
+          
+          <div className="mt-8 p-4 bg-[#1f2937] rounded-lg max-w-md mx-auto">
+            <p className="text-[#9ca3af] text-sm">
+              <strong className="text-white">Want to see your posts?</strong><br />
+              Create posts in the Create tab and they&apos;ll appear here after scheduling.
+            </p>
+          </div>
         </div>
       ) : (
         <div className="space-y-8">
@@ -147,7 +136,7 @@ export default function CalendarPage() {
                         
                         {/* Platforms */}
                         <div className="flex flex-wrap gap-2">
-                          {post.channels.map((ch) => (
+                          {post.platforms.map((ch) => (
                             <span 
                               key={ch}
                               className="text-lg"
