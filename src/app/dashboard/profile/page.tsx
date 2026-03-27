@@ -176,7 +176,7 @@ export default function ProfilePage() {
           {activeTab === 'subscription' && (
             <div className="space-y-6">
               <div className="card">
-                <h2 className="text-lg font-semibold text-white mb-4">Manage Subscription</h2>
+                <h2 className="text-lg font-semibold text-white mb-4">Subscription</h2>
                 
                 {/* Current */}
                 <div className="p-4 bg-[#111827] rounded-lg mb-4">
@@ -190,41 +190,32 @@ export default function ProfilePage() {
                   <p className="text-[#6b7280] text-xs">Next billing: April 27, 2026</p>
                 </div>
 
-                <div className="flex gap-3">
-                  <button className="btn btn-secondary">
-                    Change Plan
-                  </button>
-                  <button className="btn btn-secondary text-[#f59e0b]">
-                    Cancel Subscription
-                  </button>
+                <div className="bg-[#1780e3]/10 border border-[#1780e3]/30 rounded-lg p-4 mb-4">
+                  <p className="text-[#1780e3] text-sm">
+                    <strong>💳 Powered by Stripe</strong><br />
+                    Manage your subscription, payment method, and billing history securely through Stripe.
+                  </p>
                 </div>
+
+                <a 
+                  href="#" 
+                  className="btn btn-primary inline-block"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // In production, this would link to Stripe Customer Portal
+                    alert('Stripe Customer Portal link would go here');
+                  }}
+                >
+                  Manage via Stripe
+                </a>
               </div>
 
               {/* Billing History */}
               <div className="card">
                 <h2 className="text-lg font-semibold text-white mb-4">Billing History</h2>
                 <div className="text-center py-8 text-[#6b7280]">
-                  <p>No billing history yet</p>
-                  <p className="text-sm">Your subscription will appear here after your first billing cycle</p>
-                </div>
-              </div>
-
-              {/* Payment Method */}
-              <div className="card">
-                <h2 className="text-lg font-semibold text-white mb-4">Payment Method</h2>
-                <div className="flex items-center justify-between p-4 bg-[#111827] rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-6 bg-[#1f2937] rounded flex items-center justify-center text-xs text-white">
-                      ••••
-                    </div>
-                    <div>
-                      <p className="text-white text-sm">•••• •••• •••• 4242</p>
-                      <p className="text-[#6b7280] text-xs">Expires 12/28</p>
-                    </div>
-                  </div>
-                  <button className="btn btn-secondary text-sm">
-                    Update
-                  </button>
+                  <p>No invoices yet</p>
+                  <p className="text-sm">View your invoices in the Stripe Customer Portal after your first billing</p>
                 </div>
               </div>
             </div>
