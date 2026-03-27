@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
+const API_PROXY_URL = 'https://api.clawpack.net';
 const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
 
 interface Channel {
@@ -37,8 +38,8 @@ export default function ConnectedAccountsPage() {
 
   const handleConnect = (platform: string) => {
     setConnecting(platform);
-    // Redirect to Postiz OAuth
-    window.open(`${POSTIZ_URL}/integrations/social/${platform}`, '_blank');
+    // Redirect to Postiz OAuth via our proxy
+    window.open(`${API_PROXY_URL}/connect/${platform}`, '_blank');
     
     // After OAuth, user returns - give them a moment to complete
     setTimeout(() => {
