@@ -10,8 +10,7 @@ export default function SchedulerPage() {
   const [platforms, setPlatforms] = useState<string[]>(['x']);
 
   const handleSchedule = () => {
-    // Redirect to Postiz to create a new post
-    // Postiz handles the actual scheduling
+    // Redirect to scheduling page to create a new post
     window.open(`${POSTIZ_URL}/posts/new`, '_blank');
   };
 
@@ -127,21 +126,20 @@ export default function SchedulerPage() {
             onClick={handleSchedule}
             className="btn btn-primary flex-1"
           >
-            Open Postiz to Schedule
+            Create Post
           </button>
         </div>
 
         <p className="text-xs text-[#9ca3af] mt-4">
-          You&apos;ll be redirected to Postiz to preview and confirm your post before scheduling.
+          Opens the post composer where you can preview, add images, and schedule.
         </p>
       </div>
 
       {/* Info Card */}
       <div className="p-4 rounded-lg bg-[#1780e3]/10 border border-[#1780e3]/30">
         <p className="text-sm text-[#1780e3]">
-          <strong>How it works:</strong> Clicking the button opens Postiz where you can 
-          preview your post, add images, and confirm the schedule. Your connected social 
-          accounts will automatically receive the post at the scheduled time.
+          <strong>How it works:</strong> Create your post, select platforms, and schedule. 
+          Your content will be published automatically at the scheduled time.
         </p>
       </div>
     </div>

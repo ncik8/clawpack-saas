@@ -156,13 +156,6 @@ export default function ConnectedAccountsPage() {
         <p className="text-[#9ca3af]">Connect your social media accounts to start posting</p>
       </div>
 
-      {/* Postiz Status */}
-      <div className="mb-6 p-4 rounded-lg bg-[#22c55e]/10 border border-[#22c55e]/30">
-        <p className="text-sm text-[#22c55e]">
-          ✅ Connected to <strong>Postiz</strong> at {POSTIZ_URL}
-        </p>
-      </div>
-
       {/* Platform cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {platforms.map((platform) => {
@@ -232,8 +225,8 @@ export default function ConnectedAccountsPage() {
       {/* Info */}
       <div className="mt-8 p-4 rounded-lg bg-[#1780e3]/10 border border-[#1780e3]/30">
         <p className="text-sm text-[#1780e3]">
-          <strong>How it works:</strong> Clicking Connect opens Postiz where you authorize 
-          the account. Once connected, you can schedule posts to multiple platforms from one place.
+          <strong>How it works:</strong> Clicking Connect opens the authorization page where you 
+          approve the connection. Once connected, you can schedule posts to multiple platforms from one dashboard.
         </p>
       </div>
     </div>
