@@ -2,189 +2,284 @@
 
 import { useState } from 'react';
 
-const platforms = [
-  { id: 'x', name: 'X / Twitter', checked: true },
-  { id: 'linkedin', name: 'LinkedIn', checked: true },
-  { id: 'facebook', name: 'Facebook', checked: false },
-  { id: 'instagram', name: 'Instagram', checked: false },
-];
+const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
+const MINIMAX_API_KEY = process.env.NEXT_PUBLIC_MINIMAX_API_KEY || '';
+const MINIMAX_URL = 'https://api.minimax.io/anthropic';
 
-export default function CreatePostPage() {
+const SYSTEM_PROMPT = `You are an expert social media copywriter with deep knowledge of hashtags, SEO, engagement optimization, and platform-specific best practices.
+
+Your expertise includes:
+- Writing compelling posts that drive engagement
+- Using relevant hashtags strategically (1-5 per platform)
+- Optimizing for each platform (X:280 chars, LinkedIn:3000, etc.)
+- Creating calls-to-action that work
+- Understanding what content performs well on each platform
+
+Always provide:
+1. A catchy headline/hook
+2. 2-3 relevant hashtags
+3. A clear, engaging message
+
+Format your response as a ready-to-post message. Keep it authentic and human.`;
+
+export default function SchedulerPage() {
   const [content, setContent] = useState('');
-  const [activeTab, setActiveTab] = useState<'write' | 'ai' | 'repurpose'>('write');
-  const [scheduleMode, setScheduleMode] = useState<'now' | 'schedule'>('now');
-  const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
+  const [platforms, setPlatforms] = useState<string[]>(['x']);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiError, setAiError] = useState('');
 
-  const charCount = content.length;
-  const maxXChars = 280;
+  const platformsList = [
+    { id: 'x', name: 'X / Twitter', emoji: '🐦', maxChars: 280 },
+    { id: 'linkedin', name: 'LinkedIn', emoji: '💼', maxChars: 3000 },
+    { id: 'facebook', name: 'Facebook', emoji: '📘', maxChars: 63206 },
+    { id: 'instagram', name: 'Instagram', emoji: '📷', maxChars: 2200 },
+  ];
+
+  const handleSchedule = () => {
+    window.open(`${POSTIZ_URL}/posts/new`, '_blank');
+  };
+
+  const generateAiSuggestions = async () => {
+    if (!aiPrompt.trim()) return;
+    
+    setAiLoading(true);
+    setAiError('');
+    setAiSuggestions([]);
+
+    const targetPlatform = platforms.includes('x') ? 'X/Twitter' 
+      : platforms.includes('linkedin') ? 'LinkedIn' 
+      : platforms.includes('instagram') ? 'Instagram' 
+      : 'Facebook';
+
+    try {
+      const response = await fetch(MINIMAX_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MINIMAX_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'MiniMax-M2.7',
+          max_tokens: 500,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: `Write 3 engaging social media posts about: "${aiPrompt}". Target platform: ${targetPlatform}. Make each post unique with different angles. Return ONLY the 3 posts, numbered 1-3, nothing else.` }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('AI request failed');
+      }
+
+      const data = await response.json();
+      const text = data.content?.[0]?.text || '';
+      
+      // Parse the 3 suggestions
+      const suggestions = text
+        .split(/\n?\d\.\s*/)
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length > 20);
+      
+      setAiSuggestions(suggestions.slice(0, 3));
+    } catch (err) {
+      setAiError('Failed to generate suggestions. Please try again.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const useSuggestion = (suggestion: string) => {
+    setContent(suggestion);
+    setAiSuggestions([]);
+    setAiPrompt('');
+  };
 
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-white">Create Post</h1>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-white mb-2">Create</h1>
+        <p className="text-[#9ca3af]">Write, optimize, and schedule your social media posts</p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6">
-        {[
-          { id: 'write', label: 'Write', icon: '✏️' },
-          { id: 'ai', label: 'AI Assistant', icon: '🤖' },
-          { id: 'repurpose', label: 'Repurpose', icon: '🔄' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as typeof activeTab)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'bg-[#1780e3] text-white'
-                : 'bg-[#1f2937] text-[#9ca3af] hover:text-white'
-            }`}
-          >
-            <span>{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-3 gap-6">
-        {/* Main editor */}
-        <div className="col-span-2 space-y-4">
-          {/* Text area */}
-          <div className="card">
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="What's on your mind?"
-              className="w-full h-40 bg-transparent border-none resize-none text-white placeholder-[#6b7280] focus:outline-none"
-            />
-            <div className="flex items-center justify-between pt-3 border-t border-[#374151]">
-              <div className="flex gap-2">
-                <button className="btn btn-ghost py-1 px-2 text-xs">📷 Image</button>
-                <button className="btn btn-ghost py-1 px-2 text-xs">🎨 AI Image</button>
-                <button className="btn btn-ghost py-1 px-2 text-xs">📎 File</button>
-              </div>
-              <span className={`text-xs ${charCount > maxXChars ? 'text-[#ef4444]' : 'text-[#6b7280]'}`}>
-                {charCount > 0 && `${charCount} characters`}
-              </span>
-            </div>
-          </div>
-
-          {/* Media preview */}
-          <div className="card">
-            <p className="text-sm text-[#9ca3af] mb-3">Media</p>
-            <div className="flex gap-2">
-              <div className="w-20 h-20 rounded-lg border-2 border-dashed border-[#374151] flex items-center justify-center text-[#6b7280] hover:border-[#1780e3] hover:text-[#1780e3] cursor-pointer transition-colors">
-                <span className="text-2xl">+</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Platforms */}
-          <div className="card">
-            <p className="text-sm font-medium text-white mb-3">Platforms</p>
-            <div className="space-y-2">
-              {platforms.map((platform) => (
-                <label key={platform.id} className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={platform.checked}
-                    className="w-4 h-4 rounded border-[#374151] bg-[#111827] text-[#1780e3] focus:ring-[#1780e3]"
-                  />
-                  <span className="text-sm text-white">{platform.name}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Schedule */}
-          <div className="card">
-            <p className="text-sm font-medium text-white mb-3">Schedule</p>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="schedule"
-                  checked={scheduleMode === 'now'}
-                  onChange={() => setScheduleMode('now')}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm text-white">Post now</span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Left Column - Post Composer */}
+        <div>
+          <div className="card mb-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Your Post</h2>
+            
+            {/* Content */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-white mb-2">
+                What do you want to share?
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="schedule"
-                  checked={scheduleMode === 'schedule'}
-                  onChange={() => setScheduleMode('schedule')}
-                  className="w-4 h-4"
-                />
-                <span className="text-sm text-white">Schedule</span>
-              </label>
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Write your post content..."
+                className="input h-32 resize-none"
+                maxLength={platformsList.find(p => platforms.includes(p.id))?.maxChars || 280}
+              />
+              <p className="text-xs text-[#9ca3af] mt-1">
+                {content.length}/{platformsList.find(p => platforms.includes(p.id))?.maxChars || 280} characters
+              </p>
             </div>
-            {scheduleMode === 'schedule' && (
-              <div className="flex gap-3 mt-4">
+
+            {/* Platform Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-white mb-2">
+                Select platforms
+              </label>
+              <div className="flex flex-wrap gap-3">
+                {platformsList.map((platform) => (
+                  <label
+                    key={platform.id}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
+                      platforms.includes(platform.id)
+                        ? 'bg-[#1780e3]/20 border-[#1780e3] text-white'
+                        : 'bg-[#1f2937] border-[#374151] text-[#9ca3af] hover:border-[#1780e3]/50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={platforms.includes(platform.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setPlatforms([...platforms, platform.id]);
+                        } else {
+                          setPlatforms(platforms.filter(p => p !== platform.id));
+                        }
+                      }}
+                      className="hidden"
+                    />
+                    <span>{platform.emoji}</span>
+                    <span>{platform.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Schedule Time */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-white mb-2">
+                When to post
+              </label>
+              <div className="flex gap-3">
                 <input
-                  type="date"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  className="input flex-1"
-                />
-                <input
-                  type="time"
+                  type="datetime-local"
                   value={scheduledTime}
                   onChange={(e) => setScheduledTime(e.target.value)}
                   className="input flex-1"
                 />
+                <button
+                  onClick={() => {
+                    const now = new Date();
+                    now.setMinutes(now.getMinutes() + 5);
+                    setScheduledTime(now.toISOString().slice(0, 16));
+                  }}
+                  className="btn btn-secondary"
+                >
+                  +5 min
+                </button>
+                <button
+                  onClick={() => {
+                    const now = new Date();
+                    now.setHours(now.getHours() + 1);
+                    setScheduledTime(now.toISOString().slice(0, 16));
+                  }}
+                  className="btn btn-secondary"
+                >
+                  +1 hour
+                </button>
               </div>
-            )}
-          </div>
+              <p className="text-xs text-[#9ca3af] mt-1">
+                Time is in Hong Kong timezone (GMT+8)
+              </p>
+            </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3">
-            <button className="btn btn-secondary">Save Draft</button>
-            <button className="btn btn-primary">
-              {scheduleMode === 'now' ? 'Post Now' : 'Schedule'}
-            </button>
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleSchedule}
+                className="btn btn-primary flex-1"
+              >
+                Create Post
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Preview */}
-        <div className="space-y-4">
-          <div className="card">
-            <p className="text-sm font-medium text-white mb-3">X Preview</p>
-            <div className="bg-[#111827] rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#1780e3] to-[#76afe5]" />
-                <div>
-                  <p className="text-sm font-medium text-white">Nick Williams</p>
-                  <p className="text-xs text-[#6b7280]">@nickwilliams</p>
-                </div>
-              </div>
-              <p className="text-sm text-white mb-2">{content || 'Your post content will appear here...'}</p>
-              <div className="flex items-center gap-4 text-[#6b7280] text-xs">
-                <span>{charCount}/{maxXChars}</span>
-                <span>Retweet</span>
-                <span>Like</span>
-                <span>Share</span>
-              </div>
+        {/* Right Column - AI Assistant */}
+        <div>
+          <div className="card bg-gradient-to-br from-[#083056] to-[#1780e3]">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">🤖</span>
+              <h2 className="text-xl font-semibold text-white">AI Post Assistant</h2>
             </div>
-          </div>
+            <p className="text-white/80 text-sm mb-4">
+              Describe your post topic and let AI generate engaging content with optimal hashtags and SEO.
+            </p>
 
-          <div className="card">
-            <p className="text-sm font-medium text-white mb-3">LinkedIn Preview</p>
-            <div className="bg-[#111827] rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-10 h-10 rounded-full bg-[#0A66C2] flex items-center justify-center text-white font-bold text-sm">
-                  N
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-white">Nick Williams</p>
-                  <p className="text-xs text-[#6b7280]">2h ago</p>
-                </div>
+            {/* AI Input */}
+            <div className="mb-4">
+              <textarea
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="e.g., 'We're launching our new AI tool that helps small businesses automate social media'"
+                className="input w-full h-24 resize-none bg-white/10 border-white/20 text-white placeholder-white/50"
+              />
+            </div>
+
+            <button
+              onClick={generateAiSuggestions}
+              disabled={aiLoading || !aiPrompt.trim()}
+              className="btn w-full mb-4"
+              style={{ backgroundColor: '#22c55e', color: 'white' }}
+            >
+              {aiLoading ? (
+                <>
+                  <span className="spinner mr-2" />
+                  Generating...
+                </>
+              ) : (
+                '✨ Generate Suggestions'
+              )}
+            </button>
+
+            {aiError && (
+              <p className="text-red-300 text-sm mb-4">{aiError}</p>
+            )}
+
+            {/* AI Suggestions */}
+            {aiSuggestions.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-white text-sm font-medium">Choose a suggestion:</p>
+                {aiSuggestions.map((suggestion, index) => (
+                  <div 
+                    key={index}
+                    className="bg-white/10 rounded-lg p-3 cursor-pointer hover:bg-white/20 transition-colors"
+                    onClick={() => {
+                      setContent(suggestion);
+                      setAiSuggestions([]);
+                      setAiPrompt('');
+                    }}
+                  >
+                    <p className="text-white text-sm whitespace-pre-wrap">{suggestion}</p>
+                    <p className="text-white/60 text-xs mt-2">Click to use this</p>
+                  </div>
+                ))}
               </div>
-              <p className="text-sm text-white">{content || 'Your post content will appear here...'}</p>
+            )}
+
+            {/* Tips */}
+            <div className="mt-6 pt-4 border-t border-white/20">
+              <p className="text-white/80 text-xs">
+                <strong>Pro tip:</strong> Be specific about your topic, audience, and goal for better results!
+              </p>
             </div>
           </div>
         </div>
