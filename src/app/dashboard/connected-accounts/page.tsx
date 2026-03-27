@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
-const API_PROXY_URL = 'https://api.clawpack.net';
-const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://api.clawpack.net';
+const API_PROXY_URL = 'https://post.clawpack.net';
+const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
 
 interface Channel {
   id: string;

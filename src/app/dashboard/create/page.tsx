@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://api.clawpack.net';
+const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
 const MINIMAX_API_KEY = process.env.NEXT_PUBLIC_MINIMAX_API_KEY || '';
 const MINIMAX_URL = 'https://api.minimax.io/anthropic';
 
