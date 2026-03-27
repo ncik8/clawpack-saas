@@ -1,10 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [timezone, setTimezone] = useState('Asia/Hong_Kong');
+  const [timezones] = useState([
+    'Pacific/Honolulu', 'America/Anchorage', 'America/Los_Angeles', 'America/Denver',
+    'America/Chicago', 'America/New_York', 'America/Sao_Paulo', 'Atlantic/Reykjavik',
+    'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Dubai', 'Asia/Kolkata',
+    'Asia/Singapore', 'Asia/Hong_Kong', 'Asia/Tokyo', 'Australia/Sydney', 'Pacific/Auckland'
+  ]);
+
+  useEffect(() => {
+    // Auto-detect timezone
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    setTimezone(detected);
+  }, []);
 
   const user = {
     name: 'Nick Williams',
@@ -271,26 +284,62 @@ export default function ProfilePage() {
           )}
 
           {activeTab === 'notifications' && (
-            <div className="card">
-              <h2 className="text-lg font-semibold text-white mb-4">Notification Preferences</h2>
-              
-              <div className="space-y-4">
-                {[
-                  { label: 'Email notifications', desc: 'Receive email updates about your account', enabled: true },
-                  { label: 'Marketing emails', desc: 'Tips, news, and product updates', enabled: false },
-                  { label: 'Post reminders', desc: 'Remind me to create content', enabled: true },
-                  { label: 'Weekly digest', desc: 'Summary of your social media performance', enabled: false },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between py-3 border-b border-[#374151] last:border-0">
-                    <div>
-                      <p className="text-white">{item.label}</p>
-                      <p className="text-[#6b7280] text-sm">{item.desc}</p>
+            <div className="space-y-6">
+              <div className="card">
+                <h2 className="text-lg font-semibold text-white mb-4">Notification Preferences</h2>
+                
+                <div className="space-y-4">
+                  {[
+                    { label: 'Email notifications', desc: 'Receive email updates about your account', enabled: true },
+                    { label: 'Marketing emails', desc: 'Tips, news, and product updates', enabled: false },
+                    { label: 'Post reminders', desc: 'Remind me to create content', enabled: true },
+                    { label: 'Weekly digest', desc: 'Summary of your social media performance', enabled: false },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center justify-between py-3 border-b border-[#374151] last:border-0">
+                      <div>
+                        <p className="text-white">{item.label}</p>
+                        <p className="text-[#6b7280] text-sm">{item.desc}</p>
+                      </div>
+                      <button className={`w-12 h-6 rounded-full transition-colors ${item.enabled ? 'bg-[#22c55e]' : 'bg-[#374151]'}`}>
+                        <div className={`w-5 h-5 bg-white rounded-full transition-transform ${item.enabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                      </button>
                     </div>
-                    <button className={`w-12 h-6 rounded-full transition-colors ${item.enabled ? 'bg-[#22c55e]' : 'bg-[#374151]'}`}>
-                      <div className={`w-5 h-5 bg-white rounded-full transition-transform ${item.enabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
-                    </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </div>
+
+              <div className="card">
+                <h2 className="text-lg font-semibold text-white mb-4">Timezone</h2>
+                <p className="text-[#9ca3af] text-sm mb-4">
+                  Your timezone is used to display scheduling times and send notifications at the right time.
+                </p>
+                
+                <div className="flex items-center gap-4">
+                  <select
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    className="input flex-1"
+                  >
+                    {timezones.map((tz) => (
+                      <option key={tz} value={tz}>
+                        {tz.replace('_', ' ')}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="btn btn-primary">
+                    Save
+                  </button>
+                </div>
+
+                <div className="mt-4 p-3 bg-[#111827] rounded-lg">
+                  <p className="text-white text-sm">Current local time:</p>
+                  <p className="text-[#1780e3] font-semibold">
+                    {new Date().toLocaleTimeString('en-US', { timeZone: timezone, hour: '2-digit', minute: '2-digit' })} {' '}
+                    <span className="text-[#9ca3af] text-sm">
+                      ({new Date().toLocaleDateString('en-US', { timeZone: timezone, weekday: 'short', month: 'short', day: 'numeric' })})
+                    </span>
+                  </p>
+                </div>
               </div>
             </div>
           )}
