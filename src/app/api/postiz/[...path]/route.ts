@@ -1,4 +1,4 @@
-const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
+const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://api.clawpack.net';
 const POSTIZ_EMAIL = 'charliemo123@gmail.com';
 const POSTIZ_PASSWORD = 'Noodle@478788';
 

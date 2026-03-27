@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
+const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://api.clawpack.net';
 
 export default function CalendarPage() {
   const [posts, setPosts] = useState<{id: string; content: string; scheduledAt: string; platforms: string[]}[]>([]);
