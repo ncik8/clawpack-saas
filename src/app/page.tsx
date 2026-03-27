@@ -35,14 +35,12 @@ export default function Home() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto mb-16">
-            <input 
-              type="email" 
-              placeholder="Enter your email" 
-              className="flex-1 px-4 py-3 bg-[#1f2937] border border-[#374151] rounded-lg text-white placeholder-[#6b7280] focus:outline-none focus:border-[#1780e3]"
-            />
-            <button className="px-6 py-3 bg-[#1780e3] text-white rounded-lg font-medium hover:bg-[#166bc7] transition-colors whitespace-nowrap">
-              Get Started
-            </button>
+            <Link 
+              href="/signup" 
+              className="px-8 py-4 bg-[#22c55e] text-white rounded-xl font-semibold text-lg hover:bg-[#16a34a] transition-colors whitespace-nowrap"
+            >
+              Get Started for FREE
+            </Link>
           </div>
 
           {/* Platform icons */}
