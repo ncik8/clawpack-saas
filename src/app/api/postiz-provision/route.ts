@@ -7,11 +7,6 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-function generatePassword(): string {
-  // Postiz requires password ≤64 chars
-  return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 20);
-}
-
 async function getSupabaseUser(request: Request): Promise<{ id: string; email: string } | null> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) return null;
@@ -20,7 +15,47 @@ async function getSupabaseUser(request: Request): Promise<{ id: string; email: s
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
   
   if (error || !user) return null;
-  return { id: user.id, email: user.email || '' };
+  if (!user.email) return null;
+  return { id: user.id, email: user.email };
+}
+
+async function registerPostiz(email: string, password: string, userId: string) {
+  return fetch(`${POSTIZ_URL}/api/auth/register`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password,
+      name: `user-${userId.slice(0, 8)}`,
+      company: 'Clawpack',
+      provider: 'LOCAL'
+    }),
+    signal: AbortSignal.timeout(10000)
+  });
+}
+
+async function loginPostiz(email: string, password: string) {
+  return fetch(`${POSTIZ_URL}/api/auth/login`, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password,
+      provider: 'LOCAL'
+    }),
+    signal: AbortSignal.timeout(10000)
+  });
+}
+
+function extractToken(cookieHeader: string): string {
+  const cookies = cookieHeader.split(/,(?=\s*\w+=)/);
+  for (const cookie of cookies) {
+    const match = cookie.match(/auth=([^;]+)/);
+    if (match) return match[1];
+  }
+  return '';
 }
 
 export async function POST(request: Request) {
@@ -30,74 +65,71 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: existingUser } = await supabaseAdmin
+    // Step 1: Check if already provisioned
+    const { data: existing } = await supabaseAdmin
       .from('postiz_users')
-      .select('postiz_auth_token, postiz_password')
+      .select('postiz_auth_token')
       .eq('supabase_user_id', supabaseUser.id)
       .maybeSingle();
 
-    let password = existingUser?.postiz_password ?? generatePassword();
+    if (existing?.postiz_auth_token) {
+      return NextResponse.json({ 
+        success: true, 
+        token: existing.postiz_auth_token,
+        message: 'Using existing token' 
+      });
+    }
 
-    console.log('Attempting login with:', { email: supabaseUser.email, passwordLength: password.length });
-
-    let loginResponse = await fetch(`${POSTIZ_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: supabaseUser.email,
-        password: password,
-        provider: 'LOCAL'
-      }),
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (!loginResponse.ok && !existingUser?.postiz_password) {
-      console.log('Registering new Postiz user:', supabaseUser.email, 'password length:', password.length);
+    // Step 2: Not provisioned - register first
+    const password = crypto.randomUUID();
+    
+    const registerRes = await registerPostiz(supabaseUser.email, password, supabaseUser.id);
+    
+    // If user already exists in Postiz but not in our DB - can't recover
+    if (!registerRes.ok) {
+      const text = await registerRes.text();
       
-      const registerResponse = await fetch(`${POSTIZ_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: supabaseUser.email,
-          password: password,
-          name: supabaseUser.email.split('@')[0],
-          company: 'ClawPack',
-          provider: 'LOCAL'
-        }),
-        signal: AbortSignal.timeout(10000)
-      });
-
-      if (!registerResponse.ok) {
-        const text = await registerResponse.text();
-        if (!text.toLowerCase().includes('exists')) {
-          throw new Error(`Register failed: ${text}`);
-        }
+      if (text.toLowerCase().includes('exists')) {
+        console.error('Postiz user out of sync:', supabaseUser.email);
+        return NextResponse.json({
+          error: 'User exists in Postiz but not linked. Please contact support.'
+        }, { status: 409 });
       }
-
-      loginResponse = await fetch(`${POSTIZ_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: supabaseUser.email,
-          password: password,
-          provider: 'LOCAL'
-        }),
-        signal: AbortSignal.timeout(10000)
-      });
+      
+      console.error('Register failed:', text);
+      return NextResponse.json({ error: 'Registration failed', details: text }, { status: 500 });
     }
 
-    if (!loginResponse.ok) {
-      const text = await loginResponse.text();
-      console.error('Postiz login error:', text);
-      return NextResponse.json({ error: 'Postiz login failed', details: text }, { status: 500 });
+    // Step 3: Login after successful registration
+    const loginRes = await loginPostiz(supabaseUser.email, password);
+
+    if (!loginRes.ok) {
+      const text = await loginRes.text();
+      console.error('Login failed:', text);
+      return NextResponse.json({ error: 'Login failed', details: text }, { status: 500 });
     }
 
-    const cookies = loginResponse.headers.get('set-cookie') ?? '';
-    const tokenMatch = cookies.match(/auth=([^;]+)/) || cookies.match(/next-auth\.session-token=([^;]+)/);
-    const token = tokenMatch?.[1] ?? '';
+    // Step 4: Extract and store token
+    const cookieHeader = loginRes.headers.get('set-cookie') || '';
+    const token = extractToken(cookieHeader);
 
     if (!token) {
       return NextResponse.json({ error: 'No token received' }, { status: 500 });
+    }
+
+    // Step 5: Race condition protection - re-check before insert
+    const { data: recheck } = await supabaseAdmin
+      .from('postiz_users')
+      .select('postiz_auth_token')
+      .eq('supabase_user_id', supabaseUser.id)
+      .maybeSingle();
+
+    if (recheck?.postiz_auth_token) {
+      return NextResponse.json({ 
+        success: true, 
+        token: recheck.postiz_auth_token,
+        message: 'Using existing token' 
+      });
     }
 
     const { error: dbError } = await supabaseAdmin
@@ -105,29 +137,20 @@ export async function POST(request: Request) {
       .upsert({
         supabase_user_id: supabaseUser.id,
         postiz_auth_token: token,
-        postiz_password: password,
         token_updated_at: new Date().toISOString(),
       }, {
         onConflict: 'supabase_user_id'
       });
 
     if (dbError) {
-      console.error('Database error:', dbError);
-      return NextResponse.json(
-        { error: 'Failed to store Postiz credentials' },
-        { status: 500 }
-      );
+      console.error('DB error:', dbError);
+      return NextResponse.json({ error: 'Failed to store token' }, { status: 500 });
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Postiz account provisioned'
-    });
+    console.log('Postiz provisioned:', supabaseUser.email);
+    return NextResponse.json({ success: true, token, message: 'Provisioned successfully' });
   } catch (error) {
     console.error('Provision error:', error);
-    return NextResponse.json(
-      { error: 'Provisioning failed' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Provisioning failed' }, { status: 500 });
   }
 }
