@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 const API_URL = '/api/postiz-api';
-const AUTH_URL = '/api/postiz-auth';
 
 interface Channel {
   id: string;
@@ -17,68 +17,47 @@ export default function ConnectedAccountsPage() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
 
-  // Auto-login to Postiz if user has Supabase session but no Postiz cookie
+  // Provision Postiz user if needed (on first load)
   useEffect(() => {
-    const autoLoginPostiz = async () => {
-      const existingCookie = localStorage.getItem('postiz_cookie');
-      if (existingCookie) return; // Already logged in to Postiz
+    const provisionPostiz = async () => {
+      // Get Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
 
-      // Try to login with stored credentials or demo account
       try {
-        const response = await fetch(`${AUTH_URL}/login`, {
+        await fetch('/api/postiz-provision', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            email: 'testuser1@example.com', 
-            password: 'StrongPassword123' 
-          }),
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
         });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.cookie) {
-            localStorage.setItem('postiz_cookie', data.cookie);
-          }
-          if (data.jwt) {
-            localStorage.setItem('postiz_jwt', data.jwt);
-          }
-        }
       } catch (err) {
-        console.error('Auto Postiz login failed:', err);
+        console.error('Postiz provisioning failed:', err);
       }
     };
 
-    autoLoginPostiz();
+    provisionPostiz();
   }, []);
 
   // Load channels from Postiz API
   useEffect(() => {
     const fetchChannels = async () => {
-      // Get JWT from localStorage (set during login)
-      const jwt = localStorage.getItem('postiz_jwt');
-      
-      // Get Postiz cookie from localStorage
-      const cookie = localStorage.getItem('postiz_cookie');
-      
-      if (!cookie) {
-        // Not logged in - show all as disconnected
-        const defaults = [
-          { id: 'x', platform: 'x', name: 'X / Twitter', connected: false },
-          { id: 'linkedin', platform: 'linkedin', name: 'LinkedIn', connected: false },
-          { id: 'bluesky', platform: 'bluesky', name: 'Bluesky', connected: false },
-          { id: 'mastodon', platform: 'mastodon', name: 'Mastodon', connected: false },
-          { id: 'threads', platform: 'threads', name: 'Threads', connected: false },
-        ];
-        setChannels(defaults);
-        setLoading(false);
-        return;
-      }
-
       try {
+        // Get Supabase token for authorization
+        const { data: { session } } = await supabase.auth.getSession();
+        const supabaseToken = session?.access_token;
+        
+        if (!supabaseToken) {
+          setChannels(getDefaultChannels());
+          setLoading(false);
+          return;
+        }
+        
         // Fetch integrations list from Postiz
         const response = await fetch(`${API_URL}/integrations/list`, {
           headers: {
-            'x-postiz-cookie': cookie,
+            'Authorization': `Bearer ${supabaseToken}`,
           },
         });
         
@@ -175,12 +154,20 @@ export default function ConnectedAccountsPage() {
     
     const integrationId = platformMap[platform] || platform;
     
-    // Call Postiz OAuth endpoint - it returns 302 redirect to Twitter
+    // Get Supabase token from browser session and send
+    const { data: { session } } = await supabase.auth.getSession();
+    const supabaseToken = session?.access_token;
+    
+    if (!supabaseToken) {
+      alert('Please log in first.');
+      return;
+    }
+    
     fetch(`/api/postiz-api/integrations/social/${integrationId}/connect`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-postiz-cookie': cookie,
+        'Authorization': `Bearer ${supabaseToken}`,
       },
       body: JSON.stringify({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
     })
