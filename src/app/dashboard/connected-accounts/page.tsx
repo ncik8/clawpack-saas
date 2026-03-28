@@ -157,7 +157,6 @@ export default function ConnectedAccountsPage() {
   };
 
   const handleConnect = (platform: string) => {
-    // Check for Postiz cookie (set during login)
     const cookie = localStorage.getItem('postiz_cookie');
     
     if (!cookie) {
@@ -167,11 +166,38 @@ export default function ConnectedAccountsPage() {
     
     setConnecting(platform);
     
-    const postizUrl = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
+    // Map platform to Postiz identifier
+    const platformMap: Record<string, string> = {
+      'x': 'x',
+      'linkedin': 'linkedin-oauth2',
+      'linkedin-page': 'linkedin',
+    };
     
-    // Redirect to Postiz settings to connect accounts
-    // After connecting, user returns and we refresh the page
-    window.location.href = `${postizUrl}/settings`;
+    const integrationId = platformMap[platform] || platform;
+    
+    // Call Postiz OAuth endpoint - it returns 302 redirect to Twitter
+    fetch(`/api/postiz-api/integrations/social/${integrationId}/connect`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-postiz-cookie': cookie,
+      },
+      body: JSON.stringify({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+    })
+    .then(response => {
+      if (response.redirected) {
+        // Postiz returned redirect - user goes to Twitter OAuth
+        window.location.href = response.url;
+      } else {
+        alert('Failed to start OAuth. Please try again.');
+        setConnecting(null);
+      }
+    })
+    .catch(err => {
+      console.error('OAuth error:', err);
+      alert('Connection failed. Please try again.');
+      setConnecting(null);
+    });
   };
 
   const handleDisconnect = async (platform: string) => {
