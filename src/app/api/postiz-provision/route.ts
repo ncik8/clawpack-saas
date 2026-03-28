@@ -53,8 +53,8 @@ export async function POST(request: Request) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: supabaseUser.email,
-          username: supabaseUser.email,
-          password: password
+          password: password,
+          name: supabaseUser.email
         }),
         signal: AbortSignal.timeout(10000)
       });
@@ -79,11 +79,12 @@ export async function POST(request: Request) {
 
     if (!loginResponse.ok) {
       const text = await loginResponse.text();
+      console.error('Postiz login error:', text);
       return NextResponse.json({ error: 'Postiz login failed', details: text }, { status: 500 });
     }
 
     const cookies = loginResponse.headers.get('set-cookie') ?? '';
-    const tokenMatch = cookies.match(/auth=([^;]+)/);
+    const tokenMatch = cookies.match(/auth=([^;]+)/) || cookies.match(/next-auth\.session-token=([^;]+)/);
     const token = tokenMatch?.[1] ?? '';
 
     if (!token) {
