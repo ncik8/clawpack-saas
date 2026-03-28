@@ -38,6 +38,8 @@ export async function POST(request: Request) {
 
     let password = existingUser?.postiz_password ?? generatePassword();
 
+    console.log('Attempting login with:', { email: supabaseUser.email, passwordLength: password.length });
+
     let loginResponse = await fetch(`${POSTIZ_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -50,6 +52,8 @@ export async function POST(request: Request) {
     });
 
     if (!loginResponse.ok && !existingUser?.postiz_password) {
+      console.log('Registering new Postiz user:', supabaseUser.email, 'password length:', password.length);
+      
       const registerResponse = await fetch(`${POSTIZ_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
