@@ -11,7 +11,7 @@ export async function GET(
     const url = new URL(request.url);
     const queryString = url.search;
     
-    // Get cookie from header
+    // Get cookie from header - Postiz expects Cookie header, not x-postiz-cookie
     const cookie = request.headers.get('x-postiz-cookie');
 
     const headers: Record<string, string> = {
@@ -28,16 +28,18 @@ export async function GET(
       redirect: 'manual',
     });
 
-    // Handle redirect
+    // Handle redirect - must use Response constructor, not NextResponse.redirect()
     if (response.status === 302 || response.status === 301) {
       const location = response.headers.get('location');
       if (location) {
-        return NextResponse.redirect(location, response.status);
+        return new Response(null, {
+          status: 302,
+          headers: { Location: location },
+        });
       }
     }
 
     const data = await response.json();
-    
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json({ error: 'Proxy failed' }, { status: 500 });
@@ -52,7 +54,7 @@ export async function POST(
     const path = params.path.join('/');
     const body = await request.json();
     
-    // Get cookie from header
+    // Get cookie from header - Postiz expects Cookie header
     const cookie = request.headers.get('x-postiz-cookie');
 
     const headers: Record<string, string> = {
@@ -67,19 +69,22 @@ export async function POST(
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      redirect: 'manual', // Don't follow redirect automatically
+      redirect: 'manual',
     });
 
-    // Handle redirect - Postiz returns 302 to Twitter OAuth
+    // Handle redirect - Postiz returns 302 to Twitter/LinkedIn OAuth
     if (response.status === 302 || response.status === 301) {
       const location = response.headers.get('location');
       if (location) {
-        return NextResponse.redirect(location, response.status);
+        return new Response(null, {
+          status: 302,
+          headers: { Location: location },
+        });
       }
     }
 
+    // For non-redirect responses, return as JSON
     const data = await response.json();
-    
     return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json({ error: 'Proxy failed' }, { status: 500 });
