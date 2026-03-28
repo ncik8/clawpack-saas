@@ -33,6 +33,23 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
+      // Also login to Postiz and store JWT
+      try {
+        const response = await fetch('/api/postiz-auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.jwt) {
+            localStorage.setItem('postiz_jwt', data.jwt);
+          }
+        }
+      } catch (err) {
+        console.error('Postiz login failed:', err);
+      }
       // Use replace for cleaner redirect
       window.location.replace('/dashboard');
     }

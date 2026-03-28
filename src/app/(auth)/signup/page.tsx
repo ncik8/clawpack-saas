@@ -40,6 +40,23 @@ export default function SignupPage() {
     if (error) {
       setError(error.message);
     } else {
+      // Also create Postiz account
+      try {
+        const response = await fetch('/api/postiz-auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, name: email.split('@')[0] }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.jwt) {
+            localStorage.setItem('postiz_jwt', data.jwt);
+          }
+        }
+      } catch (err) {
+        console.error('Postiz registration failed:', err);
+      }
       setSuccess(true);
     }
     

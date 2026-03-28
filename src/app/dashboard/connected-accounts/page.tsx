@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
-const API_PROXY_URL = 'https://post.clawpack.net';
-const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
+const API_URL = '/api/postiz-api';
+const AUTH_URL = '/api/postiz-auth';
 
 interface Channel {
   id: string;
@@ -17,24 +17,81 @@ export default function ConnectedAccountsPage() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
 
-  // Load channels from localStorage (simulated connection state)
+  // Load channels from Postiz API
   useEffect(() => {
-    const saved = localStorage.getItem('connected_channels');
-    if (saved) {
-      setChannels(JSON.parse(saved));
-    } else {
-      // Default connected platforms (for demo)
-      const defaults = [
-        { id: 'x', platform: 'x', name: 'X / Twitter', connected: true },
-        { id: 'linkedin', platform: 'linkedin', name: 'LinkedIn', connected: true },
-        { id: 'bluesky', platform: 'bluesky', name: 'Bluesky', connected: false },
-        { id: 'mastodon', platform: 'mastodon', name: 'Mastodon', connected: false },
-        { id: 'threads', platform: 'threads', name: 'Threads', connected: false },
-      ];
-      setChannels(defaults);
-    }
+    const fetchChannels = async () => {
+      // Get JWT from localStorage (set during login)
+      const jwt = localStorage.getItem('postiz_jwt');
+      
+      if (!jwt) {
+        // Not logged in - show all as disconnected
+        const defaults = [
+          { id: 'x', platform: 'x', name: 'X / Twitter', connected: false },
+          { id: 'linkedin', platform: 'linkedin', name: 'LinkedIn', connected: false },
+          { id: 'bluesky', platform: 'bluesky', name: 'Bluesky', connected: false },
+          { id: 'mastodon', platform: 'mastodon', name: 'Mastodon', connected: false },
+          { id: 'threads', platform: 'threads', name: 'Threads', connected: false },
+        ];
+        setChannels(defaults);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch integrations from Postiz
+        const response = await fetch(`${API_URL}/integrations`, {
+          headers: {
+            'x-postiz-jwt': jwt,
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          // Map Postiz integrations to our channel format
+          const integrations = data.integrations || [];
+          const mapped = integrations.map((int: any) => ({
+            id: int.identifier,
+            platform: int.identifier,
+            name: getPlatformName(int.identifier),
+            connected: !int.disabled,
+          }));
+          setChannels(mapped);
+        } else {
+          setChannels(getDefaultChannels());
+        }
+      } catch (error) {
+        console.error('Failed to fetch channels:', error);
+        setChannels(getDefaultChannels());
+      }
+    };
+
+    fetchChannels();
     setLoading(false);
   }, []);
+
+  const getDefaultChannels = () => [
+    { id: 'x', platform: 'x', name: 'X / Twitter', connected: false },
+    { id: 'linkedin', platform: 'linkedin', name: 'LinkedIn', connected: false },
+    { id: 'bluesky', platform: 'bluesky', name: 'Bluesky', connected: false },
+    { id: 'mastodon', platform: 'mastodon', name: 'Mastodon', connected: false },
+    { id: 'threads', platform: 'threads', name: 'Threads', connected: false },
+  ];
+
+  const getPlatformName = (id: string): string => {
+    const names: Record<string, string> = {
+      'twitter': 'X / Twitter',
+      'linkedin': 'LinkedIn',
+      'linkedin-oauth2': 'LinkedIn',
+      'facebook': 'Facebook',
+      'instagram': 'Instagram',
+      'bluesky': 'Bluesky',
+      'mastodon': 'Mastodon',
+      'threads': 'Threads',
+      'tiktok': 'TikTok',
+      'youtube': 'YouTube',
+    };
+    return names[id] || id;
+  };
 
   // Map frontend platform IDs to Postiz OAuth paths
   const getOAuthPath = (platform: string): string => {
@@ -63,31 +120,64 @@ export default function ConnectedAccountsPage() {
   };
 
   const handleConnect = (platform: string) => {
+    const jwt = localStorage.getItem('postiz_jwt');
+    if (!jwt) {
+      alert('Please log in first');
+      return;
+    }
+    
     setConnecting(platform);
     // Redirect to Postiz OAuth via our proxy
     const oauthPath = getOAuthPath(platform);
-    window.open(`${API_PROXY_URL}/connect/${oauthPath}`, '_blank');
+    const postizUrl = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
+    window.open(`${postizUrl}/connect/${oauthPath}`, '_blank');
     
-    // After OAuth, user returns - give them a moment to complete
-    setTimeout(() => {
-      // Update local state to show as "connected"
-      const updated = channels.map(ch => 
-        ch.platform === platform ? { ...ch, connected: true } : ch
-      );
-      setChannels(updated);
-      localStorage.setItem('connected_channels', JSON.stringify(updated));
+    // After OAuth, user returns - refresh channel status
+    setTimeout(async () => {
+      try {
+        const response = await fetch(`${API_URL}/integrations`, {
+          headers: { 'x-postiz-jwt': jwt },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const integrations = data.integrations || [];
+          const updated = channels.map(ch => {
+            const integration = integrations.find((i: any) => i.identifier === ch.platform);
+            return integration ? { ...ch, connected: !integration.disabled } : ch;
+          });
+          setChannels(updated);
+        }
+      } catch (error) {
+        console.error('Failed to refresh channels:', error);
+      }
       setConnecting(null);
     }, 3000);
   };
 
-  const handleDisconnect = (platform: string) => {
+  const handleDisconnect = async (platform: string) => {
     if (!confirm('Are you sure you want to disconnect this channel?')) return;
     
-    const updated = channels.map(ch => 
-      ch.platform === platform ? { ...ch, connected: false } : ch
-    );
-    setChannels(updated);
-    localStorage.setItem('connected_channels', JSON.stringify(updated));
+    const jwt = localStorage.getItem('postiz_jwt');
+    if (!jwt) return;
+
+    try {
+      const response = await fetch(`${API_URL}/integrations/${platform}`, {
+        method: 'DELETE',
+        headers: { 
+          'x-postiz-jwt': jwt,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const updated = channels.map(ch => 
+          ch.platform === platform ? { ...ch, connected: false } : ch
+        );
+        setChannels(updated);
+      }
+    } catch (error) {
+      console.error('Failed to disconnect:', error);
+    }
   };
 
   const platforms = [
