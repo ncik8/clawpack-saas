@@ -17,6 +17,40 @@ export default function ConnectedAccountsPage() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
 
+  // Auto-login to Postiz if user has Supabase session but no Postiz cookie
+  useEffect(() => {
+    const autoLoginPostiz = async () => {
+      const existingCookie = localStorage.getItem('postiz_cookie');
+      if (existingCookie) return; // Already logged in to Postiz
+
+      // Try to login with stored credentials or demo account
+      try {
+        const response = await fetch(`${AUTH_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            email: 'testuser1@example.com', 
+            password: 'StrongPassword123' 
+          }),
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.cookie) {
+            localStorage.setItem('postiz_cookie', data.cookie);
+          }
+          if (data.jwt) {
+            localStorage.setItem('postiz_jwt', data.jwt);
+          }
+        }
+      } catch (err) {
+        console.error('Auto Postiz login failed:', err);
+      }
+    };
+
+    autoLoginPostiz();
+  }, []);
+
   // Load channels from Postiz API
   useEffect(() => {
     const fetchChannels = async () => {
