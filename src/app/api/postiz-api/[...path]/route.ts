@@ -16,7 +16,6 @@ export async function GET(
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Host': 'post.clawpack.net',
     };
 
     if (cookie) {
@@ -56,7 +55,6 @@ export async function POST(
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Host': 'post.clawpack.net',
     };
 
     if (cookie) {
