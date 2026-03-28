@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
+const POSTIZ_URL = process.env.POSTIZ_URL || process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -29,48 +29,51 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user already has Postiz account
     const { data: existingUser } = await supabaseAdmin
       .from('postiz_users')
-      .select('postiz_auth_token')
+      .select('postiz_auth_token, postiz_password')
       .eq('supabase_user_id', supabaseUser.id)
-      .single();
+      .maybeSingle();
 
-    if (existingUser?.postiz_auth_token) {
-      // Already provisioned - return success
-      return NextResponse.json({ success: true, message: 'Already provisioned' });
-    }
+    let password = existingUser?.postiz_password ?? generatePassword();
 
-    // Generate random password for Postiz
-    const password = generatePassword();
-
-    // Try to register with Postiz (use identifier instead of email)
-    const registerResponse = await fetch(`${POSTIZ_URL}/api/auth/register`, {
+    let loginResponse = await fetch(`${POSTIZ_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         identifier: supabaseUser.email,
-        password: password,
-        name: supabaseUser.email.split('@')[0],
-        company: 'ClawPack User',
-        provider: 'LOCAL',
+        password: password
       }),
+      signal: AbortSignal.timeout(10000)
     });
 
-    // Register might fail if user exists - that's OK, try login
-    let loginResponse;
-    if (registerResponse.ok) {
-      loginResponse = registerResponse;
-    } else {
-      // User already exists, try login with identifier
+    if (!loginResponse.ok && !existingUser?.postiz_password) {
+      const registerResponse = await fetch(`${POSTIZ_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: supabaseUser.email,
+          username: supabaseUser.email,
+          password: password
+        }),
+        signal: AbortSignal.timeout(10000)
+      });
+
+      if (!registerResponse.ok) {
+        const text = await registerResponse.text();
+        if (!text.toLowerCase().includes('exists')) {
+          throw new Error(`Register failed: ${text}`);
+        }
+      }
+
       loginResponse = await fetch(`${POSTIZ_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           identifier: supabaseUser.email,
-          password: password,
-          provider: 'LOCAL',
+          password: password
         }),
+        signal: AbortSignal.timeout(10000)
       });
     }
 
@@ -79,32 +82,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Postiz login failed', details: text }, { status: 500 });
     }
 
-    // Extract auth token from response
-    const setCookie = loginResponse.headers.get('set-cookie');
-    const authCookie = setCookie?.split(';')[0] || '';
-    const token = authCookie.replace('auth=', '');
+    const cookies = loginResponse.headers.get('set-cookie') ?? '';
+    const tokenMatch = cookies.match(/auth=([^;]+)/);
+    const token = tokenMatch?.[1] ?? '';
 
     if (!token) {
       return NextResponse.json({ error: 'No token received' }, { status: 500 });
     }
 
-    // Store token in database
     const { error: dbError } = await supabaseAdmin
       .from('postiz_users')
       .upsert({
         supabase_user_id: supabaseUser.id,
         postiz_auth_token: token,
+        postiz_password: password,
         token_updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'supabase_user_id'
       });
 
     if (dbError) {
       console.error('Database error:', dbError);
-      return NextResponse.json({ error: 'Failed to store token' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Failed to store Postiz credentials' },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({ success: true, message: 'Provisioned successfully' });
+    return NextResponse.json({
+      success: true,
+      message: 'Postiz account provisioned'
+    });
   } catch (error) {
     console.error('Provision error:', error);
-    return NextResponse.json({ error: 'Provision failed' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Provisioning failed' },
+      { status: 500 }
+    );
   }
 }
