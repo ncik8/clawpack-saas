@@ -123,14 +123,16 @@ export default function ConnectedAccountsPage() {
   };
 
   const handleConnect = (platform: string) => {
-    const jwt = localStorage.getItem('postiz_jwt');
-    if (!jwt) {
-      alert('Please log in first');
+    // Check for Postiz cookie (set during login)
+    const cookie = localStorage.getItem('postiz_cookie');
+    
+    if (!cookie) {
+      alert('Please log in first. Go to /login and sign in.');
       return;
     }
     
     setConnecting(platform);
-    // Redirect to Postiz OAuth via our proxy
+    // Redirect to Postiz OAuth
     const oauthPath = getOAuthPath(platform);
     const postizUrl = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
     window.open(`${postizUrl}/connect/${oauthPath}`, '_blank');
@@ -138,17 +140,13 @@ export default function ConnectedAccountsPage() {
     // After OAuth, user returns - refresh channel status
     setTimeout(async () => {
       try {
-        const response = await fetch(`${API_URL}/integrations`, {
-          headers: { 'x-postiz-jwt': jwt },
+        const response = await fetch(`${API_URL}/channels`, {
+          headers: { 'x-postiz-cookie': cookie },
         });
         if (response.ok) {
           const data = await response.json();
-          const integrations = data.integrations || [];
-          const updated = channels.map(ch => {
-            const integration = integrations.find((i: any) => i.identifier === ch.platform);
-            return integration ? { ...ch, connected: !integration.disabled } : ch;
-          });
-          setChannels(updated);
+          // Update channels based on response
+          console.log('Channel data:', data);
         }
       } catch (error) {
         console.error('Failed to refresh channels:', error);
