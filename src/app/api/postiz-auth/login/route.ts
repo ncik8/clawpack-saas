@@ -14,6 +14,7 @@ export async function POST(request: Request) {
         password,
         provider: 'LOCAL',
       }),
+      credentials: 'include', // Important: include cookies
     });
 
     const data = await response.json();
@@ -22,15 +23,24 @@ export async function POST(request: Request) {
       return NextResponse.json(data, { status: response.status });
     }
 
-    // Extract JWT from set-cookie header
+    // Extract full cookie for auth
     const setCookie = response.headers.get('set-cookie');
-    const jwt = setCookie?.split(';')[0]?.replace('auth=', '') || data.auth;
+    const authCookie = setCookie?.split(';')[0] || '';
+    const jwt = data.auth || authCookie.replace('auth=', '');
 
-    return NextResponse.json({ 
+    // Create response with cookie
+    const nextResponse = NextResponse.json({ 
       success: true, 
-      jwt,
+      jwt: jwt,
       user: { email }
     });
+
+    // Forward the Postiz cookie to the browser
+    if (authCookie) {
+      nextResponse.headers.set('Set-Cookie', authCookie);
+    }
+
+    return nextResponse;
   } catch (error) {
     return NextResponse.json({ error: 'Login failed' }, { status: 500 });
   }
