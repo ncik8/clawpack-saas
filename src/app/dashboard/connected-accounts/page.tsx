@@ -31,6 +31,7 @@ export default function ConnectedAccountsPage() {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({ email: session.user.email }),
         });
       } catch (err) {
         console.error('Postiz provisioning failed:', err);

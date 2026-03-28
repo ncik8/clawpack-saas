@@ -42,9 +42,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'Already provisioned' });
     }
 
-    // Get user's email from Supabase
-    const { data: { user } } = await supabaseAdmin.auth.getUserById(supabaseUserId);
-    const email = user?.email;
+    // Get user's email from request body (frontend passes it since user is authenticated)
+    const { email } = await request.json();
     
     if (!email) {
       return NextResponse.json({ error: 'No email found' }, { status: 400 });
