@@ -38,7 +38,6 @@ export async function GET(
     const url = new URL(request.url);
     const queryString = url.search;
     
-    // Get Supabase user and Postiz token
     const supabaseUserId = await getSupabaseUser(request);
     if (!supabaseUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -50,8 +49,8 @@ export async function GET(
     }
 
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       'Cookie': `auth=${token}`,
+      'Accept': request.headers.get('accept') || '*/*',
     };
 
     const response = await fetch(`${POSTIZ_URL}/api/${path}${queryString}`, {
@@ -71,8 +70,14 @@ export async function GET(
       }
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    // Mirror upstream content-type
+    const contentType = response.headers.get('content-type') || 'text/plain';
+    const body = await response.text();
+
+    return new Response(body, {
+      status: response.status,
+      headers: { 'Content-Type': contentType },
+    });
   } catch (error) {
     return NextResponse.json({ error: 'Proxy failed' }, { status: 500 });
   }
@@ -86,7 +91,6 @@ export async function POST(
     const path = params.path.join('/');
     const body = await request.json();
     
-    // Get Supabase user and Postiz token
     const supabaseUserId = await getSupabaseUser(request);
     if (!supabaseUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -100,6 +104,7 @@ export async function POST(
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Cookie': `auth=${token}`,
+      'Accept': request.headers.get('accept') || '*/*',
     };
 
     const response = await fetch(`${POSTIZ_URL}/api/${path}`, {
@@ -120,9 +125,14 @@ export async function POST(
       }
     }
 
-    // For non-redirect responses, return as JSON
-    const data = await response.json();
-    return NextResponse.json(data);
+    // Mirror upstream content-type
+    const contentType = response.headers.get('content-type') || 'text/plain';
+    const responseBody = await response.text();
+
+    return new Response(responseBody, {
+      status: response.status,
+      headers: { 'Content-Type': contentType },
+    });
   } catch (error) {
     return NextResponse.json({ error: 'Proxy failed' }, { status: 500 });
   }
