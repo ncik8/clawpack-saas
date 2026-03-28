@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
 
 const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -12,7 +11,7 @@ function generatePassword(): string {
   return crypto.randomUUID() + '-' + crypto.randomUUID();
 }
 
-async function getSupabaseUser(request: Request): Promise<string | null> {
+async function getSupabaseUser(request: Request): Promise<{ id: string; email: string } | null> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) return null;
   
@@ -20,13 +19,13 @@ async function getSupabaseUser(request: Request): Promise<string | null> {
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
   
   if (error || !user) return null;
-  return user.id;
+  return { id: user.id, email: user.email || '' };
 }
 
 export async function POST(request: Request) {
   try {
-    const supabaseUserId = await getSupabaseUser(request);
-    if (!supabaseUserId) {
+    const supabaseUser = await getSupabaseUser(request);
+    if (!supabaseUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -34,7 +33,7 @@ export async function POST(request: Request) {
     const { data: existingUser } = await supabaseAdmin
       .from('postiz_users')
       .select('postiz_auth_token')
-      .eq('supabase_user_id', supabaseUserId)
+      .eq('supabase_user_id', supabaseUser.id)
       .single();
 
     if (existingUser?.postiz_auth_token) {
@@ -42,24 +41,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'Already provisioned' });
     }
 
-    // Get user's email from request body (frontend passes it since user is authenticated)
-    const { email } = await request.json();
-    
-    if (!email) {
-      return NextResponse.json({ error: 'No email found' }, { status: 400 });
-    }
-
     // Generate random password for Postiz
     const password = generatePassword();
 
-    // Try to register with Postiz
+    // Try to register with Postiz (use identifier instead of email)
     const registerResponse = await fetch(`${POSTIZ_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email,
-        password,
-        name: email.split('@')[0],
+        identifier: supabaseUser.email,
+        password: password,
+        name: supabaseUser.email.split('@')[0],
         company: 'ClawPack User',
         provider: 'LOCAL',
       }),
@@ -70,13 +62,13 @@ export async function POST(request: Request) {
     if (registerResponse.ok) {
       loginResponse = registerResponse;
     } else {
-      // User might already exist, try login
+      // User already exists, try login with identifier
       loginResponse = await fetch(`${POSTIZ_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email,
-          password,
+          identifier: supabaseUser.email,
+          password: password,
           provider: 'LOCAL',
         }),
       });
@@ -100,7 +92,7 @@ export async function POST(request: Request) {
     const { error: dbError } = await supabaseAdmin
       .from('postiz_users')
       .upsert({
-        supabase_user_id: supabaseUserId,
+        supabase_user_id: supabaseUser.id,
         postiz_auth_token: token,
         token_updated_at: new Date().toISOString(),
       });
