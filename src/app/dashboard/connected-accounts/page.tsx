@@ -135,14 +135,7 @@ export default function ConnectedAccountsPage() {
     return pathMap[platform] || platform;
   };
 
-  const handleConnect = (platform: string) => {
-    const cookie = localStorage.getItem('postiz_cookie');
-    
-    if (!cookie) {
-      alert('Please log in first. Go to /login and sign in.');
-      return;
-    }
-    
+  const handleConnect = async (platform: string) => {
     setConnecting(platform);
     
     // Map platform to Postiz identifier
