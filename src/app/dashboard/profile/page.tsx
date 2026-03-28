@@ -388,7 +388,16 @@ export default function ProfilePage() {
 
           {/* Logout */}
           <div className="mt-6 pt-6 border-t border-[#374151]">
-            <button className="btn btn-secondary text-[#ef4444]">
+            <button 
+              onClick={async () => {
+                localStorage.removeItem('postiz_jwt');
+                localStorage.removeItem('postiz_cookie');
+                const { supabase } = await import('@/lib/supabase');
+                await supabase.auth.signOut();
+                window.location.href = '/login';
+              }}
+              className="btn btn-secondary text-[#ef4444]"
+            >
               🚪 Log Out
             </button>
           </div>
