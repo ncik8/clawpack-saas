@@ -25,18 +25,20 @@ export async function GET(
     const response = await fetch(`${POSTIZ_URL}/api/${path}${queryString}`, {
       method: 'GET',
       headers,
-      credentials: 'include',
+      redirect: 'manual',
     });
+
+    // Handle redirect
+    if (response.status === 302 || response.status === 301) {
+      const location = response.headers.get('location');
+      if (location) {
+        return NextResponse.redirect(location, response.status);
+      }
+    }
 
     const data = await response.json();
     
-    // Return cookie in response for frontend to store
-    const setCookie = response.headers.get('set-cookie');
-    
-    return NextResponse.json({
-      ...data,
-      _cookie: setCookie?.split(';')[0]
-    });
+    return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json({ error: 'Proxy failed' }, { status: 500 });
   }
@@ -65,18 +67,20 @@ export async function POST(
       method: 'POST',
       headers,
       body: JSON.stringify(body),
-      credentials: 'include',
+      redirect: 'manual', // Don't follow redirect automatically
     });
+
+    // Handle redirect - Postiz returns 302 to Twitter OAuth
+    if (response.status === 302 || response.status === 301) {
+      const location = response.headers.get('location');
+      if (location) {
+        return NextResponse.redirect(location, response.status);
+      }
+    }
 
     const data = await response.json();
     
-    // Return cookie in response for frontend to store
-    const setCookie = response.headers.get('set-cookie');
-    
-    return NextResponse.json({
-      ...data,
-      _cookie: setCookie?.split(';')[0]
-    });
+    return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json({ error: 'Proxy failed' }, { status: 500 });
   }
