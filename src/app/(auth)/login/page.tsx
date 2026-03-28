@@ -33,16 +33,19 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      // Also login to Postiz and store JWT
+      // Also login to Postiz and store cookie
       try {
         const response = await fetch('/api/postiz-auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email, password, userId: email }),
         });
         
         if (response.ok) {
           const data = await response.json();
+          if (data.cookie) {
+            localStorage.setItem('postiz_cookie', data.cookie);
+          }
           if (data.jwt) {
             localStorage.setItem('postiz_jwt', data.jwt);
           }

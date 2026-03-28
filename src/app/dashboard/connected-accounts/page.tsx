@@ -23,7 +23,10 @@ export default function ConnectedAccountsPage() {
       // Get JWT from localStorage (set during login)
       const jwt = localStorage.getItem('postiz_jwt');
       
-      if (!jwt) {
+      // Get Postiz cookie from localStorage
+      const cookie = localStorage.getItem('postiz_cookie');
+      
+      if (!cookie) {
         // Not logged in - show all as disconnected
         const defaults = [
           { id: 'x', platform: 'x', name: 'X / Twitter', connected: false },
@@ -39,9 +42,9 @@ export default function ConnectedAccountsPage() {
 
       try {
         // Fetch integrations from Postiz
-        const response = await fetch(`${API_URL}/integrations`, {
+        const response = await fetch(`${API_URL}/channels`, {
           headers: {
-            'x-postiz-jwt': jwt,
+            'x-postiz-cookie': cookie,
           },
         });
         

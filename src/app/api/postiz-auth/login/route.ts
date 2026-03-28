@@ -4,17 +4,20 @@ const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json();
+    const { email, password, userId } = await request.json();
 
     const response = await fetch(`${POSTIZ_URL}/api/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Host': 'post.clawpack.net',
+      },
       body: JSON.stringify({
         email,
         password,
         provider: 'LOCAL',
       }),
-      credentials: 'include', // Important: include cookies
+      credentials: 'include',
     });
 
     const data = await response.json();
@@ -23,24 +26,17 @@ export async function POST(request: Request) {
       return NextResponse.json(data, { status: response.status });
     }
 
-    // Extract full cookie for auth
+    // Extract cookie
     const setCookie = response.headers.get('set-cookie');
     const authCookie = setCookie?.split(';')[0] || '';
     const jwt = data.auth || authCookie.replace('auth=', '');
 
-    // Create response with cookie
-    const nextResponse = NextResponse.json({ 
+    return NextResponse.json({ 
       success: true, 
-      jwt: jwt,
+      jwt,
+      cookie: authCookie, // Frontend stores this and sends with requests
       user: { email }
     });
-
-    // Forward the Postiz cookie to the browser
-    if (authCookie) {
-      nextResponse.headers.set('Set-Cookie', authCookie);
-    }
-
-    return nextResponse;
   } catch (error) {
     return NextResponse.json({ error: 'Login failed' }, { status: 500 });
   }
