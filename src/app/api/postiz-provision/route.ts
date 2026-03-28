@@ -42,7 +42,8 @@ export async function POST(request: Request) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: supabaseUser.email,
-        password: password
+        password: password,
+        provider: 'LOCAL'
       }),
       signal: AbortSignal.timeout(10000)
     });
@@ -54,7 +55,8 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           email: supabaseUser.email,
           password: password,
-          name: supabaseUser.email
+          name: supabaseUser.email,
+          provider: 'LOCAL'
         }),
         signal: AbortSignal.timeout(10000)
       });
@@ -71,7 +73,8 @@ export async function POST(request: Request) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: supabaseUser.email,
-          password: password
+          password: password,
+          provider: 'LOCAL'
         }),
         signal: AbortSignal.timeout(10000)
       });
