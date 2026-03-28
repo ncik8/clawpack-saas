@@ -8,7 +8,8 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 function generatePassword(): string {
-  return crypto.randomUUID() + '-' + crypto.randomUUID();
+  // Postiz requires password ≤64 chars
+  return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 20);
 }
 
 async function getSupabaseUser(request: Request): Promise<{ id: string; email: string } | null> {
@@ -55,7 +56,8 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           email: supabaseUser.email,
           password: password,
-          name: supabaseUser.email,
+          name: supabaseUser.email.split('@')[0],
+          company: 'ClawPack',
           provider: 'LOCAL'
         }),
         signal: AbortSignal.timeout(10000)
