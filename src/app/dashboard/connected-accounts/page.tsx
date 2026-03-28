@@ -75,8 +75,8 @@ export default function ConnectedAccountsPage() {
       }
 
       try {
-        // Fetch integrations from Postiz
-        const response = await fetch(`${API_URL}/channels`, {
+        // Fetch integrations list from Postiz
+        const response = await fetch(`${API_URL}/integrations/list`, {
           headers: {
             'x-postiz-cookie': cookie,
           },
@@ -87,9 +87,9 @@ export default function ConnectedAccountsPage() {
           // Map Postiz integrations to our channel format
           const integrations = data.integrations || [];
           const mapped = integrations.map((int: any) => ({
-            id: int.identifier,
+            id: int.id,
             platform: int.identifier,
-            name: getPlatformName(int.identifier),
+            name: int.name || getPlatformName(int.identifier),
             connected: !int.disabled,
           }));
           setChannels(mapped);
@@ -166,27 +166,12 @@ export default function ConnectedAccountsPage() {
     }
     
     setConnecting(platform);
-    // Redirect to Postiz OAuth
-    const oauthPath = getOAuthPath(platform);
-    const postizUrl = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
-    window.open(`${postizUrl}/connect/${oauthPath}`, '_blank');
     
-    // After OAuth, user returns - refresh channel status
-    setTimeout(async () => {
-      try {
-        const response = await fetch(`${API_URL}/channels`, {
-          headers: { 'x-postiz-cookie': cookie },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          // Update channels based on response
-          console.log('Channel data:', data);
-        }
-      } catch (error) {
-        console.error('Failed to refresh channels:', error);
-      }
-      setConnecting(null);
-    }, 3000);
+    const postizUrl = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
+    
+    // Redirect to Postiz settings to connect accounts
+    // After connecting, user returns and we refresh the page
+    window.location.href = `${postizUrl}/settings`;
   };
 
   const handleDisconnect = async (platform: string) => {
