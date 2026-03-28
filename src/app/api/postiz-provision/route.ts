@@ -83,8 +83,8 @@ export async function POST(request: Request) {
     }
 
     if (!loginResponse.ok) {
-      const error = await loginResponse.json();
-      return NextResponse.json({ error: 'Postiz login failed', details: error }, { status: 500 });
+      const text = await loginResponse.text();
+      return NextResponse.json({ error: 'Postiz login failed', details: text }, { status: 500 });
     }
 
     // Extract auth token from response
