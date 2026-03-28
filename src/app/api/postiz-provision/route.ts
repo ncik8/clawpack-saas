@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        identifier: supabaseUser.email,
+        email: supabaseUser.email,
         password: password
       }),
       signal: AbortSignal.timeout(10000)
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          identifier: supabaseUser.email,
+          email: supabaseUser.email,
           password: password
         }),
         signal: AbortSignal.timeout(10000)
