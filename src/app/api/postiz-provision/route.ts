@@ -19,6 +19,17 @@ async function getSupabaseUser(request: Request): Promise<{ id: string; email: s
   return { id: user.id, email: user.email };
 }
 
+function extractAuthToken(headers: Headers): string | null {
+  // Use getSetCookie() which is the proper way in Vercel/Node
+  const cookieArray = headers.getSetCookie?.() || [headers.get('set-cookie')].filter(Boolean);
+  
+  for (const cookie of cookieArray) {
+    const match = cookie.match(/auth=([^;]+)/);
+    if (match) return match[1];
+  }
+  return null;
+}
+
 async function registerPostiz(email: string, password: string, userId: string) {
   return fetch(`${POSTIZ_URL}/api/auth/register`, {
     method: 'POST',
@@ -47,15 +58,6 @@ async function loginPostiz(email: string, password: string) {
     }),
     signal: AbortSignal.timeout(10000)
   });
-}
-
-function extractToken(cookieHeader: string): string {
-  const cookies = cookieHeader.split(/,(?=\s*\w+=)/);
-  for (const cookie of cookies) {
-    const match = cookie.match(/auth=([^;]+)/);
-    if (match) return match[1];
-  }
-  return '';
 }
 
 export async function POST(request: Request) {
@@ -109,29 +111,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Login failed', details: text }, { status: 500 });
     }
 
-    // Step 4: Extract and store token
-    const cookieHeader = loginRes.headers.get('set-cookie') || '';
-    const token = extractToken(cookieHeader);
+    // Step 4: Extract token properly using getSetCookie
+    const token = extractAuthToken(loginRes.headers);
 
     if (!token) {
+      console.error('No token in cookie. Headers:', loginRes.headers.get('set-cookie'));
       return NextResponse.json({ error: 'No token received' }, { status: 500 });
     }
 
-    // Step 5: Race condition protection - re-check before insert
-    const { data: recheck } = await supabaseAdmin
-      .from('postiz_users')
-      .select('postiz_auth_token')
-      .eq('supabase_user_id', supabaseUser.id)
-      .maybeSingle();
-
-    if (recheck?.postiz_auth_token) {
-      return NextResponse.json({ 
-        success: true, 
-        token: recheck.postiz_auth_token,
-        message: 'Using existing token' 
-      });
-    }
-
+    // Step 5: Store token
     const { error: dbError } = await supabaseAdmin
       .from('postiz_users')
       .upsert({
