@@ -78,6 +78,10 @@ export async function GET(request: Request) {
 </html>`;
 
   return new Response(html, {
-    headers: { 'Content-Type': 'text/html' },
+    headers: { 
+      'Content-Type': 'text/html',
+      'Access-Control-Allow-Origin': 'https://clawpack-saas.vercel.app',
+      'Access-Control-Allow-Credentials': 'true',
+    },
   });
 }
