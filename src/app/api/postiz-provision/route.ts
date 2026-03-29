@@ -1,11 +1,21 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createHash } from 'crypto';
 
 const POSTIZ_URL = process.env.POSTIZ_URL || process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const POSTIZ_PASSWORD_SECRET = process.env.POSTIZ_PASSWORD_SECRET || 'default-secret';
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+// Deterministic password based on user ID - stable across provisioning attempts
+function generatePassword(userId: string): string {
+  return createHash('sha256')
+    .update(userId + POSTIZ_PASSWORD_SECRET)
+    .digest('hex')
+    .slice(0, 32);
+}
 
 async function getSupabaseUser(request: Request): Promise<{ id: string; email: string } | null> {
   const authHeader = request.headers.get('authorization');
@@ -19,12 +29,6 @@ async function getSupabaseUser(request: Request): Promise<{ id: string; email: s
   return { id: user.id, email: user.email };
 }
 
-function extractAuthToken(setCookieHeader: string | null): string | null {
-  if (!setCookieHeader) return null;
-  const match = setCookieHeader.match(/auth=([^;]+)/);
-  return match ? match[1] : null;
-}
-
 export async function POST(request: Request) {
   try {
     const supabaseUser = await getSupabaseUser(request);
@@ -32,7 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Step 1: Check if already provisioned
+    // Check if already provisioned
     const { data: existing } = await supabaseAdmin
       .from('postiz_users')
       .select('postiz_auth_token')
@@ -47,9 +51,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // Step 2: Generate password and try to register
-    const password = crypto.randomUUID();
+    // Generate deterministic password (stable for this user)
+    const password = generatePassword(supabaseUser.id);
     
+    // Try to register user
     const registerRes = await fetch(`${POSTIZ_URL}/api/auth/register`, {
       method: 'POST',
       cache: 'no-store',
@@ -64,7 +69,17 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(10000)
     });
 
-    // Step 3: Login (whether user was just created or already existed)
+    // If user exists, that's OK - continue to login
+    if (!registerRes.ok) {
+      const text = await registerRes.text();
+      if (!text.toLowerCase().includes('exists')) {
+        console.error('Register failed:', text);
+        return NextResponse.json({ error: 'Registration failed', details: text }, { status: 500 });
+      }
+      console.log('User already exists in Postiz, attempting login');
+    }
+
+    // Login and get token from JSON response
     const loginRes = await fetch(`${POSTIZ_URL}/api/auth/login`, {
       method: 'POST',
       cache: 'no-store',
@@ -77,26 +92,22 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(10000)
     });
 
-    // Log headers for debugging
-    console.log('LOGIN STATUS:', loginRes.status);
-    console.log('LOGIN HEADERS:', loginRes.headers.get('set-cookie'));
-
     if (!loginRes.ok) {
       const text = await loginRes.text();
       console.error('Login failed:', text);
       return NextResponse.json({ error: 'Login failed', details: text }, { status: 500 });
     }
 
-    // Step 4: Extract token
-    const setCookie = loginRes.headers.get('set-cookie');
-    const token = extractAuthToken(setCookie);
+    // Get token from JSON response - check multiple possible fields
+    const loginData = await loginRes.json();
+    const token = loginData.access_token || loginData.token || loginData.auth;
 
     if (!token) {
-      console.error('Token extraction failed. Cookie:', setCookie);
+      console.error('No token in response:', loginData);
       return NextResponse.json({ error: 'No token received' }, { status: 500 });
     }
 
-    // Step 5: Store token
+    // Store token
     const { error: dbError } = await supabaseAdmin
       .from('postiz_users')
       .upsert({

@@ -48,14 +48,13 @@ export async function GET(
       return NextResponse.json({ error: 'Postiz not connected' }, { status: 401 });
     }
 
-    const headers: Record<string, string> = {
-      'Cookie': `auth=${token}`,
-      'Accept': request.headers.get('accept') || '*/*',
-    };
-
     const response = await fetch(`${POSTIZ_URL}/api/${path}${queryString}`, {
       method: 'GET',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Cookie': `auth=${token}`,
+      },
       redirect: 'manual',
     });
 
@@ -70,7 +69,7 @@ export async function GET(
       }
     }
 
-    // Mirror upstream content-type
+    // Return response
     const contentType = response.headers.get('content-type') || 'text/plain';
     const body = await response.text();
 
@@ -101,22 +100,18 @@ export async function POST(
       return NextResponse.json({ error: 'Postiz not connected' }, { status: 401 });
     }
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Cookie': `auth=${token}`,
-      'Accept': request.headers.get('accept') || '*/*',
-      'Origin': POSTIZ_URL,
-      'Referer': POSTIZ_URL,
-    };
-
     const response = await fetch(`${POSTIZ_URL}/api/${path}`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Cookie': `auth=${token}`,
+      },
       body: JSON.stringify(body),
       redirect: 'manual',
     });
 
-    // Handle redirect - Postiz returns 302 to Twitter/LinkedIn OAuth
+    // Handle redirect
     if (response.status === 302 || response.status === 301) {
       const location = response.headers.get('location');
       if (location) {
@@ -127,7 +122,7 @@ export async function POST(
       }
     }
 
-    // Mirror upstream content-type
+    // Return response
     const contentType = response.headers.get('content-type') || 'text/plain';
     const responseBody = await response.text();
 
