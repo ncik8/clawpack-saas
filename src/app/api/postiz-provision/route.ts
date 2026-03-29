@@ -19,45 +19,10 @@ async function getSupabaseUser(request: Request): Promise<{ id: string; email: s
   return { id: user.id, email: user.email };
 }
 
-function extractAuthToken(headers: Headers): string | null {
-  // Use getSetCookie() which is the proper way in Vercel/Node
-  const cookieArray = headers.getSetCookie?.() || [headers.get('set-cookie')].filter(Boolean);
-  
-  for (const cookie of cookieArray) {
-    const match = cookie.match(/auth=([^;]+)/);
-    if (match) return match[1];
-  }
-  return null;
-}
-
-async function registerPostiz(email: string, password: string, userId: string) {
-  return fetch(`${POSTIZ_URL}/api/auth/register`, {
-    method: 'POST',
-    cache: 'no-store',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      password,
-      name: `user-${userId.slice(0, 8)}`,
-      company: 'Clawpack',
-      provider: 'LOCAL'
-    }),
-    signal: AbortSignal.timeout(10000)
-  });
-}
-
-async function loginPostiz(email: string, password: string) {
-  return fetch(`${POSTIZ_URL}/api/auth/login`, {
-    method: 'POST',
-    cache: 'no-store',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      password,
-      provider: 'LOCAL'
-    }),
-    signal: AbortSignal.timeout(10000)
-  });
+function extractAuthToken(setCookieHeader: string | null): string | null {
+  if (!setCookieHeader) return null;
+  const match = setCookieHeader.match(/auth=([^;]+)/);
+  return match ? match[1] : null;
 }
 
 export async function POST(request: Request) {
@@ -82,28 +47,39 @@ export async function POST(request: Request) {
       });
     }
 
-    // Step 2: Not provisioned - register first
+    // Step 2: Generate password and try to register
     const password = crypto.randomUUID();
     
-    const registerRes = await registerPostiz(supabaseUser.email, password, supabaseUser.id);
-    
-    // If user already exists in Postiz but not in our DB - can't recover
-    if (!registerRes.ok) {
-      const text = await registerRes.text();
-      
-      if (text.toLowerCase().includes('exists')) {
-        console.error('Postiz user out of sync:', supabaseUser.email);
-        return NextResponse.json({
-          error: 'User exists in Postiz but not linked. Please contact support.'
-        }, { status: 409 });
-      }
-      
-      console.error('Register failed:', text);
-      return NextResponse.json({ error: 'Registration failed', details: text }, { status: 500 });
-    }
+    const registerRes = await fetch(`${POSTIZ_URL}/api/auth/register`, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: supabaseUser.email,
+        password: password,
+        name: `user-${supabaseUser.id.slice(0, 8)}`,
+        company: 'Clawpack',
+        provider: 'LOCAL'
+      }),
+      signal: AbortSignal.timeout(10000)
+    });
 
-    // Step 3: Login after successful registration
-    const loginRes = await loginPostiz(supabaseUser.email, password);
+    // Step 3: Login (whether user was just created or already existed)
+    const loginRes = await fetch(`${POSTIZ_URL}/api/auth/login`, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: supabaseUser.email,
+        password: password,
+        provider: 'LOCAL'
+      }),
+      signal: AbortSignal.timeout(10000)
+    });
+
+    // Log headers for debugging
+    console.log('LOGIN STATUS:', loginRes.status);
+    console.log('LOGIN HEADERS:', loginRes.headers.get('set-cookie'));
 
     if (!loginRes.ok) {
       const text = await loginRes.text();
@@ -111,11 +87,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Login failed', details: text }, { status: 500 });
     }
 
-    // Step 4: Extract token properly using getSetCookie
-    const token = extractAuthToken(loginRes.headers);
+    // Step 4: Extract token
+    const setCookie = loginRes.headers.get('set-cookie');
+    const token = extractAuthToken(setCookie);
 
     if (!token) {
-      console.error('No token in cookie. Headers:', loginRes.headers.get('set-cookie'));
+      console.error('Token extraction failed. Cookie:', setCookie);
       return NextResponse.json({ error: 'No token received' }, { status: 500 });
     }
 
