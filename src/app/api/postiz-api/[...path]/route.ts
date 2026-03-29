@@ -105,6 +105,8 @@ export async function POST(
       'Content-Type': 'application/json',
       'Cookie': `auth=${token}`,
       'Accept': request.headers.get('accept') || '*/*',
+      'Origin': POSTIZ_URL,
+      'Referer': POSTIZ_URL,
     };
 
     const response = await fetch(`${POSTIZ_URL}/api/${path}`, {
