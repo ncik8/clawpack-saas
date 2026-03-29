@@ -39,7 +39,10 @@ export default function SchedulerPage() {
   ];
 
   const handleSchedule = () => {
-    window.open(`${POSTIZ_URL}/posts/new`, '_blank');
+    // TODO: Build native post creation UI that uses Postiz API
+    // For now, show message that user should be logged into Postiz
+    alert('Coming soon: Native post creation. For now, please ensure your X account is connected in Connected Accounts page.');
+    // window.open(`${POSTIZ_URL}/posts/new`, '_blank');
   };
 
   const generateAiSuggestions = async () => {
