@@ -9,7 +9,7 @@ const POSTIZ_PASSWORD_SECRET = process.env.POSTIZ_PASSWORD_SECRET || 'default-se
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// Deterministic password based on user ID - stable across provisioning attempts
+// Deterministic password - stable across provisioning attempts
 function generatePassword(userId: string): string {
   return createHash('sha256')
     .update(userId + POSTIZ_PASSWORD_SECRET)
@@ -36,6 +36,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    console.log('Provisioning:', supabaseUser.email);
+
     // Check if already provisioned
     const { data: existing } = await supabaseAdmin
       .from('postiz_users')
@@ -51,9 +53,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // Generate deterministic password (stable for this user)
+    // Generate deterministic password
     const password = generatePassword(supabaseUser.id);
-    
+    console.log('Generated password hash:', password.slice(0, 8));
+
     // Try to register user
     const registerRes = await fetch(`${POSTIZ_URL}/api/auth/register`, {
       method: 'POST',
@@ -69,12 +72,14 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(10000)
     });
 
+    const registerText = await registerRes.text();
+    console.log('Register response:', registerRes.status, registerText.slice(0, 200));
+
     // If user exists, that's OK - continue to login
     if (!registerRes.ok) {
-      const text = await registerRes.text();
-      if (!text.toLowerCase().includes('exists')) {
-        console.error('Register failed:', text);
-        return NextResponse.json({ error: 'Registration failed', details: text }, { status: 500 });
+      if (!registerText.toLowerCase().includes('exists')) {
+        console.error('Register failed:', registerText);
+        return NextResponse.json({ error: 'Registration failed', details: registerText }, { status: 500 });
       }
       console.log('User already exists in Postiz, attempting login');
     }
@@ -92,27 +97,38 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(10000)
     });
 
+    const loginText = await loginRes.text();
+    console.log('Login response:', loginRes.status, loginText.slice(0, 200));
+
     if (!loginRes.ok) {
-      const text = await loginRes.text();
-      console.error('Login failed:', text);
-      return NextResponse.json({ error: 'Login failed', details: text }, { status: 500 });
+      console.error('Login failed:', loginText);
+      return NextResponse.json({ error: 'Login failed', details: loginText }, { status: 500 });
     }
 
-    // Get token from JSON response - check multiple possible fields
-    const loginData = await loginRes.json();
+    // Get token from JSON response
+    let loginData: any;
+    try {
+      loginData = JSON.parse(loginText);
+    } catch {
+      console.error('Invalid JSON from login:', loginText.slice(0, 200));
+      return NextResponse.json({ error: 'Invalid login response' }, { status: 500 });
+    }
+
     const token = loginData.access_token || loginData.token || loginData.auth;
+    console.log('Token received:', token ? `${token.slice(0, 10)}...` : 'NULL');
 
     if (!token) {
       console.error('No token in response:', loginData);
       return NextResponse.json({ error: 'No token received' }, { status: 500 });
     }
 
-    // Store token
+    // Store token and password
     const { error: dbError } = await supabaseAdmin
       .from('postiz_users')
       .upsert({
         supabase_user_id: supabaseUser.id,
         postiz_auth_token: token,
+        postiz_password: password,
         token_updated_at: new Date().toISOString(),
       }, {
         onConflict: 'supabase_user_id'
