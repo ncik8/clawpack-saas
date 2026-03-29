@@ -167,9 +167,8 @@ export default function ConnectedAccountsPage() {
   const handleConnect = async (platform: string) => {
     setConnecting(platform);
     
-    // For X/Twitter, use our own OAuth flow
+    // For X/Twitter, use our own OAuth flow - redirect to Twitter
     if (platform === 'x') {
-      // Open our OAuth connect endpoint - it redirects to Twitter
       window.location.href = '/api/connect/x';
       return;
     }
