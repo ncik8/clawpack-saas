@@ -18,18 +18,17 @@ function generatePassword(userId: string): string {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const platform = url.searchParams.get('platform');
+  const token = url.searchParams.get('token');
 
   if (!platform) {
     return new Response('Missing platform', { status: 400 });
   }
 
-  // Get user from Supabase via Authorization header
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response('Unauthorized', { status: 401 });
+  if (!token) {
+    return new Response('Missing token', { status: 401 });
   }
 
-  const token = authHeader.substring(7);
+  // Get user from Supabase using the token from query param
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
   if (error || !user) {
