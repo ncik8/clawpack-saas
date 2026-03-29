@@ -39,6 +39,34 @@ export default function ConnectedAccountsPage() {
     };
 
     provisionPostiz();
+
+    // Listen for OAuth callback messages from popup
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.data?.type === 'social-connected') {
+        const platform = event.data.platform;
+        // Sync tokens to Postiz
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            await fetch('/api/sync-postiz', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ platform }),
+            });
+          }
+        } catch (err) {
+          console.error('Sync failed:', err);
+        }
+        // Refresh page
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   // Load channels from Postiz API
@@ -139,9 +167,15 @@ export default function ConnectedAccountsPage() {
   const handleConnect = async (platform: string) => {
     setConnecting(platform);
     
-    // Map platform to Postiz identifier
+    // For X/Twitter, use our own OAuth flow
+    if (platform === 'x') {
+      // Open our OAuth connect endpoint - it redirects to Twitter
+      window.location.href = '/api/connect/x';
+      return;
+    }
+    
+    // For other platforms, use Postiz OAuth (fallback)
     const platformMap: Record<string, string> = {
-      'x': 'x',
       'linkedin': 'linkedin-oauth2',
       'linkedin-page': 'linkedin',
     };
@@ -158,7 +192,7 @@ export default function ConnectedAccountsPage() {
       return;
     }
     
-    // Use popup approach - opens our bridge endpoint which logs into Postiz and redirects to OAuth
+    // Use popup approach for Postiz OAuth
     const popup = window.open(
       `/api/postiz-connect?platform=${integrationId}&token=${encodeURIComponent(supabaseToken)}`,
       `Connect ${platform}`,
