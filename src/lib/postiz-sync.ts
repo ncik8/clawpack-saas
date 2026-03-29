@@ -1,10 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 
-const POSTIZ_URL = process.env.POSTIZ_URL || process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+export async function getPostizToken(supabaseUserId: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from('postiz_users')
+    .select('postiz_auth_token')
+    .eq('supabase_user_id', supabaseUserId)
+    .single();
+  
+  if (error || !data) return null;
+  return data.postiz_auth_token;
+}
 
 export async function syncTokenToPostiz(params: {
   supabaseUserId: string;
@@ -15,18 +26,14 @@ export async function syncTokenToPostiz(params: {
   platformUsername: string;
   expiresAt: string;
 }) {
-  // Get Postiz user for this Supabase user
-  const { data: postizUser } = await supabaseAdmin
-    .from('postiz_users')
-    .select('*')
-    .eq('supabase_user_id', params.supabaseUserId)
-    .single();
-
-  if (!postizUser) {
-    throw new Error('Postiz user not found - run provisioning first');
+  // Get Postiz auth token for this user
+  const postizToken = await getPostizToken(params.supabaseUserId);
+  
+  if (!postizToken) {
+    throw new Error('Postiz user not provisioned - run provisioning first');
   }
 
-  // Map platform to Postiz provider identifier
+  // Map platform to Postiz identifier
   const providerMap: Record<string, string> = {
     'x': 'x',
     'linkedin': 'linkedin-oauth2',
@@ -34,56 +41,34 @@ export async function syncTokenToPostiz(params: {
   };
   const providerIdentifier = providerMap[params.platform] || params.platform;
 
-  // Connect to Postiz database directly
-  const postizDb = await import('pg').then(pg => {
-    return new pg.Pool({
-      connectionString: process.env.POSTIZ_DATABASE_URL,
-    });
+  // Use Postiz API to connect the integration
+  const res = await fetch(`${POSTIZ_URL}/api/integrations/social/${providerIdentifier}/connect`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${postizToken}`,
+    },
+    body: JSON.stringify({
+      token: params.accessToken,
+      refreshToken: params.refreshToken,
+      expiresIn: params.expiresAt,
+      internalId: params.platformUserId,
+      username: params.platformUsername,
+    }),
   });
 
-  // Insert/update integration in Postiz
-  const result = await postizDb.query(`
-    INSERT INTO "Integration" (
-      id, "internalId", "organizationId", "name", 
-      "providerIdentifier", "token", "refreshToken", "expiresIn", 
-      "type", "profile", "disabled", "createdAt", "updatedAt"
-    )
-    VALUES (
-      gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, false, NOW(), NOW()
-    )
-    ON CONFLICT ("providerIdentifier", "organizationId") 
-    DO UPDATE SET 
-      token = $5, 
-      "refreshToken" = $6, 
-      "expiresIn" = $7, 
-      "updatedAt" = NOW()
-    RETURNING id
-  `, [
-    params.platformUserId,           // internalId
-    postizUser.postiz_user_id,     // organizationId (Postiz user id)
-    params.platformUsername,       // name
-    providerIdentifier,             // providerIdentifier
-    params.accessToken,             // token
-    params.refreshToken,            // refreshToken
-    params.expiresAt,               // expiresIn
-    params.platform,                // type
-    params.platformUsername,        // profile (JSON)
-  ]);
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(`Failed to sync: ${error}`);
+  }
 
-  await postizDb.end();
-
-  return result.rows[0].id;
+  return await res.json();
 }
 
 export async function getPostizIntegrationId(supabaseUserId: string, platform: string) {
-  // Get Postiz user for this Supabase user
-  const { data: postizUser } = await supabaseAdmin
-    .from('postiz_users')
-    .select('*')
-    .eq('supabase_user_id', supabaseUserId)
-    .single();
-
-  if (!postizUser) {
+  const postizToken = await getPostizToken(supabaseUserId);
+  
+  if (!postizToken) {
     return null;
   }
 
@@ -94,19 +79,19 @@ export async function getPostizIntegrationId(supabaseUserId: string, platform: s
   };
   const providerIdentifier = providerMap[platform] || platform;
 
-  // Query Postiz database
-  const postizDb = await import('pg').then(pg => {
-    return new pg.Pool({
-      connectionString: process.env.POSTIZ_DATABASE_URL,
-    });
+  // Get integrations from Postiz
+  const res = await fetch(`${POSTIZ_URL}/api/integrations/list`, {
+    headers: {
+      'Authorization': `Bearer ${postizToken}`,
+    },
   });
 
-  const result = await postizDb.query(`
-    SELECT id FROM "Integration" 
-    WHERE "organizationId" = $1 AND "providerIdentifier" = $2
-  `, [postizUser.postiz_user_id, providerIdentifier]);
+  if (!res.ok) {
+    return null;
+  }
 
-  await postizDb.end();
-
-  return result.rows[0]?.id || null;
+  const integrations = await res.json();
+  const integration = integrations.find((i: any) => i.provider === providerIdentifier);
+  
+  return integration?.id || null;
 }
