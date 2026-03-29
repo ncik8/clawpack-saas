@@ -68,19 +68,6 @@ export async function GET(request: Request) {
     onConflict: 'user_id,platform'
   });
 
-  // Close popup and notify parent
-  const html = `
-<!DOCTYPE html>
-<html>
-<body>
-<script>
-  window.opener?.postMessage({ type: 'social-connected', platform: 'x' }, '*');
-  window.close();
-</script>
-</body>
-</html>`;
-
-  return new Response(html, {
-    headers: { 'Content-Type': 'text/html' },
-  });
+  // Redirect back to connected accounts page (with success param)
+  return Response.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dashboard/connected-accounts?connected=x`);
 }
