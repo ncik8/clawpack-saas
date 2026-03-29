@@ -148,37 +148,32 @@ export default function ConnectedAccountsPage() {
     
     const integrationId = platformMap[platform] || platform;
     
-    // Get Supabase token from browser session and send
+    // Get Supabase token from browser session
     const { data: { session } } = await supabase.auth.getSession();
     const supabaseToken = session?.access_token;
     
     if (!supabaseToken) {
       alert('Please log in first.');
+      setConnecting(null);
       return;
     }
     
-    fetch(`/api/postiz-api/integrations/social/${integrationId}/connect`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseToken}`,
-      },
-      body: JSON.stringify({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
-    })
-    .then(response => {
-      if (response.redirected) {
-        // Postiz returned redirect - user goes to Twitter OAuth
-        window.location.href = response.url;
-      } else {
-        alert('Failed to start OAuth. Please try again.');
+    // Use popup approach - opens our bridge endpoint which logs into Postiz and redirects to OAuth
+    const popup = window.open(
+      `/api/postiz-connect?platform=${integrationId}&token=${encodeURIComponent(supabaseToken)}`,
+      `Connect ${platform}`,
+      'width=600,height=700,scrollbars=yes'
+    );
+    
+    // Poll for popup closure
+    const checkClosed = setInterval(() => {
+      if (!popup || popup.closed) {
+        clearInterval(checkClosed);
         setConnecting(null);
+        // Refresh channels list
+        window.location.reload();
       }
-    })
-    .catch(err => {
-      console.error('OAuth error:', err);
-      alert('Connection failed. Please try again.');
-      setConnecting(null);
-    });
+    }, 1000);
   };
 
   const handleDisconnect = async (platform: string) => {
