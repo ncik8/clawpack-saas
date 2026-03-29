@@ -8,10 +8,6 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const POSTIZ_PASSWORD_SECRET = process.env.POSTIZ_PASSWORD_SECRET!;
 
-if (!POSTIZ_PASSWORD_SECRET || POSTIZ_PASSWORD_SECRET === 'default-secret') {
-  console.warn('⚠️ POSTIZ_PASSWORD_SECRET is not set or using default!');
-}
-
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 // ─── Helpers ──────────────────────────────────────────────
@@ -35,9 +31,6 @@ async function getSupabaseUser(request: Request) {
   return { id: user.id, email: user.email };
 }
 
-/**
- * Fetch with retry — handles transient 502/522 from Postiz
- */
 async function fetchWithRetry(
   url: string,
   options: RequestInit,
@@ -52,12 +45,9 @@ async function fetchWithRetry(
         signal: AbortSignal.timeout(10000),
       });
 
-      // Retry on 502, 503, 522 (server down / restarting)
       if (res.status >= 500 && attempt < retries) {
         const body = await res.text();
-        console.warn(
-          `Attempt ${attempt + 1} failed: ${res.status} ${body.slice(0, 100)}`
-        );
+        console.warn(`Attempt ${attempt + 1} failed: ${res.status} ${body.slice(0, 100)}`);
         await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
         continue;
       }
@@ -76,9 +66,26 @@ async function fetchWithRetry(
   throw new Error('All retries exhausted');
 }
 
-/**
- * Safely parse JSON, returns null if not valid JSON
- */
+// Extract token from Set-Cookie header (Postiz stores token in cookie)
+function extractTokenFromCookie(setCookieHeader: string | null): string | null {
+  if (!setCookieHeader) return null;
+  
+  // Handle array of cookies
+  const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
+  
+  for (const cookie of cookies) {
+    // Match auth= token
+    const match = cookie.match(/auth=([^;]+)/);
+    if (match) return match[1];
+    
+    // Or token= field
+    const tokenMatch = cookie.match(/token=([^;]+)/);
+    if (tokenMatch) return tokenMatch[1];
+  }
+  
+  return null;
+}
+
 function safeJsonParse(text: string): any | null {
   try {
     return JSON.parse(text);
@@ -87,20 +94,10 @@ function safeJsonParse(text: string): any | null {
   }
 }
 
-/**
- * Extract token from Postiz login response
- * Postiz has returned different shapes across versions
- */
-function extractToken(data: any): string | null {
-  if (!data || typeof data !== 'object') return null;
-  return data.access_token || data.token || data.auth || data.jwt || null;
-}
-
 // ─── Main Handler ─────────────────────────────────────────
 
 export async function POST(request: Request) {
   try {
-    // 1. Authenticate Supabase user
     const supabaseUser = await getSupabaseUser(request);
     if (!supabaseUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -108,7 +105,7 @@ export async function POST(request: Request) {
 
     console.log('📦 Provisioning:', supabaseUser.email);
 
-    // 2. Check if already provisioned
+    // Check if already provisioned
     const { data: existing } = await supabaseAdmin
       .from('postiz_users')
       .select('postiz_auth_token')
@@ -124,10 +121,9 @@ export async function POST(request: Request) {
       });
     }
 
-    // 3. Generate deterministic password
     const password = generatePassword(supabaseUser.id);
 
-    // 4. Try to register in Postiz
+    // Register
     let userExists = false;
 
     const registerRes = await fetchWithRetry(
@@ -154,10 +150,7 @@ export async function POST(request: Request) {
       if (isHtml) {
         console.error('❌ Postiz server unreachable:', registerText.slice(0, 100));
         return NextResponse.json(
-          {
-            error: 'Postiz server is temporarily unavailable',
-            hint: 'Check if post.clawpack.net is running',
-          },
+          { error: 'Postiz server is temporarily unavailable', hint: 'Check if post.clawpack.net is running' },
           { status: 503 }
         );
       }
@@ -168,14 +161,11 @@ export async function POST(request: Request) {
         console.log('👤 User already exists, proceeding to login');
       } else {
         console.error('❌ Register failed:', registerText);
-        return NextResponse.json(
-          { error: 'Registration failed', details: registerText.slice(0, 500) },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: 'Registration failed', details: registerText.slice(0, 500) }, { status: 500 });
       }
     }
 
-    // 5. Login to get token
+    // Login to get token from cookie
     const loginRes = await fetchWithRetry(
       `${POSTIZ_URL}/api/auth/login`,
       {
@@ -192,63 +182,32 @@ export async function POST(request: Request) {
     const loginText = await loginRes.text();
     console.log('🔑 Login:', loginRes.status, loginText.slice(0, 200));
 
-    if (!loginRes.ok) {
-      const isHtml = loginText.trim().startsWith('<');
+    // Check for Set-Cookie header FIRST (Postiz may return token in cookie)
+    const setCookieHeader = loginRes.headers.get('set-cookie');
+    console.log('🍪 Set-Cookie header:', setCookieHeader?.slice(0, 200));
+    
+    let token = extractTokenFromCookie(setCookieHeader);
 
-      if (isHtml) {
-        console.error('❌ Postiz server unreachable on login');
-        return NextResponse.json(
-          {
-            error: 'Postiz server is temporarily unavailable',
-            hint: 'Check if post.clawpack.net is running',
-          },
-          { status: 503 }
-        );
+    // Also try JSON fields as fallback
+    if (!token) {
+      const loginData = safeJsonParse(loginText);
+      if (loginData) {
+        token = loginData.access_token || loginData.token || loginData.auth || loginData.jwt;
       }
-
-      if (userExists && loginText.toLowerCase().includes('invalid')) {
-        console.error('❌ Password mismatch — user was created with a different password');
-        return NextResponse.json(
-          {
-            error: 'Password mismatch',
-            hint: 'Delete user from Postiz DB and retry',
-            details: loginText.slice(0, 500),
-          },
-          { status: 409 }
-        );
-      }
-
-      console.error('❌ Login failed:', loginText);
-      return NextResponse.json(
-        { error: 'Login failed', details: loginText.slice(0, 500) },
-        { status: 500 }
-      );
     }
 
-    // 6. Parse login response
-    const loginData = safeJsonParse(loginText);
-
-    if (!loginData) {
-      console.error('❌ Non-JSON login response:', loginText.slice(0, 200));
-      return NextResponse.json({ error: 'Invalid login response format' }, { status: 502 });
-    }
-
-    const token = extractToken(loginData);
     console.log('🎫 Token:', token ? `${token.slice(0, 15)}...` : 'NULL');
-    console.log('🔍 Login response keys:', Object.keys(loginData));
 
     if (!token) {
-      console.error('❌ No token found in:', JSON.stringify(loginData).slice(0, 300));
+      console.error('❌ No token found. Login response:', loginText.slice(0, 300));
+      console.error('❌ Set-Cookie was:', setCookieHeader);
       return NextResponse.json(
-        {
-          error: 'No token in login response',
-          keys: Object.keys(loginData),
-        },
+        { error: 'No token received from Postiz', details: loginText },
         { status: 502 }
       );
     }
 
-    // 7. Store in Supabase
+    // Store in Supabase
     const { error: dbError } = await supabaseAdmin
       .from('postiz_users')
       .upsert(
@@ -267,19 +226,9 @@ export async function POST(request: Request) {
     }
 
     console.log('✅ Provisioned successfully:', supabaseUser.email);
-    return NextResponse.json({
-      success: true,
-      token,
-      message: 'Provisioned successfully',
-    });
+    return NextResponse.json({ success: true, token, message: 'Provisioned successfully' });
   } catch (error: any) {
     console.error('💥 Provision error:', error.message || error);
-    return NextResponse.json(
-      {
-        error: 'Provisioning failed',
-        message: error.message || 'Unknown error',
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Provisioning failed', message: error.message || 'Unknown error' }, { status: 500 });
   }
 }
