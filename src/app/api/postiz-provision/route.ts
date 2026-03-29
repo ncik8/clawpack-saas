@@ -66,21 +66,14 @@ async function fetchWithRetry(
   throw new Error('All retries exhausted');
 }
 
-// Extract token from Set-Cookie header (Postiz stores token in cookie)
 function extractTokenFromCookie(setCookieHeader: string | null): string | null {
   if (!setCookieHeader) return null;
   
-  // Handle array of cookies
   const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
   
   for (const cookie of cookies) {
-    // Match auth= token
     const match = cookie.match(/auth=([^;]+)/);
     if (match) return match[1];
-    
-    // Or token= field
-    const tokenMatch = cookie.match(/token=([^;]+)/);
-    if (tokenMatch) return tokenMatch[1];
   }
   
   return null;
@@ -130,7 +123,11 @@ export async function POST(request: Request) {
       `${POSTIZ_URL}/api/auth/register`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Origin': POSTIZ_URL,
+          'Host': new URL(POSTIZ_URL).host,
+        },
         body: JSON.stringify({
           email: supabaseUser.email,
           password,
@@ -165,12 +162,17 @@ export async function POST(request: Request) {
       }
     }
 
-    // Login to get token from cookie
+    // Login - IMPORTANT: include Origin and Host headers to make Postiz treat as same-origin
     const loginRes = await fetchWithRetry(
       `${POSTIZ_URL}/api/auth/login`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Origin': POSTIZ_URL,
+          'Host': new URL(POSTIZ_URL).host,
+        },
+        credentials: 'include',
         body: JSON.stringify({
           email: supabaseUser.email,
           password,
@@ -182,7 +184,7 @@ export async function POST(request: Request) {
     const loginText = await loginRes.text();
     console.log('🔑 Login:', loginRes.status, loginText.slice(0, 200));
 
-    // Check for Set-Cookie header FIRST (Postiz may return token in cookie)
+    // Check Set-Cookie header FIRST
     const setCookieHeader = loginRes.headers.get('set-cookie');
     console.log('🍪 Set-Cookie header:', setCookieHeader?.slice(0, 200));
     
@@ -200,7 +202,6 @@ export async function POST(request: Request) {
 
     if (!token) {
       console.error('❌ No token found. Login response:', loginText.slice(0, 300));
-      console.error('❌ Set-Cookie was:', setCookieHeader);
       return NextResponse.json(
         { error: 'No token received from Postiz', details: loginText },
         { status: 502 }
