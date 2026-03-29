@@ -17,71 +17,54 @@ function generatePassword(userId: string): string {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const platform = url.searchParams.get('platform') || 'x';
-  const token = url.searchParams.get('token');
+  const platform = url.searchParams.get('platform');
 
-  if (!token) {
-    return new Response('Unauthorized - no token', { status: 401 });
+  if (!platform) {
+    return new Response('Missing platform', { status: 400 });
   }
 
-  // Get user from Supabase
+  // Get user from Supabase via Authorization header
+  const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  const token = authHeader.substring(7);
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
   if (error || !user) {
-    return new Response('Unauthorized - invalid token', { status: 401 });
+    return new Response('Unauthorized', { status: 401 });
   }
 
-  // Get Postiz token from our DB
-  const { data: postizUser } = await supabaseAdmin
-    .from('postiz_users')
-    .select('postiz_auth_token')
-    .eq('supabase_user_id', user.id)
-    .single();
-
-  const postizToken = postizUser?.postiz_auth_token;
+  // Generate deterministic password
   const password = generatePassword(user.id);
 
-  const html = `<!DOCTYPE html>
-<html>
-<head><title>Connecting to ${platform}...</title></head>
-<body style="font-family: sans-serif; text-align: center; padding: 50px; background: #1f2937; color: white;">
-<p style="font-size: 18px;">🔄 Connecting to ${platform}...</p>
-<script>
-(async () => {
-  try {
-    // Login to Postiz (sets cookie via credentials: include)
-    const loginRes = await fetch('${POSTIZ_URL}/api/auth/login', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: '${user.email}',
-        password: '${password}',
-        provider: 'LOCAL'
-      })
-    });
-    
-    if (loginRes.ok) {
-      console.log('Postiz login successful, redirecting to OAuth...');
-      // Redirect to OAuth flow on Postiz
-      window.location.href = '${POSTIZ_URL}/integrations/social/${platform}';
-    } else {
-      const text = await loginRes.text();
-      document.body.innerHTML = '<p>❌ Login failed: ' + text + '</p><button onclick="window.close()">Close</button>';
-    }
-  } catch (err) {
-    document.body.innerHTML = '<p>❌ Error: ' + err.message + '</p><button onclick="window.close()">Close</button>';
-  }
-})();
-</script>
-</body>
-</html>`;
-
-  return new Response(html, {
-    headers: { 
-      'Content-Type': 'text/html',
-      'Access-Control-Allow-Origin': 'https://clawpack-saas.vercel.app',
-      'Access-Control-Allow-Credentials': 'true',
-    },
+  // Login to Postiz server-side
+  const loginRes = await fetch(`${POSTIZ_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: user.email,
+      password: password,
+      provider: 'LOCAL'
+    }),
   });
+
+  if (!loginRes.ok) {
+    return new Response(`Postiz login failed: ${loginRes.status}`, { status: 500 });
+  }
+
+  // Extract JWT from Set-Cookie
+  const setCookie = loginRes.headers.get('set-cookie');
+  const authToken = setCookie?.match(/auth=([^;]+)/)?.[1];
+
+  if (!authToken) {
+    return new Response('No auth token from Postiz', { status: 500 });
+  }
+
+  // Redirect to auth-bridge: nginx sets cookie and redirects to OAuth
+  const redirectPath = `/integrations/social/${platform}`;
+  const bridgeUrl = `${POSTIZ_URL}/auth-bridge?token=${encodeURIComponent(authToken)}&redirect=${encodeURIComponent(redirectPath)}`;
+
+  return Response.redirect(bridgeUrl, 302);
 }
