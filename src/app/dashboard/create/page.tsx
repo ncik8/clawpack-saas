@@ -1,291 +1,260 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
-const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
-const MINIMAX_API_KEY = process.env.NEXT_PUBLIC_MINIMAX_API_KEY || '';
-const MINIMAX_URL = 'https://api.minimax.io/anthropic';
+interface ConnectedPlatform {
+  id: string;
+  name: string;
+  connected: boolean;
+  platformUsername?: string;
+}
 
-const SYSTEM_PROMPT = `You are an expert social media copywriter with deep knowledge of hashtags, SEO, engagement optimization, and platform-specific best practices.
-
-Your expertise includes:
-- Writing compelling posts that drive engagement
-- Using relevant hashtags strategically (1-5 per platform)
-- Optimizing for each platform (X:280 chars, LinkedIn:3000, etc.)
-- Creating calls-to-action that work
-- Understanding what content performs well on each platform
-
-Always provide:
-1. A catchy headline/hook
-2. 2-3 relevant hashtags
-3. A clear, engaging message
-
-Format your response as a ready-to-post message. Keep it authentic and human.`;
-
-export default function SchedulerPage() {
+export default function CreatePostPage() {
   const [content, setContent] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('');
-  const [platforms, setPlatforms] = useState<string[]>(['x']);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
-  const [aiError, setAiError] = useState('');
+  const [platforms, setPlatforms] = useState<string[]>([]);
+  const [connectedPlatforms, setConnectedPlatforms] = useState<ConnectedPlatform[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  const platformsList = [
-    { id: 'x', name: 'X / Twitter', emoji: '🐦', maxChars: 280 },
-    { id: 'linkedin', name: 'LinkedIn', emoji: '💼', maxChars: 3000 },
-    { id: 'facebook', name: 'Facebook', emoji: '📘', maxChars: 63206 },
-    { id: 'instagram', name: 'Instagram', emoji: '📷', maxChars: 2200 },
-  ];
+  useEffect(() => {
+    loadConnectedPlatforms();
+  }, []);
 
-  const handleSchedule = () => {
-    // TODO: Build native post creation UI that uses Postiz API
-    // For now, show message that user should be logged into Postiz
-    alert('Coming soon: Native post creation. For now, please ensure your X account is connected in Connected Accounts page.');
-    // window.open(`${POSTIZ_URL}/posts/new`, '_blank');
-  };
-
-  const generateAiSuggestions = async () => {
-    if (!aiPrompt.trim()) return;
-    
-    setAiLoading(true);
-    setAiError('');
-    setAiSuggestions([]);
-
-    const targetPlatform = platforms.includes('x') ? 'X/Twitter' 
-      : platforms.includes('linkedin') ? 'LinkedIn' 
-      : platforms.includes('instagram') ? 'Instagram' 
-      : 'Facebook';
-
+  const loadConnectedPlatforms = async () => {
+    setLoading(true);
     try {
-      const response = await fetch(MINIMAX_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${MINIMAX_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'MiniMax-M2.7',
-          max_tokens: 500,
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: `Write 3 engaging social media posts about: "${aiPrompt}". Target platform: ${targetPlatform}. Make each post unique with different angles. Return ONLY the 3 posts, numbered 1-3, nothing else.` }
-          ]
-        })
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
 
-      if (!response.ok) {
-        throw new Error('AI request failed');
-      }
+      // Fetch connected platforms from our social_connections table
+      const { data: connections } = await supabase
+        .from('social_connections')
+        .select('platform, platform_username')
+        .eq('user_id', session.user.id);
 
-      const data = await response.json();
-      const text = data.content?.[0]?.text || '';
+      const connected = connections || [];
       
-      // Parse the 3 suggestions
-      const suggestions = text
-        .split(/\n?\d\.\s*/)
-        .map((s: string) => s.trim())
-        .filter((s: string) => s.length > 20);
+      const platformInfo: Record<string, { name: string; emoji: string }> = {
+        'x': { name: 'X / Twitter', emoji: '🐦' },
+        'linkedin': { name: 'LinkedIn', emoji: '💼' },
+      };
+
+      const allPlatforms = ['x', 'linkedin'];
+      const platformsWithStatus = allPlatforms.map(p => ({
+        id: p,
+        name: platformInfo[p]?.name || p,
+        emoji: platformInfo[p]?.emoji || '📱',
+        connected: connected.some(c => c.platform === p),
+        platformUsername: connected.find(c => c.platform === p)?.platform_username,
+      }));
+
+      setConnectedPlatforms(platformsWithStatus);
       
-      setAiSuggestions(suggestions.slice(0, 3));
+      // Pre-select connected platforms
+      setPlatforms(connected.map(c => c.platform));
     } catch (err) {
-      setAiError('Failed to generate suggestions. Please try again.');
+      console.error('Error loading platforms:', err);
     } finally {
-      setAiLoading(false);
+      setLoading(false);
     }
   };
 
-  const useSuggestion = (suggestion: string) => {
-    setContent(suggestion);
-    setAiSuggestions([]);
-    setAiPrompt('');
+  const togglePlatform = (platformId: string) => {
+    const platform = connectedPlatforms.find(p => p.id === platformId);
+    if (!platform?.connected) return; // Can't select disconnected platforms
+    
+    setPlatforms(prev => 
+      prev.includes(platformId)
+        ? prev.filter(p => p !== platformId)
+        : [...prev, platformId]
+    );
   };
 
+  const handlePost = async () => {
+    if (!content.trim()) {
+      setResult({ success: false, message: 'Please enter some content' });
+      return;
+    }
+
+    if (platforms.length === 0) {
+      setResult({ success: false, message: 'Please select at least one platform' });
+      return;
+    }
+
+    setPosting(true);
+    setResult(null);
+
+    const results: string[] = [];
+    const errors: string[] = [];
+
+    for (const platform of platforms) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          errors.push(`Not logged in`);
+          continue;
+        }
+
+        const response = await fetch('/api/post', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ content, platform }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          results.push(`${platform} ✓`);
+        } else {
+          errors.push(`${platform}: ${data.error}`);
+        }
+      } catch (err) {
+        errors.push(`${platform}: Network error`);
+      }
+    }
+
+    setPosting(false);
+
+    if (results.length > 0 && errors.length === 0) {
+      setResult({ success: true, message: `Posted to ${results.join(', ')}!` });
+      setContent('');
+    } else if (results.length > 0 && errors.length > 0) {
+      setResult({ 
+        success: true, 
+        message: `Posted to ${results.join(', ')}. Failed: ${errors.join(', ')}` 
+      });
+    } else {
+      setResult({ success: false, message: errors.join('. ') });
+    }
+  };
+
+  const charCount = content.length;
+  const maxChars = 280;
+
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Create</h1>
-        <p className="text-[#9ca3af]">Write, optimize, and schedule your social media posts</p>
-      </div>
+    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>
+        Create Post
+      </h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left Column - Post Composer */}
-        <div>
-          <div className="card mb-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Your Post</h2>
-            
-            {/* Content */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-white mb-2">
-                What do you want to share?
-              </label>
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Write your post content..."
-                className="input h-32 resize-none"
-                maxLength={platformsList.find(p => platforms.includes(p.id))?.maxChars || 280}
-              />
-              <p className="text-xs text-[#9ca3af] mt-1">
-                {content.length}/{platformsList.find(p => platforms.includes(p.id))?.maxChars || 280} characters
-              </p>
-            </div>
-
-            {/* Platform Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-white mb-2">
-                Select platforms
-              </label>
-              <div className="flex flex-wrap gap-3">
-                {platformsList.map((platform) => (
-                  <label
-                    key={platform.id}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
-                      platforms.includes(platform.id)
-                        ? 'bg-[#1780e3]/20 border-[#1780e3] text-white'
-                        : 'bg-[#1f2937] border-[#374151] text-[#9ca3af] hover:border-[#1780e3]/50'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={platforms.includes(platform.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setPlatforms([...platforms, platform.id]);
-                        } else {
-                          setPlatforms(platforms.filter(p => p !== platform.id));
-                        }
-                      }}
-                      className="hidden"
-                    />
-                    <span>{platform.emoji}</span>
-                    <span>{platform.name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Schedule Time */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-white mb-2">
-                When to post
-              </label>
-              <div className="flex gap-3">
-                <input
-                  type="datetime-local"
-                  value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                  className="input flex-1"
-                />
-                <button
-                  onClick={() => {
-                    const now = new Date();
-                    now.setMinutes(now.getMinutes() + 5);
-                    setScheduledTime(now.toISOString().slice(0, 16));
-                  }}
-                  className="btn btn-secondary"
-                >
-                  +5 min
-                </button>
-                <button
-                  onClick={() => {
-                    const now = new Date();
-                    now.setHours(now.getHours() + 1);
-                    setScheduledTime(now.toISOString().slice(0, 16));
-                  }}
-                  className="btn btn-secondary"
-                >
-                  +1 hour
-                </button>
-              </div>
-              <p className="text-xs text-[#9ca3af] mt-1">
-                Time is in Hong Kong timezone (GMT+8)
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleSchedule}
-                className="btn btn-primary flex-1"
-              >
-                Create Post
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column - AI Assistant */}
-        <div>
-          <div className="card bg-gradient-to-br from-[#083056] to-[#1780e3]">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-2xl">🤖</span>
-              <h2 className="text-xl font-semibold text-white">AI Post Assistant</h2>
-            </div>
-            <p className="text-white/80 text-sm mb-4">
-              Describe your post topic and let AI generate engaging content with optimal hashtags and SEO.
-            </p>
-
-            {/* AI Input */}
-            <div className="mb-4">
-              <textarea
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="e.g., 'We're launching our new AI tool that helps small businesses automate social media'"
-                className="input w-full h-24 resize-none bg-white/10 border-white/20 text-white placeholder-white/50"
-              />
-            </div>
-
+      {/* Platform Selection */}
+      <div style={{ marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>
+          Select Platforms
+        </h2>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          {connectedPlatforms.map(platform => (
             <button
-              onClick={generateAiSuggestions}
-              disabled={aiLoading || !aiPrompt.trim()}
-              className="btn w-full mb-4"
-              style={{ backgroundColor: '#22c55e', color: 'white' }}
+              key={platform.id}
+              onClick={() => togglePlatform(platform.id)}
+              disabled={!platform.connected}
+              style={{
+                padding: '12px 16px',
+                borderRadius: '8px',
+                border: platforms.includes(platform.id) ? '2px solid #10b981' : '2px solid #374151',
+                background: platforms.includes(platform.id) ? '#064e3b' : platform.connected ? '#1f2937' : '#1f293780',
+                color: platform.connected ? 'white' : '#6b7280',
+                cursor: platform.connected ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                opacity: platform.connected ? 1 : 0.5,
+              }}
             >
-              {aiLoading ? (
-                <>
-                  <span className="spinner mr-2" />
-                  Generating...
-                </>
-              ) : (
-                '✨ Generate Suggestions'
+              <span>{platform.emoji}</span>
+              <span>{platform.name}</span>
+              {platform.connected && (
+                <span style={{ fontSize: '12px', color: '#10b981' }}>
+                  @{platform.platformUsername || 'connected'}
+                </span>
+              )}
+              {!platform.connected && (
+                <span style={{ fontSize: '12px', color: '#6b7280' }}>Not connected</span>
               )}
             </button>
-
-            {aiError && (
-              <p className="text-red-300 text-sm mb-4">{aiError}</p>
-            )}
-
-            {/* AI Suggestions */}
-            {aiSuggestions.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-white text-sm font-medium">Choose a suggestion:</p>
-                {aiSuggestions.map((suggestion, index) => (
-                  <div 
-                    key={index}
-                    className="bg-white/10 rounded-lg p-3 cursor-pointer hover:bg-white/20 transition-colors"
-                    onClick={() => {
-                      setContent(suggestion);
-                      setAiSuggestions([]);
-                      setAiPrompt('');
-                    }}
-                  >
-                    <p className="text-white text-sm whitespace-pre-wrap">{suggestion}</p>
-                    <p className="text-white/60 text-xs mt-2">Click to use this</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Tips */}
-            <div className="mt-6 pt-4 border-t border-white/20">
-              <p className="text-white/80 text-xs">
-                <strong>Pro tip:</strong> Be specific about your topic, audience, and goal for better results!
-              </p>
-            </div>
-          </div>
+          ))}
         </div>
+      </div>
+
+      {/* Content Input */}
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <h2 style={{ fontSize: '14px', color: '#6b7280' }}>Content</h2>
+          <span style={{ 
+            fontSize: '12px', 
+            color: charCount > maxChars ? '#ef4444' : '#6b7280' 
+          }}>
+            {charCount}/{maxChars}
+          </span>
+        </div>
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="What's happening?"
+          maxLength={500}
+          style={{
+            width: '100%',
+            height: '150px',
+            padding: '12px',
+            borderRadius: '8px',
+            border: '2px solid #374151',
+            background: '#1f2937',
+            color: 'white',
+            fontSize: '16px',
+            resize: 'vertical',
+            outline: 'none',
+          }}
+        />
+      </div>
+
+      {/* Post Button */}
+      <button
+        onClick={handlePost}
+        disabled={posting || platforms.length === 0 || !content.trim()}
+        style={{
+          padding: '12px 32px',
+          borderRadius: '8px',
+          border: 'none',
+          background: platforms.length > 0 && content.trim() ? '#3b82f6' : '#374151',
+          color: 'white',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          cursor: platforms.length > 0 && content.trim() ? 'pointer' : 'not-allowed',
+          opacity: posting ? 0.7 : 1,
+        }}
+      >
+        {posting ? 'Posting...' : 'Post Now'}
+      </button>
+
+      {/* Result Message */}
+      {result && (
+        <div style={{
+          marginTop: '16px',
+          padding: '12px',
+          borderRadius: '8px',
+          background: result.success ? '#064e3b' : '#7f1d1d',
+          color: 'white',
+        }}>
+          {result.message}
+        </div>
+      )}
+
+      {/* Connect More Accounts */}
+      <div style={{ marginTop: '32px', padding: '16px', background: '#1f2937', borderRadius: '8px' }}>
+        <p style={{ color: '#9ca3af', marginBottom: '12px' }}>
+          Want to connect more accounts?
+        </p>
+        <a 
+          href="/dashboard/connected-accounts"
+          style={{ color: '#3b82f6', textDecoration: 'underline' }}
+        >
+          Go to Connected Accounts →
+        </a>
       </div>
     </div>
   );
