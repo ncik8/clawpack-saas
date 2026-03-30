@@ -184,8 +184,6 @@ export default function ConnectedAccountsPage() {
       return;
     }
     
-    const integrationId = platformMap[platform] || platform;
-    
     // Get Supabase token from browser session
     const { data: { session } } = await supabase.auth.getSession();
     const supabaseToken = session?.access_token;
