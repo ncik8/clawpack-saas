@@ -6,7 +6,7 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { text } = await request.json();
+  const { text, platform } = await request.json();
   if (!text) return Response.json({ error: 'Missing text' }, { status: 400 });
 
   // This automatically refreshes if needed

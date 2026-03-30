@@ -98,13 +98,13 @@ export default function CreatePostPage() {
           continue;
         }
 
-        const response = await fetch('/api/post', {
+        const response = await fetch('/api/post/x', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ content, platform }),
+          body: JSON.stringify({ text: content, platform }),
         });
 
         const data = await response.json();
