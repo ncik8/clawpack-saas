@@ -34,14 +34,11 @@ export async function GET(request: Request) {
   // Delete used state immediately
   await supabase.from('oauth_states').delete().eq('state', state);
 
-  // Exchange code for tokens
+  // Exchange code for tokens (LinkedIn OAuth 2.0 uses body params only, no Basic auth)
   const tokenRes = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${Buffer.from(
-        `${process.env.LINKEDIN_CLIENT_ID}:${process.env.LINKEDIN_CLIENT_SECRET}`
-      ).toString('base64')}`,
     },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
