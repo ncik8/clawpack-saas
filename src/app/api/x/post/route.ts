@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import crypto from 'crypto';
+import { uploadVideoUrlToX } from '@/lib/supabase-storage';
 
 function percentEncode(str: string): string {
   return encodeURIComponent(str).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
@@ -84,11 +84,26 @@ export async function POST(request: Request) {
     const body = await request.json();
     const text = body.text as string;
     const mediaIds = body.media_ids as string[] | undefined;
+    const videoUrl = body.video_url as string | undefined;
+
+    // If video URL provided, download and upload to Twitter
+    let finalMediaIds = mediaIds || [];
+    if (videoUrl && !mediaIds?.length) {
+      try {
+        const mediaId = await uploadVideoUrlToX(videoUrl, connection.access_token, connection.refresh_token);
+        if (mediaId) {
+          finalMediaIds = [mediaId];
+        }
+      } catch (err) {
+        console.error('Video upload from URL failed:', err);
+        return NextResponse.json({ error: 'Video upload failed' }, { status: 500 });
+      }
+    }
 
     const url = 'https://api.twitter.com/2/tweets';
     const payload: any = { text };
-    if (mediaIds?.length) {
-      payload.media = { media_ids: mediaIds };
+    if (finalMediaIds?.length) {
+      payload.media = { media_ids: finalMediaIds };
     }
 
     const authHeader = buildOAuthHeaderForJson({
