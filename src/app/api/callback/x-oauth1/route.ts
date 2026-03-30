@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildOAuthHeader, parseFormEncoded } from '@/lib/x-oauth';
+import { buildOAuthHeaderUrlEncoded } from '@/lib/x-oauth';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+
+function parseFormEncoded(body: string): Record<string, string> {
+  const params = new URLSearchParams(body);
+  const result: Record<string, string> = {};
+  for (const [key, value] of params.entries()) {
+    result[key] = value;
+  }
+  return result;
+}
 
 export async function GET(request: NextRequest) {
   const oauthToken = request.nextUrl.searchParams.get('oauth_token');
@@ -44,24 +53,27 @@ export async function GET(request: NextRequest) {
   }
 
   const accessUrl = 'https://api.twitter.com/oauth/access_token';
+  const bodyParams = {
+    oauth_verifier: oauthVerifier,
+  };
 
-  const authHeader = buildOAuthHeader({
+  const authHeader = buildOAuthHeaderUrlEncoded({
     method: 'POST',
     url: accessUrl,
     consumerKey: process.env.X_API_KEY!,
     consumerSecret: process.env.X_API_SECRET!,
-    token: {
-      key: pending.access_token,
-      secret: pending.refresh_token,
-    },
-    verifier: oauthVerifier,
+    accessToken: pending.access_token,
+    accessTokenSecret: pending.refresh_token,
+    bodyParams,
   });
 
   const res = await fetch(accessUrl, {
     method: 'POST',
     headers: {
       Authorization: authHeader,
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
+    body: new URLSearchParams(bodyParams).toString(),
   });
 
   const text = await res.text();

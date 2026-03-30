@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
-import { buildOAuthHeader, parseFormEncoded } from '@/lib/x-oauth';
+import { buildOAuthHeaderUrlEncoded } from '@/lib/x-oauth';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+
+function parseFormEncoded(body: string): Record<string, string> {
+  const params = new URLSearchParams(body);
+  const result: Record<string, string> = {};
+  for (const [key, value] of params.entries()) {
+    result[key] = value;
+  }
+  return result;
+}
 
 export async function GET() {
   const supabase = await getSupabaseServerClient();
@@ -14,12 +23,13 @@ export async function GET() {
 
   const url = 'https://api.twitter.com/oauth/request_token';
 
-  const authHeader = buildOAuthHeader({
+  const authHeader = buildOAuthHeaderUrlEncoded({
     method: 'POST',
     url,
     consumerKey: process.env.X_API_KEY!,
     consumerSecret: process.env.X_API_SECRET!,
-    callback: process.env.X_CALLBACK_URL!,
+    accessToken: '',
+    accessTokenSecret: '',
   });
 
   const res = await fetch(url, {
