@@ -108,10 +108,11 @@ export async function POST(request: Request) {
       body: JSON.stringify(payload),
     });
 
-    const raw = await res.text();
-    if (!res.ok) return NextResponse.json({ error: `Tweet failed: ${raw}` }, { status: 500 });
+    const data = await res.json();
+    if (!res.ok) return NextResponse.json({ error: `Tweet failed: ${JSON.stringify(data)}` }, { status: 500 });
 
-    return NextResponse.json({ success: true, tweet: JSON.parse(raw) });
+    // Return in v2 format: { data: { id: "xxx" } }
+    return NextResponse.json({ data: data.data });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed' }, { status: 500 });
   }
