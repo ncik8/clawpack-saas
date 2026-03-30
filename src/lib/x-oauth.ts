@@ -151,7 +151,7 @@ export async function uploadXImage({
   const url = 'https://upload.twitter.com/1.1/media/upload.json';
 
   const form = new FormData();
-  form.append('media', new Blob([fileBuffer], { type: mimeType }));
+  form.append('media', new Blob([fileBuffer as unknown as ArrayBuffer], { type: mimeType }));
 
   const authHeader = buildOAuthHeader({
     method: 'POST',
@@ -244,7 +244,7 @@ export async function uploadXVideo({
       form.append('command', 'APPEND');
       form.append('media_id', mediaId);
       form.append('segment_index', segmentIndex.toString());
-      form.append('media', new Blob([chunk], { type: mimeType }));
+      form.append('media', new Blob([chunk as unknown as ArrayBuffer], { type: mimeType }));
 
       const appendAuthHeader = buildOAuthHeader({
         method: 'POST',
