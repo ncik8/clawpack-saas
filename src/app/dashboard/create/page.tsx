@@ -98,13 +98,14 @@ export default function CreatePostPage() {
           continue;
         }
 
-        const response = await fetch('/api/post/x', {
+        const endpoint = platform === 'x' ? '/api/post/x' : '/api/post/linkedin';
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ text: content, platform }),
+          body: JSON.stringify({ text: content }),
         });
 
         const data = await response.json();
