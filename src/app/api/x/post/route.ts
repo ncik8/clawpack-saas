@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import crypto from 'crypto';
 
 function percentEncode(str: string): string {
   return encodeURIComponent(str).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
@@ -52,7 +53,7 @@ function buildOAuthHeaderForJson({
   ].join('&');
 
   const signingKey = `${percentEncode(consumerSecret)}&${percentEncode(accessTokenSecret)}`;
-  const signature = require('crypto').createHmac('sha1', signingKey).update(baseString).digest('base64');
+  const signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
 
   oauthParams.oauth_signature = signature;
 
