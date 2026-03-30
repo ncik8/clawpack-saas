@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     }
 
     const url = 'https://api.twitter.com/1.1/statuses/update.json';
-    const bodyParams: Record<string, string> = { status: text };
+    const bodyParams: Record<string, string> = { status: text || '' };
     if (mediaIds?.length) {
       bodyParams.media_ids = mediaIds.join(',');
     }
