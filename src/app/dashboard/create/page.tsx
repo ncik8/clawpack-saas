@@ -20,6 +20,8 @@ export default function CreatePostPage() {
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     loadConnectedPlatforms();
@@ -101,9 +103,10 @@ export default function CreatePostPage() {
         }
 
         if (platform === 'x') {
-          // For X: upload image first if present, then post with media_ids
+          // For X: upload image or video first if present, then post with media_ids
           let mediaIds: string[] = [];
 
+          // Check for image file
           if (imageFile) {
             // Upload image first
             const uploadFormData = new FormData();
@@ -118,6 +121,26 @@ export default function CreatePostPage() {
 
             if (!uploadRes.ok || !uploadData.media_id) {
               errors.push(`X: Image upload failed - ${uploadData.error || 'Unknown error'}`);
+              continue;
+            }
+
+            mediaIds = [uploadData.media_id];
+          }
+          // Check for video file (video takes precedence if both exist)
+          else if (videoFile) {
+            // Upload video first
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', videoFile);
+
+            const uploadRes = await fetch('/api/x/media/upload', {
+              method: 'POST',
+              body: uploadFormData,
+            });
+
+            const uploadData = await uploadRes.json();
+
+            if (!uploadRes.ok || !uploadData.media_id) {
+              errors.push(`X: Video upload failed - ${uploadData.error || 'Unknown error'}`);
               continue;
             }
 
@@ -142,11 +165,13 @@ export default function CreatePostPage() {
             errors.push(`X: ${postData.error || 'Post failed'}`);
           }
         } else if (platform === 'linkedin') {
-          // LinkedIn: form data with image
+          // LinkedIn: form data with image or video
           const formData = new FormData();
           formData.append('text', content);
           if (imageFile) {
             formData.append('image', imageFile);
+          } else if (videoFile) {
+            formData.append('video', videoFile);
           }
 
           const response = await fetch('/api/post/linkedin', {
@@ -177,6 +202,8 @@ export default function CreatePostPage() {
       setContent('');
       setImageFile(null);
       setImagePreview(null);
+      setVideoFile(null);
+      setVideoPreview(null);
     } else if (results.length > 0 && errors.length > 0) {
       setResult({ 
         success: true, 
@@ -317,6 +344,79 @@ export default function CreatePostPage() {
               onClick={() => {
                 setImageFile(null);
                 setImagePreview(null);
+              }}
+              style={{
+                position: 'absolute',
+                top: '-8px',
+                right: '-8px',
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                border: 'none',
+                background: '#ef4444',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '14px',
+                lineHeight: '24px',
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Video Upload */}
+      <div style={{ marginBottom: '24px' }}>
+        <input
+          type="file"
+          accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm"
+          id="video-upload"
+          style={{ display: 'none' }}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setVideoFile(file);
+              // Create preview
+              const reader = new FileReader();
+              reader.onload = (e) => setVideoPreview(e.target?.result as string);
+              reader.readAsDataURL(file);
+            }
+          }}
+        />
+        <label
+          htmlFor="video-upload"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: '2px solid #374151',
+            background: '#1f2937',
+            color: '#9ca3af',
+            cursor: 'pointer',
+            fontSize: '14px',
+          }}
+        >
+          🎥 Add Video
+        </label>
+        {videoPreview && (
+          <div style={{ marginTop: '12px', position: 'relative', display: 'inline-block' }}>
+            <video
+              src={videoPreview}
+              controls
+              style={{
+                maxWidth: '200px',
+                maxHeight: '150px',
+                borderRadius: '8px',
+                border: '2px solid #374151',
+              }}
+            />
+            <button
+              onClick={() => {
+                setVideoFile(null);
+                setVideoPreview(null);
               }}
               style={{
                 position: 'absolute',
