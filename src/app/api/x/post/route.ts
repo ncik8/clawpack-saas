@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import { buildOAuthHeader } from '@/lib/x-oauth';
+import { buildOAuthHeaderUrlEncoded } from '@/lib/x-oauth';
 
 export async function POST(request: Request) {
   try {
@@ -39,28 +39,28 @@ export async function POST(request: Request) {
     }
 
     const url = 'https://api.twitter.com/1.1/statuses/update.json';
-    const authHeader = buildOAuthHeader({
+    const bodyParams: Record<string, string> = { status: text };
+    if (mediaIds?.length) {
+      bodyParams.media_ids = mediaIds.join(',');
+    }
+
+    const authHeader = buildOAuthHeaderUrlEncoded({
       method: 'POST',
       url,
       consumerKey: process.env.X_API_KEY!,
       consumerSecret: process.env.X_API_SECRET!,
-      token: {
-        key: connection.access_token,
-        secret: connection.refresh_token,
-      },
+      accessToken: connection.access_token,
+      accessTokenSecret: connection.refresh_token,
+      bodyParams,
     });
-
-    const tweetBody: any = { status: text };
-    if (mediaIds?.length) {
-      tweetBody.media_ids = mediaIds.join(',');
-    }
 
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: authHeader,
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams(tweetBody).toString(),
+      body: new URLSearchParams(bodyParams).toString(),
     });
 
     const raw = await res.text();
@@ -73,8 +73,6 @@ export async function POST(request: Request) {
     }
 
     const responseData = JSON.parse(raw);
-    // v1.1 returns { id: ..., id_str: ..., ... }
-    // v2 returns { data: { id: ..., ... } }
     return NextResponse.json({ success: true, tweet: responseData });
   } catch (error: any) {
     return NextResponse.json(

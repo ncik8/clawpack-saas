@@ -1,28 +1,12 @@
 import crypto from 'crypto';
 
-type OAuthToken = {
-  key: string;
-  secret: string;
-};
-
-type OAuthParamsInput = {
-  method: string;
-  url: string;
-  consumerKey: string;
-  consumerSecret: string;
-  token?: OAuthToken;
-  extraParams?: Record<string, string>;
-  verifier?: string;
-  callback?: string;
-};
-
 function percentEncode(str: string): string {
   return encodeURIComponent(str)
     .replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 }
 
-function generateNonce(length = 32): string {
-  return crypto.randomBytes(length).toString('hex');
+function generateNonce(): string {
+  return crypto.randomBytes(16).toString('hex');
 }
 
 function generateTimestamp(): string {
@@ -34,107 +18,162 @@ function normalizeUrl(input: string): string {
   url.hash = '';
   url.search = '';
   if (
-    (url.protocol === 'http:' && url.port === '80') ||
-    (url.protocol === 'https:' && url.port === '443')
+    (url.protocol === 'https:' && url.port === '443') ||
+    (url.protocol === 'http:' && url.port === '80')
   ) {
     url.port = '';
   }
   return url.toString();
 }
 
-function collectQueryParams(url: string): Record<string, string> {
-  const parsed = new URL(url);
-  const result: Record<string, string> = {};
-  parsed.searchParams.forEach((value, key) => {
-    result[key] = value;
-  });
-  return result;
-}
-
-function buildSignatureBaseString(
-  method: string,
-  url: string,
-  params: Record<string, string>
-): string {
-  const sorted = Object.keys(params)
-    .sort()
-    .map((key) => `${percentEncode(key)}=${percentEncode(params[key])}`)
-    .join('&');
-
-  return [
-    method.toUpperCase(),
-    percentEncode(normalizeUrl(url)),
-    percentEncode(sorted),
-  ].join('&');
-}
-
-function buildSigningKey(consumerSecret: string, tokenSecret = ''): string {
-  return `${percentEncode(consumerSecret)}&${percentEncode(tokenSecret)}`;
-}
-
-function signHmacSha1(baseString: string, signingKey: string): string {
-  return crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
-}
-
-export function buildOAuthHeader({
-  method,
-  url,
+function buildOAuthParams({
   consumerKey,
-  consumerSecret,
-  token,
-  extraParams = {},
-  verifier,
-  callback,
-}: OAuthParamsInput): string {
-  const oauthParams: Record<string, string> = {
+  accessToken,
+}: {
+  consumerKey: string;
+  accessToken?: string;
+}) {
+  const params: Record<string, string> = {
     oauth_consumer_key: consumerKey,
-    oauth_nonce: generateNonce(16),
+    oauth_nonce: generateNonce(),
     oauth_signature_method: 'HMAC-SHA1',
     oauth_timestamp: generateTimestamp(),
     oauth_version: '1.0',
   };
 
-  if (token?.key) {
-    oauthParams.oauth_token = token.key;
+  if (accessToken) {
+    params.oauth_token = accessToken;
   }
 
-  if (verifier) {
-    oauthParams.oauth_verifier = verifier;
-  }
+  return params;
+}
 
-  if (callback) {
-    oauthParams.oauth_callback = callback;
-  }
-
-  const allParams = {
-    ...collectQueryParams(url),
-    ...extraParams,
-    ...oauthParams,
-  };
-
-  const baseString = buildSignatureBaseString(method, url, allParams);
-  const signingKey = buildSigningKey(consumerSecret, token?.secret || '');
-  const signature = signHmacSha1(baseString, signingKey);
-
-  oauthParams.oauth_signature = signature;
-
-  const header =
+function toAuthHeader(oauthParams: Record<string, string>) {
+  return (
     'OAuth ' +
     Object.keys(oauthParams)
       .sort()
       .map((key) => `${percentEncode(key)}="${percentEncode(oauthParams[key])}"`)
-      .join(', ');
-
-  return header;
+      .join(', ')
+  );
 }
 
-export function parseFormEncoded(body: string): Record<string, string> {
-  const params = new URLSearchParams(body);
-  const result: Record<string, string> = {};
-  for (const [key, value] of params.entries()) {
-    result[key] = value;
-  }
-  return result;
+// For multipart/form-data requests - signature ONLY OAuth params, no body
+export function buildOAuthHeaderMultipart({
+  method,
+  url,
+  consumerKey,
+  consumerSecret,
+  accessToken,
+  accessTokenSecret,
+}: {
+  method: string;
+  url: string;
+  consumerKey: string;
+  consumerSecret: string;
+  accessToken: string;
+  accessTokenSecret: string;
+}) {
+  const oauthParams = buildOAuthParams({ consumerKey, accessToken });
+
+  // For multipart: only sign OAuth params, NOT body params
+  const baseString = [
+    method.toUpperCase(),
+    percentEncode(normalizeUrl(url)),
+    percentEncode(
+      Object.keys(oauthParams)
+        .sort()
+        .map((key) => `${percentEncode(key)}=${percentEncode(oauthParams[key])}`)
+        .join('&')
+    ),
+  ].join('&');
+
+  const signingKey = `${percentEncode(consumerSecret)}&${percentEncode(accessTokenSecret)}`;
+  const signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
+
+  oauthParams.oauth_signature = signature;
+
+  return toAuthHeader(oauthParams);
+}
+
+// For application/x-www-form-urlencoded requests
+export function buildOAuthHeaderUrlEncoded({
+  method,
+  url,
+  consumerKey,
+  consumerSecret,
+  accessToken,
+  accessTokenSecret,
+  bodyParams = {},
+}: {
+  method: string;
+  url: string;
+  consumerKey: string;
+  consumerSecret: string;
+  accessToken: string;
+  accessTokenSecret: string;
+  bodyParams?: Record<string, string>;
+}) {
+  const oauthParams = buildOAuthParams({ consumerKey, accessToken });
+
+  // For URL-encoded: include body params in signature
+  const allParams = { ...oauthParams, ...bodyParams };
+
+  const baseString = [
+    method.toUpperCase(),
+    percentEncode(normalizeUrl(url)),
+    percentEncode(
+      Object.keys(allParams)
+        .sort()
+        .map((key) => `${percentEncode(key)}=${percentEncode(allParams[key])}`)
+        .join('&')
+    ),
+  ].join('&');
+
+  const signingKey = `${percentEncode(consumerSecret)}&${percentEncode(accessTokenSecret)}`;
+  const signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
+
+  oauthParams.oauth_signature = signature;
+
+  return toAuthHeader(oauthParams);
+}
+
+// For JSON requests
+export function buildOAuthHeaderJson({
+  method,
+  url,
+  consumerKey,
+  consumerSecret,
+  accessToken,
+  accessTokenSecret,
+}: {
+  method: string;
+  url: string;
+  consumerKey: string;
+  consumerSecret: string;
+  accessToken: string;
+  accessTokenSecret: string;
+}) {
+  const oauthParams = buildOAuthParams({ consumerKey, accessToken });
+
+  // For JSON: only OAuth params in signature
+  const baseString = [
+    method.toUpperCase(),
+    percentEncode(normalizeUrl(url)),
+    percentEncode(
+      Object.keys(oauthParams)
+        .sort()
+        .map((key) => `${percentEncode(key)}=${percentEncode(oauthParams[key])}`)
+        .join('&')
+    ),
+  ].join('&');
+
+  const signingKey = `${percentEncode(consumerSecret)}&${percentEncode(accessTokenSecret)}`;
+  const signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
+
+  oauthParams.oauth_signature = signature;
+
+  return toAuthHeader(oauthParams);
 }
 
 export async function uploadXImage({
@@ -150,40 +189,38 @@ export async function uploadXImage({
 }): Promise<string> {
   const url = 'https://upload.twitter.com/1.1/media/upload.json';
 
-  // For multipart, signature only includes oauth params (no body params)
-  const authHeader = buildOAuthHeader({
+  // Use multipart OAuth signing - no body params in signature
+  const authHeader = buildOAuthHeaderMultipart({
     method: 'POST',
     url,
     consumerKey: process.env.X_API_KEY!,
     consumerSecret: process.env.X_API_SECRET!,
-    token: { key: accessToken, secret: accessTokenSecret },
+    accessToken,
+    accessTokenSecret,
   });
 
-  // Create multipart form
-  const boundary = `----TwitterUpload${Date.now()}`;
-  const header = Buffer.from(
-    `--${boundary}\r\nContent-Disposition: form-data; name="media"; filename="blob"\r\nContent-Type: ${mimeType}\r\n\r\n`,
-    'utf-8'
-  );
-  const footer = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8');
-  const body = Buffer.concat([header, fileBuffer, footer]);
+  // Use FormData - fetch sets Content-Type automatically for multipart
+  const form = new FormData();
+  const blob = new Blob([fileBuffer], { type: mimeType });
+  form.append('media', blob, 'upload');
 
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: authHeader,
-      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      // DO NOT set Content-Type manually for FormData
     },
-    body,
+    body: form,
   });
 
   const text = await res.text();
+
   if (!res.ok) {
-    throw new Error(`X image upload failed: ${text}`);
+    throw new Error(`Twitter media upload failed: ${text}`);
   }
 
   const json = JSON.parse(text);
-  return json.media_id_string;
+  return json.media_id_string as string;
 }
 
 export async function uploadXVideo({
@@ -203,34 +240,30 @@ export async function uploadXVideo({
 
   // INIT
   {
-    const bodyParams = new URLSearchParams({
+    const bodyParams = {
       command: 'INIT',
       total_bytes: totalBytes.toString(),
       media_type: mimeType,
       media_category: mediaCategory,
-    });
+    };
 
-    const authHeader = buildOAuthHeader({
+    const authHeader = buildOAuthHeaderUrlEncoded({
       method: 'POST',
       url: baseUrl,
       consumerKey: process.env.X_API_KEY!,
       consumerSecret: process.env.X_API_SECRET!,
-      token: { key: accessToken, secret: accessTokenSecret },
-      extraParams: {
-        command: 'INIT',
-        total_bytes: totalBytes.toString(),
-        media_type: mimeType,
-        media_category: mediaCategory,
-      },
+      accessToken,
+      accessTokenSecret,
+      bodyParams,
     });
 
     const res = await fetch(baseUrl, {
       method: 'POST',
       headers: {
         Authorization: authHeader,
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: bodyParams.toString(),
+      body: new URLSearchParams(bodyParams).toString(),
     });
 
     const text = await res.text();
@@ -252,14 +285,15 @@ export async function uploadXVideo({
       form.append('command', 'APPEND');
       form.append('media_id', mediaId);
       form.append('segment_index', segmentIndex.toString());
-      form.append('media', new Blob([chunk as unknown as ArrayBuffer], { type: mimeType }));
+      form.append('media', new Blob([chunk], { type: mimeType }));
 
-      const appendAuthHeader = buildOAuthHeader({
+      const appendAuthHeader = buildOAuthHeaderMultipart({
         method: 'POST',
         url: baseUrl,
         consumerKey: process.env.X_API_KEY!,
         consumerSecret: process.env.X_API_SECRET!,
-        token: { key: accessToken, secret: accessTokenSecret },
+        accessToken,
+        accessTokenSecret,
       });
 
       const appendRes = await fetch(baseUrl, {
@@ -279,30 +313,25 @@ export async function uploadXVideo({
     }
 
     // FINALIZE
-    const finalizeBody = new URLSearchParams({
-      command: 'FINALIZE',
-      media_id: mediaId,
-    });
+    const finalizeBody = { command: 'FINALIZE', media_id: mediaId };
 
-    const finalizeAuthHeader = buildOAuthHeader({
+    const finalizeAuthHeader = buildOAuthHeaderUrlEncoded({
       method: 'POST',
       url: baseUrl,
       consumerKey: process.env.X_API_KEY!,
       consumerSecret: process.env.X_API_SECRET!,
-      token: { key: accessToken, secret: accessTokenSecret },
-      extraParams: {
-        command: 'FINALIZE',
-        media_id: mediaId,
-      },
+      accessToken,
+      accessTokenSecret,
+      bodyParams: finalizeBody,
     });
 
     const finalizeRes = await fetch(baseUrl, {
       method: 'POST',
       headers: {
         Authorization: finalizeAuthHeader,
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: finalizeBody.toString(),
+      body: new URLSearchParams(finalizeBody).toString(),
     });
 
     const finalizeText = await finalizeRes.text();
@@ -313,11 +342,7 @@ export async function uploadXVideo({
     const finalizeJson = JSON.parse(finalizeText);
 
     if (finalizeJson.processing_info) {
-      await pollMediaStatus({
-        accessToken,
-        accessTokenSecret,
-        mediaId,
-      });
+      await pollMediaStatus({ accessToken, accessTokenSecret, mediaId });
     }
 
     return mediaId;
@@ -338,16 +363,13 @@ async function pollMediaStatus({
   for (let i = 0; i < 20; i++) {
     const url = `${baseUrl}?command=STATUS&media_id=${encodeURIComponent(mediaId)}`;
 
-    const authHeader = buildOAuthHeader({
+    const authHeader = buildOAuthHeaderUrlEncoded({
       method: 'GET',
       url,
       consumerKey: process.env.X_API_KEY!,
       consumerSecret: process.env.X_API_SECRET!,
-      token: { key: accessToken, secret: accessTokenSecret },
-      extraParams: {
-        command: 'STATUS',
-        media_id: mediaId,
-      },
+      accessToken,
+      accessTokenSecret,
     });
 
     const res = await fetch(url, {
