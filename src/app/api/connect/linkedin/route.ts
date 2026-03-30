@@ -16,8 +16,8 @@ export async function GET() {
     .update(codeVerifier)
     .digest('base64url');
 
-  // Generate random state for CSRF protection
-  const state = crypto.randomBytes(16).toString('hex');
+  // Generate simpler state (LinkedIn can be picky about encoding)
+  const state = crypto.randomBytes(8).toString('base64url');
 
   // Clean up any old states for this user+platform
   await supabase
