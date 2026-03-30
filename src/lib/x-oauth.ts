@@ -201,7 +201,7 @@ export async function uploadXImage({
 
   // Use FormData - fetch sets Content-Type automatically for multipart
   const form = new FormData();
-  const blob = new Blob([fileBuffer], { type: mimeType });
+  const blob = new Blob([fileBuffer as unknown as BlobPart], { type: mimeType });
   form.append('media', blob, 'upload');
 
   const res = await fetch(url, {
@@ -285,7 +285,7 @@ export async function uploadXVideo({
       form.append('command', 'APPEND');
       form.append('media_id', mediaId);
       form.append('segment_index', segmentIndex.toString());
-      form.append('media', new Blob([chunk], { type: mimeType }));
+      form.append('media', new Blob([chunk as unknown as BlobPart], { type: mimeType }));
 
       const appendAuthHeader = buildOAuthHeaderMultipart({
         method: 'POST',
