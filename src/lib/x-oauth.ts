@@ -189,28 +189,40 @@ export async function uploadXImage({
 }): Promise<string> {
   const url = 'https://upload.twitter.com/1.1/media/upload.json';
 
-  // Use multipart OAuth signing - no body params in signature
-  const authHeader = buildOAuthHeaderMultipart({
+  // Use base64 media_data - more reliable in Node.js runtime
+  const mediaData = fileBuffer.toString('base64');
+
+  // Determine media category
+  let mediaCategory = 'tweet_image';
+  if (mimeType.startsWith('video/')) {
+    mediaCategory = 'tweet_video';
+  } else if (mimeType === 'image/gif') {
+    mediaCategory = 'tweet_gif';
+  }
+
+  const bodyParams = {
+    media_data: mediaData,
+    media_category: mediaCategory,
+  };
+
+  // Use urlencoded signing - include body params
+  const authHeader = buildOAuthHeaderUrlEncoded({
     method: 'POST',
     url,
     consumerKey: process.env.X_API_KEY!,
     consumerSecret: process.env.X_API_SECRET!,
     accessToken,
     accessTokenSecret,
+    bodyParams,
   });
-
-  // Use FormData - fetch sets Content-Type automatically for multipart
-  const form = new FormData();
-  const blob = new Blob([fileBuffer as unknown as BlobPart], { type: mimeType });
-  form.append('media', blob, 'upload');
 
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: authHeader,
-      // DO NOT set Content-Type manually for FormData
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: form,
+    body: new URLSearchParams(bodyParams).toString(),
   });
 
   const text = await res.text();
@@ -285,7 +297,7 @@ export async function uploadXVideo({
       form.append('command', 'APPEND');
       form.append('media_id', mediaId);
       form.append('segment_index', segmentIndex.toString());
-      form.append('media', new Blob([chunk as unknown as BlobPart], { type: mimeType }));
+      form.append('media', new Blob([new Uint8Array(chunk)], { type: mimeType }), 'chunk');
 
       const appendAuthHeader = buildOAuthHeaderMultipart({
         method: 'POST',
