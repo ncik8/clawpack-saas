@@ -3,6 +3,8 @@ import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { uploadVideoUrlToX } from '@/lib/supabase-storage';
 import crypto from 'crypto';
 
+export const runtime = 'nodejs';
+
 function percentEncode(str: string): string {
   return encodeURIComponent(str).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 }

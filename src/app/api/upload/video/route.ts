@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { uploadVideoToSupabase } from '@/lib/supabase-storage';
 
+export const runtime = 'nodejs';
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -25,12 +27,14 @@ export async function POST(request: Request) {
     const publicUrl = await uploadVideoToSupabase(file);
     
     if (!publicUrl) {
+      console.error('Video upload failed: uploadVideoToSupabase returned null');
       return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
     }
     
+    console.log('Video upload successful:', publicUrl);
     return NextResponse.json({ url: publicUrl });
   } catch (error) {
     console.error('Video upload error:', error);
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+    return NextResponse.json({ error: `Upload failed: ${error instanceof Error ? error.message : String(error)}` }, { status: 500 });
   }
 }
