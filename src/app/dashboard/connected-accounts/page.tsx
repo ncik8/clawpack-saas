@@ -178,19 +178,15 @@ export default function ConnectedAccountsPage() {
       return;
     }
     
-    // For LinkedIn, use our own OAuth flow
-    if (platform === 'linkedin') {
-      window.location.href = '/api/connect/linkedin';
+    // For X/Twitter, use OAuth 1.0a for media support
+    if (platform === 'x') {
+      window.location.href = '/api/x/connect';
       return;
     }
     
-    // Get Supabase token from browser session
-    const { data: { session } } = await supabase.auth.getSession();
-    const supabaseToken = session?.access_token;
-    
-    if (!supabaseToken) {
-      alert('Please log in first.');
-      setConnecting(null);
+    // For LinkedIn, use our own OAuth flow
+    if (platform === 'linkedin') {
+      window.location.href = '/api/connect/linkedin';
       return;
     }
     

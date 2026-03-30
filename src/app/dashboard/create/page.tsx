@@ -100,28 +100,70 @@ export default function CreatePostPage() {
           continue;
         }
 
-        // Build form data for image upload
-        const formData = new FormData();
-        formData.append('text', content);
-        if (imageFile) {
-          formData.append('image', imageFile);
-        }
+        if (platform === 'x') {
+          // For X: upload image first if present, then post with media_ids
+          let mediaIds: string[] = [];
 
-        const endpoint = platform === 'x' ? '/api/post/x' : '/api/post/linkedin';
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: formData,
-        });
+          if (imageFile) {
+            // Upload image first
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', imageFile);
 
-        const data = await response.json();
+            const uploadRes = await fetch('/api/x/media/upload', {
+              method: 'POST',
+              body: uploadFormData,
+            });
 
-        if (response.ok && data.success) {
-          results.push(`${platform} ✓`);
-        } else {
-          errors.push(`${platform}: ${data.error}`);
+            const uploadData = await uploadRes.json();
+
+            if (!uploadRes.ok || !uploadData.media_id) {
+              errors.push(`X: Image upload failed - ${uploadData.error || 'Unknown error'}`);
+              continue;
+            }
+
+            mediaIds = [uploadData.media_id];
+          }
+
+          // Create post with media_ids
+          const postRes = await fetch('/api/x/post', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: content,
+              media_ids: mediaIds,
+            }),
+          });
+
+          const postData = await postRes.json();
+
+          if (postRes.ok && postData.data?.id) {
+            results.push(`X ✓`);
+          } else {
+            errors.push(`X: ${postData.error || 'Post failed'}`);
+          }
+        } else if (platform === 'linkedin') {
+          // LinkedIn: form data with image
+          const formData = new FormData();
+          formData.append('text', content);
+          if (imageFile) {
+            formData.append('image', imageFile);
+          }
+
+          const response = await fetch('/api/post/linkedin', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: formData,
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            results.push(`LinkedIn ✓`);
+          } else {
+            errors.push(`LinkedIn: ${data.error}`);
+          }
         }
       } catch (err) {
         errors.push(`${platform}: Network error`);
@@ -133,6 +175,8 @@ export default function CreatePostPage() {
     if (results.length > 0 && errors.length === 0) {
       setResult({ success: true, message: `Posted to ${results.join(', ')}!` });
       setContent('');
+      setImageFile(null);
+      setImagePreview(null);
     } else if (results.length > 0 && errors.length > 0) {
       setResult({ 
         success: true, 
