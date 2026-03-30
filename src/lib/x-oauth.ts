@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 function percentEncode(str: string): string {
   return encodeURIComponent(str)
@@ -200,29 +200,28 @@ export async function uploadXImage({
     mediaCategory = 'tweet_gif';
   }
 
-  const bodyParams = {
-    media_data: mediaData,
-    media_category: mediaCategory,
-  };
+  // Create FormData for multipart request
+  const form = new FormData();
+  form.append('media_data', mediaData);
+  form.append('media_category', mediaCategory);
 
-  // Use urlencoded signing - include body params
-  const authHeader = buildOAuthHeaderUrlEncoded({
+  // Use multipart signing - only OAuth params in signature
+  const authHeader = buildOAuthHeaderMultipart({
     method: 'POST',
     url,
     consumerKey: process.env.X_API_KEY!,
     consumerSecret: process.env.X_API_SECRET!,
     accessToken,
     accessTokenSecret,
-    bodyParams,
   });
 
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: authHeader,
-      'Content-Type': 'application/x-www-form-urlencoded',
+      // Don't set Content-Type header - FormData will set it with boundary
     },
-    body: new URLSearchParams(bodyParams).toString(),
+    body: form,
   });
 
   const text = await res.text();
