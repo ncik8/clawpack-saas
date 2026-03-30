@@ -178,11 +178,11 @@ export default function ConnectedAccountsPage() {
       return;
     }
     
-    // For other platforms, use Postiz OAuth (fallback)
-    const platformMap: Record<string, string> = {
-      'linkedin': 'linkedin-oauth2',
-      'linkedin-page': 'linkedin',
-    };
+    // For LinkedIn, use our own OAuth flow
+    if (platform === 'linkedin') {
+      window.location.href = '/api/connect/linkedin';
+      return;
+    }
     
     const integrationId = platformMap[platform] || platform;
     
