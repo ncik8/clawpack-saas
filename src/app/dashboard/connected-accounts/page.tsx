@@ -9,7 +9,9 @@ interface Channel {
   id: string;
   platform: string;
   name: string;
+  emoji?: string;
   connected: boolean;
+  platformUsername?: string;
 }
 
 export default function ConnectedAccountsPage() {
@@ -69,7 +71,7 @@ export default function ConnectedAccountsPage() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // Load channels from Postiz API
+  // Load channels - check both our social_connections AND Postiz
   useEffect(() => {
     const fetchChannels = async () => {
       try {
@@ -82,28 +84,31 @@ export default function ConnectedAccountsPage() {
           setLoading(false);
           return;
         }
+
+        // First, check our social_connections table (this is the source of truth for our OAuth)
+        const { data: connections } = await supabase
+          .from('social_connections')
+          .select('platform, platform_username')
+          .eq('user_id', session.user.id);
+
+        const connectedPlatforms = connections || [];
         
-        // Fetch integrations list from Postiz
-        const response = await fetch(`${API_URL}/integrations/list`, {
-          headers: {
-            'Authorization': `Bearer ${supabaseToken}`,
-          },
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          // Map Postiz integrations to our channel format
-          const integrations = data.integrations || [];
-          const mapped = integrations.map((int: any) => ({
-            id: int.id,
-            platform: int.identifier,
-            name: int.name || getPlatformName(int.identifier),
-            connected: !int.disabled,
-          }));
-          setChannels(mapped);
-        } else {
-          setChannels(getDefaultChannels());
-        }
+        // Build channels from our connections
+        const channelMap: Record<string, { name: string; emoji: string }> = {
+          'x': { name: 'X / Twitter', emoji: '🐦' },
+          'linkedin': { name: 'LinkedIn', emoji: '💼' },
+        };
+
+        const channelsFromOurDB = ['x', 'linkedin'].map(p => ({
+          id: p,
+          platform: p,
+          name: channelMap[p]?.name || p,
+          emoji: channelMap[p]?.emoji || '📱',
+          connected: connectedPlatforms.some(c => c.platform === p),
+          platformUsername: connectedPlatforms.find(c => c.platform === p)?.platform_username,
+        }));
+
+        setChannels(channelsFromOurDB);
       } catch (error) {
         console.error('Failed to fetch channels:', error);
         setChannels(getDefaultChannels());
