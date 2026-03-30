@@ -5,7 +5,23 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { text } = await request.json();
+  // Handle both JSON and FormData
+  let text: string;
+  let imageFile: File | null = null;
+
+  const contentType = request.headers.get('content-type') || '';
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await request.formData();
+    text = formData.get('text') as string;
+    const image = formData.get('image');
+    if (image instanceof File) {
+      imageFile = image;
+    }
+  } else {
+    const body = await request.json();
+    text = body.text;
+  }
+
   if (!text) return Response.json({ error: 'Missing text' }, { status: 400 });
 
   // Get stored connection
@@ -17,16 +33,14 @@ export async function POST(request: Request) {
     .single();
 
   if (!connection?.access_token) {
-    return Response.json(
-      { error: 'LinkedIn not connected. Please reconnect.' },
-      { status: 401 }
-    );
+    return Response.json({ error: 'LinkedIn not connected' }, { status: 401 });
   }
+
+  let accessToken = connection.access_token;
 
   // Check if token needs refresh
   const expiresAt = new Date(connection.expires_at).getTime();
   if (Date.now() > expiresAt - 300000 && connection.refresh_token) {
-    // Refresh token
     const refreshRes = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -49,31 +63,87 @@ export async function POST(request: Request) {
         })
         .eq('user_id', user.id)
         .eq('platform', 'linkedin');
-      connection.access_token = newTokens.access_token;
+      accessToken = newTokens.access_token;
     }
   }
 
-  // Post to LinkedIn using their API
+  // For LinkedIn with image, we need to upload the image first
+  let mediaAsset: string | null = null;
+  let mediaUploadUrl: string | null = null;
+
+  if (imageFile) {
+    // Register image upload
+    const registerRes = await fetch('https://api.linkedin.com/v2/assets', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+      },
+      body: JSON.stringify({
+        registerUploadRequest: {
+          owner: `urn:li:person:${connection.platform_user_id}`,
+          serviceRelationships: [
+            {
+              relationshipType: 'OWNER',
+              identifier: 'urn:li:userGeneratedContent',
+            },
+          ],
+        },
+      }),
+    });
+
+    const registerData = await registerRes.json();
+
+    if (registerRes.ok && registerData.value?.asset) {
+      mediaAsset = registerData.value.asset;
+      mediaUploadUrl = registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
+
+      // Upload the image binary
+      if (mediaUploadUrl) {
+        const arrayBuffer = await imageFile.arrayBuffer();
+        await fetch(mediaUploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: arrayBuffer,
+        });
+      }
+    }
+  }
+
+  // Create the post
+  const postBody: any = {
+    author: `urn:li:person:${connection.platform_user_id}`,
+    lifecycleState: 'PUBLISHED',
+    specificContent: {
+      'com.linkedin.ugc.ShareContent': {
+        shareCommentary: { text },
+        shareMediaCategory: mediaAsset ? 'IMAGE' : 'NONE',
+        media: mediaAsset
+          ? [
+              {
+                status: 'READY',
+                media: mediaAsset,
+              },
+            ]
+          : [],
+      },
+    },
+    visibility: {
+      'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+    },
+  };
+
   const postRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${connection.access_token}`,
+      Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       'X-Restli-Protocol-Version': '2.0.0',
     },
-    body: JSON.stringify({
-      author: `urn:li:person:${connection.platform_user_id}`,
-      lifecycleState: 'PUBLISHED',
-      specificContent: {
-        'com.linkedin.ugc.ShareContent': {
-          shareCommentary: { text },
-          shareMediaCategory: 'NONE',
-        },
-      },
-      visibility: {
-        'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
-      },
-    }),
+    body: JSON.stringify(postBody),
   });
 
   const postData = await postRes.json();

@@ -18,6 +18,8 @@ export default function CreatePostPage() {
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     loadConnectedPlatforms();
@@ -98,14 +100,20 @@ export default function CreatePostPage() {
           continue;
         }
 
+        // Build form data for image upload
+        const formData = new FormData();
+        formData.append('text', content);
+        if (imageFile) {
+          formData.append('image', imageFile);
+        }
+
         const endpoint = platform === 'x' ? '/api/post/x' : '/api/post/linkedin';
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ text: content }),
+          body: formData,
         });
 
         const data = await response.json();
@@ -212,6 +220,79 @@ export default function CreatePostPage() {
             outline: 'none',
           }}
         />
+      </div>
+
+      {/* Image Upload */}
+      <div style={{ marginBottom: '24px' }}>
+        <input
+          type="file"
+          accept="image/*"
+          id="image-upload"
+          style={{ display: 'none' }}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setImageFile(file);
+              // Create preview
+              const reader = new FileReader();
+              reader.onload = (e) => setImagePreview(e.target?.result as string);
+              reader.readAsDataURL(file);
+            }
+          }}
+        />
+        <label
+          htmlFor="image-upload"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: '2px solid #374151',
+            background: '#1f2937',
+            color: '#9ca3af',
+            cursor: 'pointer',
+            fontSize: '14px',
+          }}
+        >
+          📷 Add Image
+        </label>
+        {imagePreview && (
+          <div style={{ marginTop: '12px', position: 'relative', display: 'inline-block' }}>
+            <img
+              src={imagePreview}
+              alt="Preview"
+              style={{
+                maxWidth: '200px',
+                maxHeight: '150px',
+                borderRadius: '8px',
+                border: '2px solid #374151',
+              }}
+            />
+            <button
+              onClick={() => {
+                setImageFile(null);
+                setImagePreview(null);
+              }}
+              style={{
+                position: 'absolute',
+                top: '-8px',
+                right: '-8px',
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                border: 'none',
+                background: '#ef4444',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '14px',
+                lineHeight: '24px',
+              }}
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Post Button */}
