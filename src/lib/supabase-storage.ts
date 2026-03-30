@@ -9,9 +9,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export async function uploadVideoToSupabase(file: File): Promise<string | null> {
   const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
   
+  // Convert File to ArrayBuffer for Node.js compatibility
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  
   const { data, error } = await supabase.storage
     .from('videos')
-    .upload(fileName, file, {
+    .upload(fileName, buffer, {
       contentType: file.type,
       upsert: false
     });
