@@ -197,21 +197,20 @@ export default function ConnectedAccountsPage() {
 
   const handleDisconnect = async (platform: string) => {
     if (!confirm('Are you sure you want to disconnect this channel?')) return;
-    
-    const jwt = localStorage.getItem('postiz_jwt');
-    if (!jwt) return;
 
     try {
-      const response = await fetch(`${API_URL}/integrations/${platform}`, {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const response = await fetch(`/api/social-disconnect?platform=${platform}`, {
         method: 'DELETE',
-        headers: { 
-          'x-postiz-jwt': jwt,
-          'Content-Type': 'application/json',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
         },
       });
-      
+
       if (response.ok) {
-        const updated = channels.map(ch => 
+        const updated = channels.map(ch =>
           ch.platform === platform ? { ...ch, connected: false } : ch
         );
         setChannels(updated);
