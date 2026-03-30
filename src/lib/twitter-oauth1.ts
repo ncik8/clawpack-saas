@@ -1,29 +1,42 @@
-// OAuth 1.0a signing utility for Twitter API v1.1 requests (like media upload)
+// OAuth 1.0a signing utility for Twitter API v1.1 requests
 
 const TwitterAPIKey = process.env.TWITTER_CONSUMER_KEY!;
 const TwitterAPISecret = process.env.TWITTER_CONSUMER_SECRET!;
 
-interface OAuthParams {
-  [key: string]: string;
+function percentEncode(str: string): string {
+  return encodeURIComponent(str).replace(/[!'()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
-export function generateOAuth1Signature(
+function baseString(params: Record<string, string>): string {
+  return Object.keys(params)
+    .sort()
+    .map((k) => `${percentEncode(k)}=${percentEncode(params[k])}`)
+    .join('&');
+}
+
+export function createOAuth1Header(
   method: string,
   url: string,
-  params: Record<string, string>,
-  oauthTokenSecret?: string
+  oauthToken: string,
+  oauthTokenSecret: string
 ): string {
-  // Create signing key
-  const signingKey = `${encodeURIComponent(TwitterAPISecret)}&${oauthTokenSecret ? encodeURIComponent(oauthTokenSecret) : ''}`;
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const nonce = Math.random().toString(36).substring(2);
 
-  // Create parameter string
-  const sortedParams = Object.entries(params)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-    .join('&');
+  const params: Record<string, string> = {
+    oauth_consumer_key: TwitterAPIKey,
+    oauth_nonce: nonce,
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: timestamp,
+    oauth_token: oauthToken,
+    oauth_version: '1.0',
+  };
 
   // Create signature base string
-  const signatureBase = `${method}&${encodeURIComponent(url)}&${encodeURIComponent(sortedParams)}`;
+  const signatureBase = `${method}&${percentEncode(url)}&${percentEncode(baseString(params))}`;
+
+  // Create signing key
+  const signingKey = `${percentEncode(TwitterAPISecret)}&${oauthTokenSecret ? percentEncode(oauthTokenSecret) : ''}`;
 
   // Generate HMAC-SHA1 signature
   const crypto = require('crypto');
@@ -32,38 +45,11 @@ export function generateOAuth1Signature(
     .update(signatureBase)
     .digest('base64');
 
-  return signature;
-}
+  params.oauth_signature = signature;
 
-export function createOAuth1Header(
-  method: string,
-  url: string,
-  params: Record<string, string>,
-  oauthTokenSecret?: string
-): string {
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const nonce = Math.random().toString(36).substring(2);
-
-  const oauthParams: OAuthParams = {
-    oauth_consumer_key: TwitterAPIKey,
-    oauth_signature_method: 'HMAC-SHA1',
-    oauth_timestamp: timestamp,
-    oauth_nonce: nonce,
-    oauth_version: '1.0',
-  };
-
-  if (params.oauth_token) {
-    oauthParams.oauth_token = params.oauth_token;
-    delete params.oauth_token;
-  }
-
-  // Generate signature
-  const signature = generateOAuth1Signature(method, url, { ...params, ...oauthParams }, oauthTokenSecret);
-  oauthParams.oauth_signature = signature;
-
-  // Create auth header
-  const authHeader = Object.entries(oauthParams)
-    .map(([k, v]) => `${encodeURIComponent(k)}="${encodeURIComponent(v)}"`)
+  // Create Authorization header
+  const authHeader = Object.entries(params)
+    .map(([k, v]) => `${percentEncode(k)}="${percentEncode(v)}"`)
     .join(', ');
 
   return `OAuth ${authHeader}`;

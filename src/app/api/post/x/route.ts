@@ -39,39 +39,42 @@ export async function POST(request: Request) {
     // Get user's access token secret from database
     const { data: connection } = await supabase
       .from('social_connections')
-      .select('refresh_token')
+      .select('access_token, refresh_token')
       .eq('user_id', user.id)
       .eq('platform', 'x')
       .single();
 
-    const accessTokenSecret = connection?.refresh_token || '';
+    if (connection?.access_token && connection?.refresh_token) {
+      const accessTokenSecret = connection.refresh_token;
 
-    // Create OAuth 1.0a signed request for media upload
-    const mediaUploadUrl = 'https://upload.twitter.com/1.1/media/upload.json';
-    const oauthHeader = createOAuth1Header(
-      'POST',
-      mediaUploadUrl,
-      { oauth_consumer_key: process.env.TWITTER_CONSUMER_KEY! },
-      accessTokenSecret
-    );
+      // Create OAuth 1.0a signed request for media upload
+      const mediaUploadUrl = 'https://upload.twitter.com/1.1/media/upload.json';
+      const authHeader = createOAuth1Header(
+        'POST',
+        mediaUploadUrl,
+        token,
+        accessTokenSecret
+      );
 
-    // We need to include the oauth_token in the signing
-    const mediaRes = await fetch(mediaUploadUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `OAuth ${oauthHeader.split('OAuth ')[1]}`,
-        'Content-Type': 'application/octet-stream',
-      },
-      body: await imageFile.arrayBuffer(),
-    });
+      const arrayBuffer = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
 
-    if (!mediaRes.ok) {
-      const error = await mediaRes.text();
-      console.error('Media upload failed:', error);
-      // Continue without image if upload fails
-    } else {
-      const mediaData = await mediaRes.json();
-      mediaId = mediaData.media_id_string;
+      const mediaRes = await fetch(mediaUploadUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/octet-stream',
+        },
+        body: buffer,
+      });
+
+      if (!mediaRes.ok) {
+        const error = await mediaRes.text();
+        console.error('Media upload failed:', error);
+      } else {
+        const mediaData = await mediaRes.json();
+        mediaId = mediaData.media_id_string;
+      }
     }
   }
 
