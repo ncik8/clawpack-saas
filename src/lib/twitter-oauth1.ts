@@ -4,12 +4,7 @@ const TwitterAPIKey = process.env.TWITTER_CONSUMER_KEY!;
 const TwitterAPISecret = process.env.TWITTER_CONSUMER_SECRET!;
 
 interface OAuthParams {
-  oauth_consumer_key: string;
-  oauth_token?: string;
-  oauth_signature_method: string;
-  oauth_timestamp: string;
-  oauth_nonce: string;
-  oauth_version: string;
+  [key: string]: string;
 }
 
 export function generateOAuth1Signature(
