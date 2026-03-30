@@ -150,6 +150,7 @@ export async function uploadXImage({
 }): Promise<string> {
   const url = 'https://upload.twitter.com/1.1/media/upload.json';
 
+  // For multipart, signature only includes oauth params (no body params)
   const authHeader = buildOAuthHeader({
     method: 'POST',
     url,
@@ -158,15 +159,14 @@ export async function uploadXImage({
     token: { key: accessToken, secret: accessTokenSecret },
   });
 
-  // Send as multipart form with raw binary
+  // Create multipart form
   const boundary = `----TwitterUpload${Date.now()}`;
-  const body = Buffer.concat([
-    Buffer.from(`--${boundary}\r\n`),
-    Buffer.from(`Content-Disposition: form-data; name="media"; filename="media"\r\n`),
-    Buffer.from(`Content-Type: ${mimeType}\r\n\r\n`),
-    fileBuffer,
-    Buffer.from(`\r\n--${boundary}--\r\n`),
-  ]);
+  const header = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="media"; filename="blob"\r\nContent-Type: ${mimeType}\r\n\r\n`,
+    'utf-8'
+  );
+  const footer = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8');
+  const body = Buffer.concat([header, fileBuffer, footer]);
 
   const res = await fetch(url, {
     method: 'POST',
