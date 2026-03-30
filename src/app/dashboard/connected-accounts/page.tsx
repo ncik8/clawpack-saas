@@ -194,22 +194,9 @@ export default function ConnectedAccountsPage() {
       return;
     }
     
-    // Use popup approach for Postiz OAuth
-    const popup = window.open(
-      `/api/postiz-connect?platform=${integrationId}&token=${encodeURIComponent(supabaseToken)}`,
-      `Connect ${platform}`,
-      'width=600,height=700,scrollbars=yes'
-    );
-    
-    // Poll for popup closure
-    const checkClosed = setInterval(() => {
-      if (!popup || popup.closed) {
-        clearInterval(checkClosed);
-        setConnecting(null);
-        // Refresh channels list
-        window.location.reload();
-      }
-    }, 1000);
+    // Other platforms not yet supported - show message
+    alert('This platform is not yet supported. Coming soon!');
+    setConnecting(null);
   };
 
   const handleDisconnect = async (platform: string) => {
