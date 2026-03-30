@@ -39,14 +39,15 @@ export async function GET(request: Request) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Basic ${Buffer.from(
+        `${process.env.LINKEDIN_CLIENT_ID}:${process.env.LINKEDIN_CLIENT_SECRET}`
+      ).toString('base64')}`,
     },
     body: new URLSearchParams({
-      code,
       grant_type: 'authorization_code',
+      code,
       redirect_uri: `${appUrl}/api/auth/callback/linkedin`,
       code_verifier: oauthState.code_verifier,
-      client_id: process.env.LINKEDIN_CLIENT_ID!,
-      client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
     }),
   });
 
