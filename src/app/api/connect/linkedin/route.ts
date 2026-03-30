@@ -37,7 +37,7 @@ export async function GET() {
     response_type: 'code',
     client_id: process.env.LINKEDIN_CLIENT_ID!,
     redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/linkedin`,
-    scope: 'openid profile email w_member_social',
+    scope: 'openid profile w_member_social',
     state,
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
