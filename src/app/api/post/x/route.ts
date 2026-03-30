@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import { getValidTwitterToken } from '@/lib/twitter-refresh';
+import { createOAuth1Header } from '@/lib/twitter-oauth1';
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -33,18 +34,35 @@ export async function POST(request: Request) {
 
   let mediaId: string | null = null;
 
-  // Upload image if provided
+  // Upload image if provided using OAuth 1.0a
   if (imageFile) {
-    const arrayBuffer = await imageFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // Get user's access token secret from database
+    const { data: connection } = await supabase
+      .from('social_connections')
+      .select('refresh_token')
+      .eq('user_id', user.id)
+      .eq('platform', 'x')
+      .single();
 
-    // Upload to Twitter media API
-    const mediaRes = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
+    const accessTokenSecret = connection?.refresh_token || '';
+
+    // Create OAuth 1.0a signed request for media upload
+    const mediaUploadUrl = 'https://upload.twitter.com/1.1/media/upload.json';
+    const oauthHeader = createOAuth1Header(
+      'POST',
+      mediaUploadUrl,
+      { oauth_consumer_key: process.env.TWITTER_CONSUMER_KEY! },
+      accessTokenSecret
+    );
+
+    // We need to include the oauth_token in the signing
+    const mediaRes = await fetch(mediaUploadUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `OAuth ${oauthHeader.split('OAuth ')[1]}`,
+        'Content-Type': 'application/octet-stream',
       },
-      body: buffer,
+      body: await imageFile.arrayBuffer(),
     });
 
     if (!mediaRes.ok) {
