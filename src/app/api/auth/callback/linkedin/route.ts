@@ -48,6 +48,7 @@ export async function GET(request: Request) {
       code,
       redirect_uri: `${appUrl}/api/auth/callback/linkedin`,
       code_verifier: oauthState.code_verifier,
+      client_id: process.env.LINKEDIN_CLIENT_ID!,
     }),
   });
 
