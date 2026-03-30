@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   // Delete used state immediately
   await supabase.from('oauth_states').delete().eq('state', state);
 
-  // Exchange code for tokens (LinkedIn OAuth 2.0 uses body params only, no Basic auth)
+  // Exchange code for tokens (no PKCE, just body params)
   const tokenRes = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
     method: 'POST',
     headers: {
@@ -44,7 +44,6 @@ export async function GET(request: Request) {
       grant_type: 'authorization_code',
       code,
       redirect_uri: `${appUrl}/api/auth/callback/linkedin`,
-      code_verifier: oauthState.code_verifier,
       client_id: process.env.LINKEDIN_CLIENT_ID!,
       client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
     }),
@@ -75,7 +74,7 @@ export async function GET(request: Request) {
       user_id: oauthState.user_id,
       platform: 'linkedin',
       platform_user_id: userData.sub,
-      platform_username: userData.name || userData.email,
+      platform_username: userData.name || userData.preferred_username,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token || null,
       expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),

@@ -9,14 +9,7 @@ export async function GET() {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  // Generate PKCE values
-  const codeVerifier = crypto.randomBytes(32).toString('base64url');
-  const codeChallenge = crypto
-    .createHash('sha256')
-    .update(codeVerifier)
-    .digest('base64url');
-
-  // Generate simpler state (LinkedIn can be picky about encoding)
+  // Simple state (no PKCE for LinkedIn)
   const state = crypto.randomBytes(8).toString('base64url');
 
   // Clean up any old states for this user+platform
@@ -29,7 +22,7 @@ export async function GET() {
   await supabase.from('oauth_states').insert({
     user_id: user.id,
     state,
-    code_verifier: codeVerifier,
+    code_verifier: '',
     platform: 'linkedin',
   });
 
@@ -39,8 +32,6 @@ export async function GET() {
     redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/linkedin`,
     scope: 'openid profile w_member_social',
     state,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
   });
 
   return Response.redirect(`https://www.linkedin.com/oauth/v2/authorization?${params}`);
