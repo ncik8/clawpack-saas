@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const url = 'https://api.twitter.com/2/tweets';
+    const url = 'https://api.twitter.com/1.1/statuses/update.json';
     const authHeader = buildOAuthHeader({
       method: 'POST',
       url,
@@ -50,19 +50,17 @@ export async function POST(request: Request) {
       },
     });
 
-    const tweetBody: any = {};
-    if (text) tweetBody.text = text;
+    const tweetBody: any = { status: text };
     if (mediaIds?.length) {
-      tweetBody.media = { media_ids: mediaIds };
+      tweetBody.media_ids = mediaIds.join(',');
     }
 
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: authHeader,
-        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(tweetBody),
+      body: new URLSearchParams(tweetBody).toString(),
     });
 
     const raw = await res.text();
@@ -74,7 +72,10 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json(JSON.parse(raw));
+    const responseData = JSON.parse(raw);
+    // v1.1 returns { id: ..., id_str: ..., ... }
+    // v2 returns { data: { id: ..., ... } }
+    return NextResponse.json({ success: true, tweet: responseData });
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || 'Tweet creation failed' },
