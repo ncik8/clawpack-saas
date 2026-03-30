@@ -160,7 +160,7 @@ export default function CreatePostPage() {
               continue;
             }
 
-            successCount++;
+            results.push('X (video)');
             setContent('');
             setVideoFile(null);
             setVideoPreview(null);
