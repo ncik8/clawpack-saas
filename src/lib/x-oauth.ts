@@ -250,7 +250,6 @@ export async function uploadXVideo({
   const mediaCategory = mimeType.startsWith('video/') ? 'tweet_video' : 'tweet_gif';
 
   // INIT
-  {
     const bodyParams = {
       command: 'INIT',
       total_bytes: totalBytes.toString(),

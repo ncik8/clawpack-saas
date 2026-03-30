@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import { uploadXImage } from '@/lib/x-oauth';
+import { uploadXImage, uploadXVideo } from '@/lib/x-oauth';
 
 export const runtime = 'nodejs';
 
@@ -74,19 +74,54 @@ export async function POST(request: Request) {
 
     const mimeType = file.type || 'image/jpeg';
 
-    console.log('[x-upload] calling uploadXImage with', {
-      accessToken: connection.access_token ? 'present' : 'missing',
-      accessTokenSecret: connection.refresh_token ? 'present' : 'missing',
-      bufferLength: fileBuffer.length,
-      mimeType,
-    });
+    console.log('[x-upload] checking file type', { mimeType, size: fileBuffer.length });
 
-    const mediaId = await uploadXImage({
-      accessToken: connection.access_token,
-      accessTokenSecret: connection.refresh_token,
-      fileBuffer,
-      mimeType,
-    });
+    let mediaId: string;
+    
+    // For video files
+    if (mimeType.startsWith('video/')) {
+      console.log('[x-upload] processing video file', { size: fileBuffer.length });
+      
+      // Check file size limits
+      // Twitter limits: 512MB for videos, but we have serverless timeout constraints
+      // Vercel has 10s timeout on Hobby plan, 15s on Pro
+      const maxSimpleUploadSize = 5 * 1024 * 1024; // 5MB
+      
+      if (fileBuffer.length <= maxSimpleUploadSize) {
+        // Small video: use simple uploadXImage with media_data (base64)
+        console.log('[x-upload] using simple upload for small video');
+        mediaId = await uploadXImage({
+          accessToken: connection.access_token,
+          accessTokenSecret: connection.refresh_token,
+          fileBuffer,
+          mimeType,
+        });
+      } else {
+        // Large video: use chunked upload
+        console.log('[x-upload] using chunked upload for large video');
+        
+        // Warn about potential timeout
+        if (fileBuffer.length > 10 * 1024 * 1024) { // 10MB
+          console.warn('[x-upload] Video file is large (>10MB), may timeout on serverless function');
+        }
+        
+        mediaId = await uploadXVideo({
+          accessToken: connection.access_token,
+          accessTokenSecret: connection.refresh_token,
+          fileBuffer,
+          mimeType,
+        });
+      }
+    } else {
+      // Image or GIF
+      console.log('[x-upload] calling uploadXImage for image/GIF');
+      mediaId = await uploadXImage({
+        accessToken: connection.access_token,
+        accessTokenSecret: connection.refresh_token,
+        fileBuffer,
+        mimeType,
+      });
+    }
 
     console.log('[x-upload] success', { mediaId });
 
