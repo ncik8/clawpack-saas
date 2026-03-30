@@ -128,23 +128,43 @@ export default function CreatePostPage() {
           }
           // Check for video file (video takes precedence if both exist)
           else if (videoFile) {
-            // Upload video first
+            // Upload video to Supabase Storage first
             const uploadFormData = new FormData();
             uploadFormData.append('file', videoFile);
 
-            const uploadRes = await fetch('/api/x/media/upload', {
+            const uploadRes = await fetch('/api/upload/video', {
               method: 'POST',
               body: uploadFormData,
             });
 
             const uploadData = await uploadRes.json();
 
-            if (!uploadRes.ok || !uploadData.media_id) {
-              errors.push(`X: Video upload failed - ${uploadData.error || 'Unknown error'}`);
+            if (!uploadRes.ok || !uploadData.url) {
+              errors.push(`X: Video upload to storage failed - ${uploadData.error || 'Unknown error'}`);
               continue;
             }
 
-            mediaIds = [uploadData.media_id];
+            // Now post to X with the Supabase video URL
+            const postRes = await fetch('/api/x/post', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                text: content,
+                video_url: uploadData.url,
+              }),
+            });
+
+            const postData = await postRes.json();
+            if (!postRes.ok) {
+              errors.push(`X: Video post failed - ${postData.error || 'Unknown error'}`);
+              continue;
+            }
+
+            successCount++;
+            setContent('');
+            setVideoFile(null);
+            setVideoPreview(null);
+            continue;
           }
 
           // Create post with media_ids
