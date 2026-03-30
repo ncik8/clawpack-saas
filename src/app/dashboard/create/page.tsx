@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 interface ConnectedPlatform {
   id: string;
   name: string;
+  emoji: string;
   connected: boolean;
   platformUsername?: string;
 }
