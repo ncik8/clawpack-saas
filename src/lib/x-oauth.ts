@@ -357,7 +357,6 @@ export async function uploadXVideo({
 
     return mediaId;
   }
-}
 
 async function pollMediaStatus({
   accessToken,
