@@ -85,6 +85,12 @@ export async function GET(request: NextRequest) {
   }
 
   const parsed = parseFormEncoded(text);
+  console.log('[x-callback] access token response:', {
+    hasOauthToken: !!parsed.oauth_token,
+    hasOauthSecret: !!parsed.oauth_token_secret,
+    hasUserId: !!parsed.user_id,
+    hasScreenName: !!parsed.screen_name,
+  });
 
   if (!parsed.oauth_token || !parsed.oauth_token_secret || !parsed.user_id || !parsed.screen_name) {
     return NextResponse.json(
@@ -92,6 +98,8 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+
+  console.log('[x-callback] storing tokens for user:', user.id);
 
   const { error: upsertError } = await supabase
     .from('social_connections')
