@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       .in('platform', platforms);
 
     const connectedPlatforms = connections?.map(c => c.platform) || [];
-    const unconnected = platforms.filter(p => !connectedPlatforms.includes(p));
+    const unconnected = platforms.filter((p: string) => !connectedPlatforms.includes(p));
 
     if (unconnected.length > 0) {
       return NextResponse.json({ 
