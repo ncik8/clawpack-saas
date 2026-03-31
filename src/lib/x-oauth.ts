@@ -372,6 +372,13 @@ async function pollMediaStatus({
   for (let i = 0; i < 20; i++) {
     const url = `${baseUrl}?command=STATUS&media_id=${encodeURIComponent(mediaId)}`;
 
+    // Extract query parameters for OAuth signature
+    const urlObj = new URL(url);
+    const queryParams: Record<string, string> = {};
+    for (const [key, value] of urlObj.searchParams) {
+      queryParams[key] = value;
+    }
+
     const authHeader = buildOAuthHeaderUrlEncoded({
       method: 'GET',
       url,
@@ -379,6 +386,7 @@ async function pollMediaStatus({
       consumerSecret: process.env.X_API_SECRET!,
       accessToken,
       accessTokenSecret,
+      bodyParams: queryParams,
     });
 
     const res = await fetch(url, {
