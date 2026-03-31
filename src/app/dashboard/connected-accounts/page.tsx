@@ -228,7 +228,7 @@ export default function ConnectedAccountsPage() {
   const platforms = [
     { id: 'x', name: 'X / Twitter', emoji: '🐦', color: '#1DA1F2', comingSoon: false },
     { id: 'linkedin', name: 'LinkedIn', emoji: '💼', color: '#0A66C2', comingSoon: false },
-    { id: 'bluesky', name: 'Bluesky', emoji: '☁️', color: '#1185FE', comingSoon: false },
+    { id: 'bluesky', name: 'Bluesky', emoji: '☁️', color: '#1185FE', comingSoon: true },
     { id: 'mastodon', name: 'Mastodon', emoji: '🐘', color: '#6364FF', comingSoon: true },
     { id: 'nostr', name: 'Nostr', emoji: '⚡', color: '#FFD700', comingSoon: true },
     { id: 'threads', name: 'Threads', emoji: '🧵', color: '#000000', comingSoon: true },
