@@ -27,3 +27,26 @@ export async function uploadVideoToSupabaseBrowser(file: File): Promise<string |
 
   return urlData.publicUrl;
 }
+
+export async function deleteVideoFromSupabaseBrowser(videoUrl: string): Promise<void> {
+  if (!videoUrl || !videoUrl.includes('/storage/v1/object/public/videos/')) {
+    return;
+  }
+  
+  try {
+    const fileName = videoUrl.split('/videos/')[1];
+    if (!fileName) return;
+    
+    const { error } = await supabaseBrowser.storage
+      .from('videos')
+      .remove([fileName]);
+    
+    if (error) {
+      console.error('Failed to delete video from Supabase:', error);
+    } else {
+      console.log('Deleted video from Supabase:', fileName);
+    }
+  } catch (err) {
+    console.error('Failed to delete video from Supabase:', err);
+  }
+}

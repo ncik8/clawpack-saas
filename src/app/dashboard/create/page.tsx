@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { supabaseBrowser, uploadVideoToSupabaseBrowser } from '@/lib/supabase-browser';
+import { supabaseBrowser, uploadVideoToSupabaseBrowser, deleteVideoFromSupabaseBrowser } from '@/lib/supabase-browser';
 
 interface ConnectedPlatform {
   id: string;
@@ -154,6 +154,8 @@ export default function CreatePostPage() {
             }
 
             results.push('X (video)');
+            // Delete video from Supabase after successful post
+            await deleteVideoFromSupabaseBrowser(videoUrl);
             setContent('');
             setVideoFile(null);
             setVideoPreview(null);
