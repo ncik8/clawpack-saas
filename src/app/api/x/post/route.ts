@@ -92,15 +92,13 @@ export async function POST(request: Request) {
     // If video URL provided, download and upload to Twitter
     let finalMediaIds = mediaIds || [];
     if (videoUrl && !mediaIds?.length) {
-      try {
-        const mediaId = await uploadVideoUrlToX(videoUrl, connection.access_token, connection.refresh_token);
-        if (mediaId) {
-          finalMediaIds = [mediaId];
-        }
-      } catch (err) {
-        console.error('Video upload from URL failed:', err);
-        return NextResponse.json({ error: 'Video upload failed' }, { status: 500 });
+      console.log('Downloading video from:', videoUrl);
+      const mediaId = await uploadVideoUrlToX(videoUrl, connection.access_token, connection.refresh_token);
+      console.log('Upload result:', mediaId);
+      if (!mediaId) {
+        return NextResponse.json({ error: 'Video upload to X failed' }, { status: 500 });
       }
+      finalMediaIds = [mediaId];
     }
 
     const url = 'https://api.twitter.com/2/tweets';
