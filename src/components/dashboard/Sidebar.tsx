@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
@@ -9,11 +11,32 @@ const navigation = [
   { name: 'AI Image', href: '/dashboard/ai-image', icon: ImageIcon },
   { name: 'Calendar', href: '/dashboard/calendar', icon: CalendarIcon },
   { name: 'Connected', href: '/dashboard/connected-accounts', icon: LinkIcon },
-  { name: 'Settings', href: '/dashboard/profile', icon: SettingsIcon },
+  { name: 'Settings', href: '/dashboard/settings', icon: SettingsIcon },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [user, setUser] = useState<any>(null);
+  const [connectedCount, setConnectedCount] = useState(0);
+
+  useEffect(() => {
+    loadUser();
+  }, []);
+
+  const loadUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setUser(user);
+    
+    if (user) {
+      // Count connected platforms
+      const { data: connections } = await supabase
+        .from('social_connections')
+        .select('platform')
+        .eq('user_id', user.id);
+      
+      setConnectedCount(connections?.length || 0);
+    }
+  };
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-60 bg-[#111827] border-r border-[#374151] flex flex-col">
@@ -56,7 +79,7 @@ export default function Sidebar() {
             <PlatformIcon platform="x" className="w-6 h-6" />
             <PlatformIcon platform="linkedin" className="w-6 h-6" />
           </div>
-          <span className="text-xs text-[#9ca3af]">2 platforms</span>
+          <span className="text-xs text-[#9ca3af]">{connectedCount} platforms</span>
         </div>
       </div>
 
@@ -64,10 +87,12 @@ export default function Sidebar() {
       <div className="p-4 border-t border-[#374151]">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#1780e3] to-[#76afe5] flex items-center justify-center text-white font-medium text-sm">
-            N
+            {user?.user_metadata?.display_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">Nick Williams</p>
+            <p className="text-sm font-medium text-white truncate">
+              {user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'}
+            </p>
             <p className="text-xs text-[#6b7280]">Free Plan</p>
           </div>
         </div>
