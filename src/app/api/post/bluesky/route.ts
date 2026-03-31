@@ -86,12 +86,14 @@ export async function POST(request: Request) {
       };
     }
 
-    // Upload video if provided (same approach)
+    // Upload video if provided - Bluesky uses separate video upload endpoint
     if (videoFile) {
       console.log('Uploading video to Bluesky...');
       
       const arrayBuffer = await videoFile.arrayBuffer();
-      const blobRes = await fetch(`${BLUESKY_API}/com.atproto.repo.uploadBlob`, {
+      
+      // Use app.bsky.video.uploadVideo for videos
+      const videoRes = await fetch(`${BLUESKY_API}/app.bsky.video.uploadVideo`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${connection.access_token}`,
@@ -100,19 +102,20 @@ export async function POST(request: Request) {
         body: arrayBuffer,
       });
 
-      const blobData = await blobRes.json();
-      console.log('Video blob upload response:', blobRes.status, JSON.stringify(blobData));
+      const videoData = await videoRes.json();
+      console.log('Video upload response:', videoRes.status, JSON.stringify(videoData));
 
-      if (!blobRes.ok) {
+      if (!videoRes.ok) {
         return NextResponse.json({ 
           error: 'Failed to upload video to Bluesky',
-          details: blobData 
-        }, { status: blobRes.status });
+          details: videoData 
+        }, { status: videoRes.status });
       }
 
+      // Video uploaded successfully - create embed with the video reference
       embed = {
         $type: 'app.bsky.embed.video',
-        video: blobData.blob,
+        video: videoData.blob || videoData,
         alt: text || 'Video',
       };
     }
