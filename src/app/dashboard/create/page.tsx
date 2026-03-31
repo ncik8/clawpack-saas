@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { supabaseBrowser, uploadVideoToSupabaseBrowser } from '@/lib/supabase-browser';
 
 interface ConnectedPlatform {
   id: string;
@@ -128,19 +129,11 @@ export default function CreatePostPage() {
           }
           // Check for video file (video takes precedence if both exist)
           else if (videoFile) {
-            // Upload video to Supabase Storage first
-            const uploadFormData = new FormData();
-            uploadFormData.append('file', videoFile);
+            // Upload video directly to Supabase from browser (bypasses Vercel 4.5MB limit)
+            const videoUrl = await uploadVideoToSupabaseBrowser(videoFile);
 
-            const uploadRes = await fetch('/api/upload/video', {
-              method: 'POST',
-              body: uploadFormData,
-            });
-
-            const uploadData = await uploadRes.json();
-
-            if (!uploadRes.ok || !uploadData.url) {
-              errors.push(`X: Video upload to storage failed - ${uploadData.error || 'Unknown error'}`);
+            if (!videoUrl) {
+              errors.push(`X: Video upload to storage failed`);
               continue;
             }
 
@@ -150,7 +143,7 @@ export default function CreatePostPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 text: content,
-                video_url: uploadData.url,
+                video_url: videoUrl,
               }),
             });
 
