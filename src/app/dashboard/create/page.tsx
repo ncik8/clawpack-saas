@@ -458,25 +458,39 @@ export default function CreatePostPage() {
               }}>
                 {msg.content}
                 {msg.role === 'ai' && (
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(msg.content);
-                      setResult({ success: true, message: 'Copied!' });
-                    }}
-                    style={{
-                      display: 'block',
-                      marginTop: '8px',
-                      padding: '4px 8px',
-                      fontSize: '11px',
-                      background: '#3b82f6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    📋 Copy
-                  </button>
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                    <button
+                      onClick={() => setContent(msg.content)}
+                      style={{
+                        padding: '4px 10px',
+                        fontSize: '11px',
+                        background: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ✓ Use This
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content);
+                        setResult({ success: true, message: 'Copied!' });
+                      }}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '11px',
+                        background: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      📋 Copy
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
