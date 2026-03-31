@@ -86,14 +86,14 @@ export async function POST(request: Request) {
       };
     }
 
-    // Upload video if provided - Bluesky uses separate video upload endpoint
+    // Upload video if provided - Bluesky uses video.bsky.app for videos
     if (videoFile) {
       console.log('Uploading video to Bluesky...');
       
       const arrayBuffer = await videoFile.arrayBuffer();
       
-      // Use app.bsky.video.uploadVideo for videos
-      const videoRes = await fetch(`${BLUESKY_API}/app.bsky.video.uploadVideo`, {
+      // Use video.bsky.app for video uploads
+      const videoRes = await fetch(`https://video.bsky.app/xrpc/app.bsky.video.uploadVideo`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${connection.access_token}`,
