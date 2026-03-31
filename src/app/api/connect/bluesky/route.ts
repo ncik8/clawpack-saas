@@ -20,6 +20,8 @@ export async function POST(request: Request) {
     }
 
     // Create Bluesky session
+    console.log('Attempting Bluesky login for handle:', handle);
+    
     const sessionRes = await fetch(`${BLUESKY_API}/com.atproto.server.createSession`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -30,11 +32,15 @@ export async function POST(request: Request) {
     });
 
     const sessionData = await sessionRes.json();
+    console.log('Bluesky response status:', sessionRes.status);
+    console.log('Bluesky response body:', JSON.stringify(sessionData));
 
     if (!sessionRes.ok) {
       return NextResponse.json({ 
         error: sessionData.error || 'Failed to connect to Bluesky',
-        message: sessionData.message 
+        message: sessionData.message,
+        blueskyStatus: sessionRes.status,
+        blueskyError: sessionData
       }, { status: sessionRes.status });
     }
 
