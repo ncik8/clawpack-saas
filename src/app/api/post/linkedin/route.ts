@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     console.log('Starting LinkedIn image upload...');
     
     // Register image upload
-    const registerRes = await fetch('https://api.linkedin.com/v2/assets', {
+    const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
