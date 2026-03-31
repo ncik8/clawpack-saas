@@ -42,7 +42,7 @@ export async function uploadVideoToSupabase(file: File): Promise<string | null> 
       });
     
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Upload timeout (30s)')), 30000);
+      setTimeout(() => reject(new Error('Upload timeout (120s)')), 120000);
     });
     
     const { data, error } = await Promise.race([uploadPromise, timeoutPromise]) as any;
