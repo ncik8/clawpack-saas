@@ -1,33 +1,95 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
 
-export default function CalendarPage() {
-  const [posts, setPosts] = useState<{id: string; content: string; scheduledAt: string; platforms: string[]}[]>([]);
-  const [loading, setLoading] = useState(true);
+interface ScheduledPost {
+  id: string;
+  content: string;
+  platforms: string[];
+  scheduled_for: string;
+  status: string;
+  video_url?: string;
+  created_at: string;
+  updated_at: string;
+}
 
-  // Load from localStorage for demo
+export default function CalendarPage() {
+  const [posts, setPosts] = useState<ScheduledPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingPost, setEditingPost] = useState<ScheduledPost | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [editScheduledFor, setEditScheduledFor] = useState('');
+  const [editPlatforms, setEditPlatforms] = useState<string[]>([]);
+  const [editLoading, setEditLoading] = useState(false);
+
+  // Fetch scheduled posts from Supabase
   useEffect(() => {
-    const saved = localStorage.getItem('scheduled_posts');
-    if (saved) {
-      setPosts(JSON.parse(saved));
-    }
-    setLoading(false);
+    fetchScheduledPosts();
   }, []);
 
-  const handleDelete = (postId: string) => {
+  const fetchScheduledPosts = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.error('No session found');
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/schedule', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch scheduled posts: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setPosts(data);
+    } catch (error) {
+      console.error('Error fetching scheduled posts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (postId: string) => {
     if (!confirm('Are you sure you want to delete this post?')) return;
     
-    const updated = posts.filter(p => p.id !== postId);
-    setPosts(updated);
-    localStorage.setItem('scheduled_posts', JSON.stringify(updated));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.error('No session found');
+        return;
+      }
+
+      const response = await fetch(`/api/schedule?id=${postId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete post: ${response.status}`);
+      }
+
+      // Remove from local state
+      setPosts(posts.filter(p => p.id !== postId));
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      alert('Failed to delete post. Please try again.');
+    }
   };
 
   // Group posts by date
   const groupedPosts = posts.reduce((acc, post) => {
-    const date = new Date(post.scheduledAt).toLocaleDateString('en-US', {
+    const date = new Date(post.scheduled_for).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -36,7 +98,7 @@ export default function CalendarPage() {
     if (!acc[date]) acc[date] = [];
     acc[date].push(post);
     return acc;
-  }, {} as Record<string, typeof posts>);
+  }, {} as Record<string, ScheduledPost[]>);
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString('en-US', {
@@ -44,6 +106,65 @@ export default function CalendarPage() {
       minute: '2-digit',
       hour12: true
     });
+  };
+
+  const handleEdit = (post: ScheduledPost) => {
+    setEditingPost(post);
+    setEditContent(post.content);
+    setEditScheduledFor(new Date(post.scheduled_for).toISOString().slice(0, 16));
+    setEditPlatforms([...post.platforms]);
+  };
+
+  const saveEdit = async () => {
+    if (!editingPost) return;
+    
+    setEditLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.error('No session found');
+        return;
+      }
+
+      const response = await fetch('/api/schedule', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: editingPost.id,
+          content: editContent,
+          platforms: editPlatforms,
+          scheduledFor: new Date(editScheduledFor).toISOString(),
+          videoUrl: editingPost.video_url,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update post');
+      }
+
+      const updatedPost = await response.json();
+      
+      // Update local state
+      setPosts(posts.map(p => p.id === editingPost.id ? updatedPost : p));
+      setEditingPost(null);
+      
+    } catch (error: any) {
+      console.error('Error updating post:', error);
+      alert(`Failed to update post: ${error.message}`);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditingPost(null);
+    setEditContent('');
+    setEditScheduledFor('');
+    setEditPlatforms([]);
   };
 
   const getPlatformEmoji = (platform: string) => {
@@ -126,7 +247,7 @@ export default function CalendarPage() {
                       <div className="flex-1 min-w-0">
                         {/* Time */}
                         <p className="text-[#1780e3] text-sm font-medium mb-1">
-                          {formatTime(post.scheduledAt)}
+                          {formatTime(post.scheduled_for)}
                         </p>
                         
                         {/* Content */}
@@ -152,7 +273,7 @@ export default function CalendarPage() {
                       <div className="flex gap-2 flex-shrink-0">
                         <button 
                           className="px-3 py-1 text-xs bg-[#374151] text-white rounded hover:bg-[#4b5563] transition-colors"
-                          onClick={() => window.open(`${POSTIZ_URL}/posts/${post.id}/edit`, '_blank')}
+                          onClick={() => handleEdit(post)}
                         >
                           Edit
                         </button>
@@ -169,6 +290,86 @@ export default function CalendarPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingPost && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-[#1f2937] rounded-xl p-6 max-w-md w-full border border-[#374151]">
+            <h2 className="text-white text-xl font-bold mb-4">Edit Scheduled Post</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Content</label>
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full h-32 p-3 bg-[#111827] border border-[#374151] rounded-lg text-white resize-none"
+                  maxLength={500}
+                />
+                <div className="text-xs text-[#6b7280] mt-1 text-right">
+                  {editContent.length}/500
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Scheduled Date & Time</label>
+                <input
+                  type="datetime-local"
+                  value={editScheduledFor}
+                  onChange={(e) => setEditScheduledFor(e.target.value)}
+                  min={new Date().toISOString().slice(0, 16)}
+                  className="w-full p-3 bg-[#111827] border border-[#374151] rounded-lg text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-[#9ca3af] mb-2">Platforms</label>
+                <div className="flex flex-wrap gap-2">
+                  {['x', 'linkedin'].map((platform) => (
+                    <button
+                      key={platform}
+                      type="button"
+                      onClick={() => {
+                        setEditPlatforms(prev =>
+                          prev.includes(platform)
+                            ? prev.filter(p => p !== platform)
+                            : [...prev, platform]
+                        );
+                      }}
+                      className={`px-3 py-2 rounded-lg border ${
+                        editPlatforms.includes(platform)
+                          ? 'bg-[#064e3b] border-[#10b981] text-white'
+                          : 'bg-[#1f2937] border-[#374151] text-[#9ca3af]'
+                      }`}
+                    >
+                      {platform === 'x' ? '🐦 X' : '💼 LinkedIn'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-[#6b7280] mt-2">
+                  Note: You can only select platforms you have connected
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={saveEdit}
+                disabled={editLoading || !editContent.trim() || editPlatforms.length === 0 || !editScheduledFor}
+                className="flex-1 py-2 bg-[#1780e3] text-white rounded-lg hover:bg-[#166bc7] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {editLoading ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                onClick={cancelEdit}
+                className="flex-1 py-2 bg-[#374151] text-white rounded-lg hover:bg-[#4b5563] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -18,11 +18,13 @@ export default function CreatePostPage() {
   const [connectedPlatforms, setConnectedPlatforms] = useState<ConnectedPlatform[]>([]);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [scheduledFor, setScheduledFor] = useState<string>('');
 
   useEffect(() => {
     loadConnectedPlatforms();
@@ -226,6 +228,86 @@ export default function CreatePostPage() {
       });
     } else {
       setResult({ success: false, message: errors.join('. ') });
+    }
+  };
+
+  const handleSchedule = async () => {
+    if (!content.trim()) {
+      setResult({ success: false, message: 'Please enter some content' });
+      return;
+    }
+
+    if (platforms.length === 0) {
+      setResult({ success: false, message: 'Please select at least one platform' });
+      return;
+    }
+
+    if (!scheduledFor) {
+      setResult({ success: false, message: 'Please select a date and time for scheduling' });
+      return;
+    }
+
+    setPosting(true);
+    setResult(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setResult({ success: false, message: 'Not logged in' });
+        setPosting(false);
+        return;
+      }
+
+      // Handle video upload if present
+      let videoUrl: string | null = null;
+      if (videoFile) {
+        videoUrl = await uploadVideoToSupabaseBrowser(videoFile);
+        if (!videoUrl) {
+          setResult({ success: false, message: 'Failed to upload video' });
+          setPosting(false);
+          return;
+        }
+      }
+
+      // Create scheduled post
+      const response = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content,
+          platforms,
+          scheduledFor: new Date(scheduledFor).toISOString(),
+          videoUrl: videoUrl || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to schedule post');
+      }
+
+      setResult({ 
+        success: true, 
+        message: `Post scheduled for ${new Date(scheduledFor).toLocaleString()}!` 
+      });
+      
+      // Reset form
+      setContent('');
+      setImageFile(null);
+      setImagePreview(null);
+      setVideoFile(null);
+      setVideoPreview(null);
+      setScheduledFor('');
+      setScheduling(false);
+      
+    } catch (error: any) {
+      setResult({ success: false, message: error.message || 'Failed to schedule post' });
+    } finally {
+      setPosting(false);
     }
   };
 
@@ -459,23 +541,66 @@ export default function CreatePostPage() {
         )}
       </div>
 
-      {/* Post Button */}
+      {/* Scheduling Option */}
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+          <input
+            type="checkbox"
+            id="schedule-toggle"
+            checked={scheduling}
+            onChange={(e) => setScheduling(e.target.checked)}
+            style={{ width: '20px', height: '20px' }}
+          />
+          <label htmlFor="schedule-toggle" style={{ color: 'white', cursor: 'pointer' }}>
+            Schedule for later
+          </label>
+        </div>
+        
+        {scheduling && (
+          <div style={{ marginTop: '12px' }}>
+            <label style={{ display: 'block', fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+              Schedule Date & Time
+            </label>
+            <input
+              type="datetime-local"
+              value={scheduledFor}
+              onChange={(e) => setScheduledFor(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '8px',
+                border: '2px solid #374151',
+                background: '#1f2937',
+                color: 'white',
+                fontSize: '16px',
+                outline: 'none',
+              }}
+            />
+            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
+              Posts will be scheduled and appear in your calendar.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Post/Schedule Button */}
       <button
-        onClick={handlePost}
-        disabled={posting || platforms.length === 0 || !content.trim()}
+        onClick={scheduling ? handleSchedule : handlePost}
+        disabled={posting || platforms.length === 0 || !content.trim() || (scheduling && !scheduledFor)}
         style={{
           padding: '12px 32px',
           borderRadius: '8px',
           border: 'none',
-          background: platforms.length > 0 && content.trim() ? '#3b82f6' : '#374151',
+          background: platforms.length > 0 && content.trim() && (!scheduling || scheduledFor) ? '#3b82f6' : '#374151',
           color: 'white',
           fontSize: '16px',
           fontWeight: 'bold',
-          cursor: platforms.length > 0 && content.trim() ? 'pointer' : 'not-allowed',
+          cursor: platforms.length > 0 && content.trim() && (!scheduling || scheduledFor) ? 'pointer' : 'not-allowed',
           opacity: posting ? 0.7 : 1,
         }}
       >
-        {posting ? 'Posting...' : 'Post Now'}
+        {posting ? (scheduling ? 'Scheduling...' : 'Posting...') : (scheduling ? 'Schedule Post' : 'Post Now')}
       </button>
 
       {/* Result Message */}

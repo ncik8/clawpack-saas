@@ -43,7 +43,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { content, platforms, scheduledFor } = await request.json();
+    const { content, platforms, scheduledFor, videoUrl } = await request.json();
 
     if (!content || !platforms || !scheduledFor) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -78,7 +78,62 @@ export async function POST(request: Request) {
         platforms,
         scheduled_for: scheduledFor,
         status: 'pending',
+        video_url: videoUrl || null,
       })
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
+
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const { id, content, platforms, scheduledFor, videoUrl } = await request.json();
+
+    if (!id || !content || !platforms || !scheduledFor) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const userId = await getSupabaseUser(request);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Verify user has these platforms connected
+    const { data: connections } = await supabaseAdmin
+      .from('social_connections')
+      .select('platform')
+      .eq('user_id', userId)
+      .in('platform', platforms);
+
+    const connectedPlatforms = connections?.map(c => c.platform) || [];
+    const unconnected = platforms.filter((p: string) => !connectedPlatforms.includes(p));
+
+    if (unconnected.length > 0) {
+      return NextResponse.json({ 
+        error: `Platforms not connected: ${unconnected.join(', ')}` 
+      }, { status: 400 });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('scheduled_posts')
+      .update({
+        content,
+        platforms,
+        scheduled_for: scheduledFor,
+        video_url: videoUrl || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
       .select()
       .single();
 
