@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY;
+const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || 'sk-cp-6f2My7cugwJBl0WILYjmmT5JPT4gkN5yUxlldZMeCC3jDiubRIsMcIbH5XtTidbGuwOKlKhrPO8NK0gnrQXyDPq-h6iLDpPdLdUGNDLt9ec1IvPGt8VnCE0';
 
 export async function POST(request: Request) {
   try {
