@@ -86,17 +86,44 @@ export async function POST(request: Request) {
       };
     }
 
-    // Upload video if provided - Bluesky uses video.bsky.app for videos
+    // Upload video if provided - Bluesky requires service auth for video uploads
     if (videoFile) {
       console.log('Uploading video to Bluesky...');
       
-      const arrayBuffer = await videoFile.arrayBuffer();
-      
-      // Use video.bsky.app for video uploads
-      const videoRes = await fetch(`https://video.bsky.app/xrpc/app.bsky.video.uploadVideo`, {
+      // First, get service auth token
+      const serviceAuthRes = await fetch(`${BLUESKY_API}/com.atproto.server.getServiceAuth`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${connection.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          aud: 'did:web:video.bsky.app',
+          lxm: 'app.bsky.video.uploadVideo',
+          exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+        }),
+      });
+
+      const serviceAuthData = await serviceAuthRes.json();
+      console.log('Service auth response:', serviceAuthRes.status, JSON.stringify(serviceAuthData));
+
+      if (!serviceAuthRes.ok || !serviceAuthData.token) {
+        return NextResponse.json({ 
+          error: 'Failed to get service auth for video upload',
+          details: serviceAuthData 
+        }, { status: serviceAuthRes.status });
+      }
+
+      // Upload video with service auth
+      const arrayBuffer = await videoFile.arrayBuffer();
+      const uploadUrl = new URL(`https://video.bsky.app/xrpc/app.bsky.video.uploadVideo`);
+      uploadUrl.searchParams.append('did', connection.platform_user_id);
+      uploadUrl.searchParams.append('name', 'video.mp4');
+
+      const videoRes = await fetch(uploadUrl.toString(), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${serviceAuthData.token}`,
           'Content-Type': videoFile.type || 'video/mp4',
         },
         body: arrayBuffer,
