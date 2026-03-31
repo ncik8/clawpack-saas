@@ -8,6 +8,7 @@ export async function POST(request: Request) {
   // Handle both JSON and FormData
   let text: string;
   let imageFile: File | null = null;
+  let videoFile: File | null = null;
 
   const contentType = request.headers.get('content-type') || '';
   if (contentType.includes('multipart/form-data')) {
@@ -16,6 +17,10 @@ export async function POST(request: Request) {
     const image = formData.get('image');
     if (image instanceof File) {
       imageFile = image;
+    }
+    const video = formData.get('video');
+    if (video instanceof File) {
+      videoFile = video;
     }
   } else {
     const body = await request.json();
@@ -67,9 +72,10 @@ export async function POST(request: Request) {
     }
   }
 
-  // For LinkedIn with image, we need to upload the image first
+  // For LinkedIn with image or video, we need to upload the media first
   let mediaAsset: string | null = null;
   let mediaUploadUrl: string | null = null;
+  let mediaType: 'IMAGE' | 'VIDEO' | null = null;
 
   if (imageFile) {
     console.log('Starting LinkedIn image upload...');
@@ -108,6 +114,7 @@ export async function POST(request: Request) {
     if (registerRes.ok && registerData.value?.asset) {
       mediaAsset = registerData.value.asset;
       mediaUploadUrl = registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
+      mediaType = 'IMAGE';
       console.log('Got media asset:', mediaAsset, 'upload URL:', mediaUploadUrl);
 
       // Upload the image binary
@@ -133,6 +140,69 @@ export async function POST(request: Request) {
     } else {
       console.error('Asset registration failed or no asset returned');
     }
+  } else if (videoFile) {
+    console.log('Starting LinkedIn video upload...');
+    console.log('platform_user_id:', connection.platform_user_id);
+    
+    // Register video upload
+    const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+      },
+      body: JSON.stringify({
+        registerUploadRequest: {
+          recipes: ['urn:li:digitalmediaRecipe:feedshare-video'],
+          owner: `urn:li:person:${connection.platform_user_id}`,
+          serviceRelationships: [
+            {
+              relationshipType: 'OWNER',
+              identifier: 'urn:li:userGeneratedContent',
+            },
+          ],
+          supportedUploadMechanism: ['SYNCHRONOUS_UPLOAD'],
+        },
+      }),
+    });
+
+    const registerData = await registerRes.json();
+    console.log('LinkedIn video asset registration response:', JSON.stringify(registerData));
+
+    if (!registerRes.ok) {
+      console.error('LinkedIn video asset registration failed:', registerData);
+    }
+
+    if (registerRes.ok && registerData.value?.asset) {
+      mediaAsset = registerData.value.asset;
+      mediaUploadUrl = registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
+      mediaType = 'VIDEO';
+      console.log('Got video asset:', mediaAsset, 'upload URL:', mediaUploadUrl);
+
+      // Upload the video binary
+      if (mediaUploadUrl) {
+        const arrayBuffer = await videoFile.arrayBuffer();
+        console.log('Uploading video binary, size:', arrayBuffer.byteLength);
+        
+        const uploadRes = await fetch(mediaUploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': videoFile.type || 'video/mp4',
+          },
+          body: arrayBuffer,
+        });
+        
+        console.log('Video upload response status:', uploadRes.status);
+        if (!uploadRes.ok) {
+          console.error('Video upload failed:', await uploadRes.text());
+        }
+      } else {
+        console.error('No upload URL returned from LinkedIn');
+      }
+    } else {
+      console.error('Video asset registration failed or no asset returned');
+    }
   }
 
   // Create the post
@@ -142,7 +212,7 @@ export async function POST(request: Request) {
     specificContent: {
       'com.linkedin.ugc.ShareContent': {
         shareCommentary: { text },
-        shareMediaCategory: mediaAsset ? 'IMAGE' : 'NONE',
+        shareMediaCategory: mediaType || 'NONE',
         media: mediaAsset
           ? [
               {
