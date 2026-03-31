@@ -1,22 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || 'sk-cp-6f2My7cugwJBl0WILYjmmT5JPT4gkN5yUxlldZMeCC3jDiubRIsMcIbH5XtTidbGuwOKlKhrPO8NK0gnrQXyDPq-h6iLDpPdLdUGNDLt9ec1IvPGt8VnCE0';
 
 export async function POST(request: Request) {
   try {
-    const { topic, userApiKey } = await request.json();
+    const { topic } = await request.json();
     
     if (!topic) {
       return NextResponse.json({ error: 'Topic is required' }, { status: 400 });
-    }
-
-    // Use user's API key if provided, otherwise use environment variable
-    const apiKey = userApiKey || process.env.MINIMAX_API_KEY;
-    
-    if (!apiKey) {
-      return NextResponse.json({ error: 'MiniMax API key not configured' }, { status: 400 });
     }
 
     const systemPrompt = `You are a social media expert with 12 years experience in writing content for all different types of platforms and have a good understanding of hashtags. 
@@ -26,7 +17,7 @@ Generate an engaging social media post under 280 characters. Include relevant em
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${MINIMAX_API_KEY}`,
       },
       body: JSON.stringify({
         model: 'MiniMax-Text-01',

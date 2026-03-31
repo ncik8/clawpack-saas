@@ -25,6 +25,11 @@ export default function CreatePostPage() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [scheduledFor, setScheduledFor] = useState<string>('');
+  
+  // AI Generate state
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiResult, setAiResult] = useState('');
 
   useEffect(() => {
     loadConnectedPlatforms();
@@ -78,6 +83,42 @@ export default function CreatePostPage() {
         ? prev.filter(p => p !== platformId)
         : [...prev, platformId]
     );
+  };
+
+  const handleAiGenerate = async () => {
+    if (!aiTopic.trim()) {
+      setResult({ success: false, message: 'Please enter a topic for AI' });
+      return;
+    }
+    
+    setAiGenerating(true);
+    setResult(null);
+    
+    try {
+      const response = await fetch('/api/ai/generate-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: aiTopic }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Generation failed');
+      }
+      
+      setAiResult(data.content);
+      setResult({ success: true, message: 'AI generated content!' });
+    } catch (error: any) {
+      setResult({ success: false, message: error.message });
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setResult({ success: true, message: 'Copied!' });
   };
 
   const handlePost = async () => {
@@ -357,6 +398,87 @@ export default function CreatePostPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* AI Generate */}
+      <div style={{ background: '#1f2937', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '14px', color: '#9ca3af', marginBottom: '12px' }}>
+          🤖 AI Post Generator
+        </h2>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <input
+            type="text"
+            value={aiTopic}
+            onChange={(e) => setAiTopic(e.target.value)}
+            placeholder="Enter a topic (e.g., crypto news, tech tips)"
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              borderRadius: '6px',
+              border: '1px solid #374151',
+              background: '#111827',
+              color: 'white',
+              fontSize: '14px',
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && handleAiGenerate()}
+          />
+          <button
+            onClick={handleAiGenerate}
+            disabled={aiGenerating || !aiTopic.trim()}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '6px',
+              border: 'none',
+              background: aiGenerating ? '#374151' : '#10b981',
+              color: 'white',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              cursor: aiGenerating ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {aiGenerating ? 'Generating...' : 'Generate'}
+          </button>
+        </div>
+        
+        {/* AI Result Box */}
+        {aiResult && (
+          <div style={{ position: 'relative' }}>
+            <textarea
+              value={aiResult}
+              readOnly
+              placeholder="AI generated content will appear here..."
+              style={{
+                width: '100%',
+                minHeight: '80px',
+                padding: '12px',
+                paddingRight: '50px',
+                borderRadius: '6px',
+                border: '1px solid #374151',
+                background: '#111827',
+                color: 'white',
+                fontSize: '14px',
+                resize: 'vertical',
+              }}
+            />
+            <button
+              onClick={() => copyToClipboard(aiResult)}
+              style={{
+                position: 'absolute',
+                top: '8px',
+                right: '8px',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                border: 'none',
+                background: '#3b82f6',
+                color: 'white',
+                fontSize: '12px',
+                cursor: 'pointer',
+              }}
+            >
+              📋 Copy
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content Input */}
