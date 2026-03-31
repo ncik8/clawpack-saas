@@ -29,7 +29,7 @@ export default function CreatePostPage() {
   // AI Generate state
   const [aiTopic, setAiTopic] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiResult, setAiResult] = useState('');
+  const [aiMessages, setAiMessages] = useState<{role: 'user' | 'ai'; content: string}[]>([]);
 
   useEffect(() => {
     loadConnectedPlatforms();
@@ -91,6 +91,9 @@ export default function CreatePostPage() {
       return;
     }
     
+    const userMessage = aiTopic;
+    setAiMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setAiTopic('');
     setAiGenerating(true);
     setResult(null);
     
@@ -98,7 +101,7 @@ export default function CreatePostPage() {
       const response = await fetch('/api/ai/generate-post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: aiTopic }),
+        body: JSON.stringify({ topic: userMessage }),
       });
       
       const data = await response.json();
@@ -107,8 +110,7 @@ export default function CreatePostPage() {
         throw new Error(data.error || 'Generation failed');
       }
       
-      setAiResult(data.content);
-      setResult({ success: true, message: 'AI generated content!' });
+      setAiMessages(prev => [...prev, { role: 'ai', content: data.content }]);
     } catch (error: any) {
       setResult({ success: false, message: error.message });
     } finally {
@@ -400,25 +402,112 @@ export default function CreatePostPage() {
         </div>
       </div>
 
-      {/* AI Generate */}
+      {/* AI Generate - Chat Style */}
       <div style={{ background: '#1f2937', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
         <h2 style={{ fontSize: '14px', color: '#9ca3af', marginBottom: '12px' }}>
-          🤖 AI Post Generator
+          💬 AI Chat
         </h2>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        
+        {/* Chat Messages */}
+        <div style={{ 
+          minHeight: '200px', 
+          maxHeight: '300px', 
+          overflow: 'auto',
+          marginBottom: '12px',
+          padding: '12px',
+          background: '#111827',
+          borderRadius: '8px',
+        }}>
+          {aiMessages.length === 0 && (
+            <p style={{ color: '#6b7280', textAlign: 'center', marginTop: '60px' }}>
+              Ask me anything about your post content!
+            </p>
+          )}
+          
+          {aiMessages.map((msg, i) => (
+            <div key={i} style={{ 
+              display: 'flex', 
+              justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              marginBottom: '12px',
+            }}>
+              {msg.role === 'ai' && (
+                <div style={{ 
+                  width: '28px', 
+                  height: '28px', 
+                  borderRadius: '50%', 
+                  background: '#10b981',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: '8px',
+                  fontSize: '12px',
+                  flexShrink: 0,
+                }}>
+                  🤖
+                </div>
+              )}
+              <div style={{ 
+                maxWidth: '75%',
+                padding: '10px 14px',
+                borderRadius: msg.role === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
+                background: msg.role === 'user' ? '#1780e3' : '#374151',
+                color: 'white',
+                fontSize: '14px',
+                lineHeight: '1.4',
+                wordBreak: 'break-word',
+              }}>
+                {msg.content}
+                {msg.role === 'ai' && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(msg.content);
+                      setResult({ success: true, message: 'Copied!' });
+                    }}
+                    style={{
+                      display: 'block',
+                      marginTop: '8px',
+                      padding: '4px 8px',
+                      fontSize: '11px',
+                      background: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    📋 Copy
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          
+          {aiGenerating && (
+            <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '12px' }}>
+              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '8px', fontSize: '12px' }}>🤖</div>
+              <div style={{ padding: '10px 14px', borderRadius: '12px 12px 12px 4px', background: '#374151', color: '#9ca3af', fontSize: '14px' }}>
+                Thinking...
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Input */}
+        <div style={{ display: 'flex', gap: '8px' }}>
           <input
             type="text"
             value={aiTopic}
             onChange={(e) => setAiTopic(e.target.value)}
-            placeholder="Enter a topic (e.g., crypto news, tech tips)"
+            placeholder="Ask AI to generate a post..."
             style={{
               flex: 1,
-              padding: '10px 12px',
-              borderRadius: '6px',
+              padding: '12px 16px',
+              borderRadius: '24px',
               border: '1px solid #374151',
               background: '#111827',
               color: 'white',
               fontSize: '14px',
+              outline: 'none',
             }}
             onKeyDown={(e) => e.key === 'Enter' && handleAiGenerate()}
           />
@@ -426,59 +515,22 @@ export default function CreatePostPage() {
             onClick={handleAiGenerate}
             disabled={aiGenerating || !aiTopic.trim()}
             style={{
-              padding: '10px 20px',
-              borderRadius: '6px',
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
               border: 'none',
               background: aiGenerating ? '#374151' : '#10b981',
               color: 'white',
-              fontSize: '14px',
-              fontWeight: 'bold',
+              fontSize: '18px',
               cursor: aiGenerating ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            {aiGenerating ? 'Generating...' : 'Generate'}
+            {aiGenerating ? '⏳' : '➤'}
           </button>
         </div>
-        
-        {/* AI Result Box */}
-        {aiResult && (
-          <div style={{ position: 'relative' }}>
-            <textarea
-              value={aiResult}
-              readOnly
-              placeholder="AI generated content will appear here..."
-              style={{
-                width: '100%',
-                minHeight: '80px',
-                padding: '12px',
-                paddingRight: '50px',
-                borderRadius: '6px',
-                border: '1px solid #374151',
-                background: '#111827',
-                color: 'white',
-                fontSize: '14px',
-                resize: 'vertical',
-              }}
-            />
-            <button
-              onClick={() => copyToClipboard(aiResult)}
-              style={{
-                position: 'absolute',
-                top: '8px',
-                right: '8px',
-                padding: '6px 12px',
-                borderRadius: '4px',
-                border: 'none',
-                background: '#3b82f6',
-                color: 'white',
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              📋 Copy
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Content Input */}
