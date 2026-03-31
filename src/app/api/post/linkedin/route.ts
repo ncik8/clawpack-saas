@@ -72,6 +72,8 @@ export async function POST(request: Request) {
   let mediaUploadUrl: string | null = null;
 
   if (imageFile) {
+    console.log('Starting LinkedIn image upload...');
+    
     // Register image upload
     const registerRes = await fetch('https://api.linkedin.com/v2/assets', {
       method: 'POST',
@@ -94,22 +96,40 @@ export async function POST(request: Request) {
     });
 
     const registerData = await registerRes.json();
+    console.log('LinkedIn asset registration response:', JSON.stringify(registerData));
+
+    if (!registerRes.ok) {
+      console.error('LinkedIn asset registration failed:', registerData);
+    }
 
     if (registerRes.ok && registerData.value?.asset) {
       mediaAsset = registerData.value.asset;
       mediaUploadUrl = registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
+      console.log('Got media asset:', mediaAsset, 'upload URL:', mediaUploadUrl);
 
       // Upload the image binary
       if (mediaUploadUrl) {
         const arrayBuffer = await imageFile.arrayBuffer();
-        await fetch(mediaUploadUrl, {
+        console.log('Uploading image binary, size:', arrayBuffer.byteLength);
+        
+        const uploadRes = await fetch(mediaUploadUrl, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': imageFile.type || 'image/jpeg',
           },
           body: arrayBuffer,
         });
+        
+        console.log('Image upload response status:', uploadRes.status);
+        if (!uploadRes.ok) {
+          console.error('Image upload failed:', await uploadRes.text());
+        }
+      } else {
+        console.error('No upload URL returned from LinkedIn');
       }
+    } else {
+      console.error('Asset registration failed or no asset returned');
     }
   }
 
