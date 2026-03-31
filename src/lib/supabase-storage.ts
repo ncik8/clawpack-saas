@@ -58,14 +58,20 @@ export async function uploadVideoToSupabase(file: File): Promise<string | null> 
 
 export async function uploadVideoUrlToX(videoUrl: string, accessToken: string, accessTokenSecret: string): Promise<string | null> {
   try {
+    console.log('uploadVideoUrlToX: Starting with URL:', videoUrl);
+    
     // Download video from URL
+    console.log('uploadVideoUrlToX: Downloading from Supabase...');
     const response = await fetch(videoUrl);
+    console.log('uploadVideoUrlToX: Download response status:', response.status);
+    
     if (!response.ok) {
-      console.error('Failed to download video:', response.status);
+      console.error('uploadVideoUrlToX: Failed to download video:', response.status, response.statusText);
       return null;
     }
     
     const arrayBuffer = await response.arrayBuffer();
+    console.log('uploadVideoUrlToX: Downloaded size:', arrayBuffer.byteLength);
     
     // Detect mime type from URL
     const urlLower = videoUrl.toLowerCase();
@@ -74,8 +80,10 @@ export async function uploadVideoUrlToX(videoUrl: string, accessToken: string, a
     else if (urlLower.includes('.mov')) mimeType = 'video/quicktime';
     else if (urlLower.includes('.avi')) mimeType = 'video/x-msvideo';
     
-    // Upload to X - need to convert to Buffer for the x-oauth functions
-    // These functions expect Buffer, but we're in a Node.js runtime
+    console.log('uploadVideoUrlToX: mimeType:', mimeType);
+    
+    // Upload to X
+    console.log('uploadVideoUrlToX: Uploading to X...');
     const buffer = Buffer.from(arrayBuffer);
     const mediaId = await uploadXVideo({
       accessToken,
@@ -84,9 +92,10 @@ export async function uploadVideoUrlToX(videoUrl: string, accessToken: string, a
       mimeType,
     });
     
+    console.log('uploadVideoUrlToX: Result mediaId:', mediaId);
     return mediaId;
   } catch (err) {
-    console.error('Failed to upload video from URL to X:', err);
+    console.error('uploadVideoUrlToX: Error:', err);
     return null;
   }
 }
