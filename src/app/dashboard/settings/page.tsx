@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
   const [minimaxKey, setMinimaxKey] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [testTopic, setTestTopic] = useState('');
   const [generatedContent, setGeneratedContent] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,13 +19,41 @@ export default function SettingsPage() {
   }, []);
 
   const loadUser = async () => {
+    setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
+    console.log('Current user:', user);
     setUser(user);
     
     if (user) {
       // Load saved API key from user metadata
       const apiKey = user.user_metadata?.minimax_api_key || '';
       setMinimaxKey(apiKey);
+      
+      // Load display name from metadata or email
+      const name = user.user_metadata?.display_name || user.email?.split('@')[0] || '';
+      setDisplayName(name);
+    }
+    setLoading(false);
+  };
+
+  const saveProfile = async () => {
+    if (!user) return;
+    
+    setSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { 
+          display_name: displayName,
+          minimax_api_key: minimaxKey
+        }
+      });
+      
+      if (error) throw error;
+      setMessage({ type: 'success', text: 'Profile saved!' });
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -90,9 +119,49 @@ export default function SettingsPage() {
           👤 Profile
         </h2>
         {user ? (
-          <div style={{ color: '#9ca3af' }}>
-            <p><strong style={{ color: 'white' }}>Email:</strong> {user.email}</p>
-            <p style={{ fontSize: '12px', marginTop: '8px' }}>User ID: {user.id}</p>
+          <div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>
+                Display Name
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Your name"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  border: '1px solid #374151',
+                  background: '#111827',
+                  color: 'white',
+                  fontSize: '14px',
+                }}
+              />
+            </div>
+            <div style={{ color: '#9ca3af', fontSize: '14px' }}>
+              <p><strong style={{ color: 'white' }}>Email:</strong> {user.email}</p>
+              <p style={{ fontSize: '12px', marginTop: '8px', color: '#6b7280' }}>User ID: {user.id}</p>
+            </div>
+            <button
+              onClick={saveProfile}
+              disabled={saving}
+              style={{
+                marginTop: '16px',
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#3b82f6',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                cursor: saving ? 'not-allowed' : 'pointer',
+                opacity: saving ? 0.7 : 1,
+              }}
+            >
+              {saving ? 'Saving...' : 'Save Profile'}
+            </button>
           </div>
         ) : (
           <p style={{ color: '#9ca3af' }}>Not logged in</p>
