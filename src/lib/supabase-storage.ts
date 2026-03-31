@@ -17,18 +17,35 @@ export async function uploadVideoToSupabase(file: File): Promise<string | null> 
     const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     console.log('Generated filename:', fileName);
     
-    // Convert File to ArrayBuffer
-    const arrayBuffer = await file.arrayBuffer();
-    console.log('Converted to ArrayBuffer, size:', arrayBuffer.byteLength);
+    // Stream the file in chunks to avoid memory issues
+    let buffer: Buffer;
+    if (file.stream) {
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of file.stream()) {
+        chunks.push(chunk);
+      }
+      buffer = Buffer.concat(chunks);
+    } else {
+      // Fallback for environments without stream()
+      const arrayBuffer = await file.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+    }
     
-    // Try uploading with ArrayBuffer directly (works in both Node.js and Edge runtimes)
-    console.log('Uploading to Supabase storage bucket: videos');
-    const { data, error } = await supabase.storage
+    console.log('Created buffer, size:', buffer.length);
+    
+    // Upload with timeout
+    const uploadPromise = supabase.storage
       .from('videos')
-      .upload(fileName, arrayBuffer, {
+      .upload(fileName, buffer, {
         contentType: file.type,
         upsert: false
       });
+    
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Upload timeout (30s)')), 30000);
+    });
+    
+    const { data, error } = await Promise.race([uploadPromise, timeoutPromise]) as any;
 
     if (error) {
       console.error('Supabase upload error:', error);
