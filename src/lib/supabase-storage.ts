@@ -17,21 +17,9 @@ export async function uploadVideoToSupabase(file: File): Promise<string | null> 
     const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     console.log('Generated filename:', fileName);
     
-    // Stream the file in chunks to avoid memory issues
-    let buffer: Buffer;
-    const stream = file.stream();
-    const chunks: Uint8Array[] = [];
-    const reader = stream.getReader();
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-      buffer = Buffer.concat(chunks);
-    } finally {
-      reader.releaseLock();
-    }
+    // Convert File to Buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
     
     console.log('Created buffer, size:', buffer.length);
     
