@@ -52,9 +52,10 @@ export default function CreatePostPage() {
       const platformInfo: Record<string, { name: string; emoji: string }> = {
         'x': { name: 'X / Twitter', emoji: '🐦' },
         'linkedin': { name: 'LinkedIn', emoji: '💼' },
+        'bluesky': { name: 'Bluesky', emoji: '☁️' },
       };
 
-      const allPlatforms = ['x', 'linkedin'];
+      const allPlatforms = ['x', 'linkedin', 'bluesky'];
       const platformsWithStatus = allPlatforms.map(p => ({
         id: p,
         name: platformInfo[p]?.name || p,
@@ -249,6 +250,24 @@ export default function CreatePostPage() {
           } else {
             errors.push(`LinkedIn: ${data.error}`);
           }
+        } else if (platform === 'bluesky') {
+          // Bluesky: simple text post
+          const response = await fetch('/api/post/bluesky', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ text: content }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            results.push(`Bluesky ✓`);
+          } else {
+            errors.push(`Bluesky: ${data.error}`);
+          }
         }
       } catch (err) {
         errors.push(`${platform}: Network error`);
@@ -360,6 +379,7 @@ export default function CreatePostPage() {
   const platformLimits: Record<string, number> = {
     x: 280,
     linkedin: 3000,
+    bluesky: 300,
     facebook: 63206,
     instagram: 2200,
   };
