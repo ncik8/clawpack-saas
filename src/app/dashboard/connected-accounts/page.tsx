@@ -170,13 +170,13 @@ export default function ConnectedAccountsPage() {
   };
 
   const handleConnect = async (platform: string) => {
-    setConnecting(platform);
-    
-    // For X/Twitter, use our own OAuth flow - redirect to Twitter
-    if (platform === 'x') {
-      window.location.href = '/api/connect/x';
-      return;
+    // Check if platform is coming soon
+    const platformInfo = platforms.find(p => p.id === platform);
+    if (platformInfo?.comingSoon) {
+      return; // Just ignore clicks on coming soon platforms
     }
+    
+    setConnecting(platform);
     
     // For X/Twitter, use OAuth 1.0a for media support
     if (platform === 'x') {
@@ -190,8 +190,13 @@ export default function ConnectedAccountsPage() {
       return;
     }
     
-    // Other platforms not yet supported - show message
-    alert('This platform is not yet supported. Coming soon!');
+    // Bluesky (not yet implemented)
+    if (platform === 'bluesky') {
+      alert('Bluesky integration is coming soon!');
+      setConnecting(null);
+      return;
+    }
+    
     setConnecting(null);
   };
 
@@ -223,23 +228,22 @@ export default function ConnectedAccountsPage() {
   const platforms = [
     { id: 'x', name: 'X / Twitter', emoji: '🐦', color: '#1DA1F2', comingSoon: false },
     { id: 'linkedin', name: 'LinkedIn', emoji: '💼', color: '#0A66C2', comingSoon: false },
-    { id: 'linkedin-page', name: 'LinkedIn Page', emoji: '💼', color: '#0A66C2', comingSoon: false },
     { id: 'bluesky', name: 'Bluesky', emoji: '☁️', color: '#1185FE', comingSoon: false },
-    { id: 'mastodon', name: 'Mastodon', emoji: '🐘', color: '#6364FF', comingSoon: false },
-    { id: 'nostr', name: 'Nostr', emoji: '⚡', color: '#FFD700', comingSoon: false },
-    { id: 'threads', name: 'Threads', emoji: '🧵', color: '#000000', comingSoon: false },
+    { id: 'mastodon', name: 'Mastodon', emoji: '🐘', color: '#6364FF', comingSoon: true },
+    { id: 'nostr', name: 'Nostr', emoji: '⚡', color: '#FFD700', comingSoon: true },
+    { id: 'threads', name: 'Threads', emoji: '🧵', color: '#000000', comingSoon: true },
     { id: 'facebook', name: 'Facebook', emoji: '📘', color: '#1877F2', comingSoon: true },
     { id: 'instagram', name: 'Instagram', emoji: '📷', color: '#E4405F', comingSoon: true },
-    { id: 'instagram-standalone', name: 'Instagram (Standalone)', emoji: '📷', color: '#E4405F', comingSoon: true },
     { id: 'tiktok', name: 'TikTok', emoji: '🎵', color: '#000000', comingSoon: true },
     { id: 'youtube', name: 'YouTube', emoji: '▶️', color: '#FF0000', comingSoon: true },
-    { id: 'pinterest', name: 'Pinterest', emoji: '📌', color: '#BD081C', comingSoon: false },
-    { id: 'dribbble', name: 'Dribbble', emoji: '🏀', color: '#EA4C89', comingSoon: false },
-    { id: 'discord', name: 'Discord', emoji: '🎮', color: '#5865F2', comingSoon: false },
-    { id: 'telegram', name: 'Telegram', emoji: '✈️', color: '#0088CC', comingSoon: false },
-    { id: 'wordpress', name: 'WordPress', emoji: '📝', color: '#21759B', comingSoon: false },
-    { id: 'reddit', name: 'Reddit', emoji: '🤖', color: '#FF4500', comingSoon: false },
-    { id: 'slack', name: 'Slack', emoji: '💬', color: '#4A154B', comingSoon: false },
+    { id: 'pinterest', name: 'Pinterest', emoji: '📌', color: '#BD081C', comingSoon: true },
+    { id: 'dribbble', name: 'Dribbble', emoji: '🏀', color: '#EA4C89', comingSoon: true },
+    { id: 'discord', name: 'Discord', emoji: '🎮', color: '#5865F2', comingSoon: true },
+    { id: 'telegram', name: 'Telegram', emoji: '✈️', color: '#0088CC', comingSoon: true },
+    { id: 'wordpress', name: 'WordPress', emoji: '📝', color: '#21759B', comingSoon: true },
+    { id: 'reddit', name: 'Reddit', emoji: '🤖', color: '#FF4500', comingSoon: true },
+    { id: 'slack', name: 'Slack', emoji: '💬', color: '#4A154B', comingSoon: true },
+    { id: 'linkedin-page', name: 'LinkedIn Page', emoji: '💼', color: '#0A66C2', comingSoon: true },
   ];
 
   const isConnected = (platformId: string) => {
