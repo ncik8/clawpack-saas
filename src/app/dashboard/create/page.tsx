@@ -251,13 +251,11 @@ export default function CreatePostPage() {
             errors.push(`LinkedIn: ${data.error}`);
           }
         } else if (platform === 'bluesky') {
-          // Bluesky: text with optional image/video
+          // Bluesky: text with optional image (video not supported on bsky.social PDS)
           const formData = new FormData();
           formData.append('text', content);
           if (imageFile) {
             formData.append('image', imageFile);
-          } else if (videoFile) {
-            formData.append('video', videoFile);
           }
 
           const response = await fetch('/api/post/bluesky', {
@@ -625,7 +623,7 @@ export default function CreatePostPage() {
 
       {/* Media Upload */}
       <div style={{ marginBottom: '8px', fontSize: '12px', color: '#6b7280' }}>
-        Images: JPG, PNG, GIF (max 20MB) • Videos: MP4, MOV (max 100MB)
+        Images: JPG, PNG, GIF (max 20MB) • Videos: MP4, MOV (max 100MB) {platforms.includes('bluesky') && '• Bluesky: images only (video coming soon)'}
       </div>
       
       {/* Image Upload */}
