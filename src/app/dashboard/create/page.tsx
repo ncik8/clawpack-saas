@@ -306,6 +306,11 @@ export default function CreatePostPage() {
         />
       </div>
 
+      {/* Media Upload */}
+      <div style={{ marginBottom: '8px', fontSize: '12px', color: '#6b7280' }}>
+        Images: JPG, PNG, GIF (max 20MB) • Videos: MP4, MOV (max 100MB)
+      </div>
+      
       {/* Image Upload */}
       <div style={{ marginBottom: '24px' }}>
         <input
