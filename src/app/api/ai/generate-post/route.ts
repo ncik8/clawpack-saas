@@ -13,14 +13,14 @@ export async function POST(request: Request) {
     const systemPrompt = `You are a social media expert with 12 years experience in writing content for all different types of platforms and have a good understanding of hashtags. 
 Generate an engaging social media post under 280 characters. Include relevant emojis and 2-3 hashtags. Make it punchy and attention-grabbing.`;
 
-    const response = await fetch('https://api.minimax.chat/v1/text/chatcompletion_pro', {
+    const response = await fetch('https://api.minimax.io/v1/text/chatcompletion_v2', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${MINIMAX_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'MiniMax-Text-01',
+        model: 'MiniMax-M2',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Create a social media post about: ${topic}` }
