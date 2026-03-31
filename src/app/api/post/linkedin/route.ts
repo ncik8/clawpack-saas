@@ -81,6 +81,7 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'X-Restli-Protocol-Version': '2.0.0',
+        'LinkedIn-Version': '202304',
       },
       body: JSON.stringify({
         registerUploadRequest: {
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': imageFile.type || 'image/jpeg',
+            'LinkedIn-Version': '202304',
           },
           body: arrayBuffer,
         });
@@ -162,6 +164,7 @@ export async function POST(request: Request) {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       'X-Restli-Protocol-Version': '2.0.0',
+      'LinkedIn-Version': '202304',
     },
     body: JSON.stringify(postBody),
   });
