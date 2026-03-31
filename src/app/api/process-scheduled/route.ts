@@ -6,6 +6,26 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
+// Helper to delete video from Supabase storage after successful post
+async function deleteVideoFromSupabase(videoUrl: string): Promise<void> {
+  if (!videoUrl || !videoUrl.includes('/storage/v1/object/public/videos/')) {
+    return;
+  }
+  
+  try {
+    const fileName = videoUrl.split('/videos/')[1];
+    if (!fileName) return;
+    
+    await supabaseAdmin.storage
+      .from('videos')
+      .remove([fileName]);
+    
+    console.log('Deleted video from Supabase:', fileName);
+  } catch (err) {
+    console.error('Failed to delete video from Supabase:', err);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     // Only allow from cron or internal calls (verify a secret if needed)
