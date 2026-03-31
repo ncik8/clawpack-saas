@@ -339,7 +339,7 @@ export default function CreatePostPage() {
             fontSize: '14px',
           }}
         >
-          📷 Add Image
+          📷 Add Image (Max 20MB)
         </label>
         {imagePreview && (
           <div style={{ marginTop: '12px', position: 'relative', display: 'inline-block' }}>
@@ -412,7 +412,7 @@ export default function CreatePostPage() {
             fontSize: '14px',
           }}
         >
-          🎥 Add Video
+          🎥 Add Video (Max 100MB)
         </label>
         {videoPreview && (
           <div style={{ marginTop: '12px', position: 'relative', display: 'inline-block' }}>
