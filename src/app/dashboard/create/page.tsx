@@ -557,9 +557,9 @@ export default function CreatePostPage() {
         </div>
         
         {scheduling && (
-          <div style={{ marginTop: '12px' }}>
-            <label style={{ display: 'block', fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
-              Schedule Date & Time
+          <div style={{ marginTop: '8px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+              Date & Time
             </label>
             <input
               type="datetime-local"
@@ -568,18 +568,15 @@ export default function CreatePostPage() {
               min={new Date().toISOString().slice(0, 16)}
               style={{
                 width: '100%',
-                padding: '12px',
-                borderRadius: '8px',
-                border: '2px solid #374151',
-                background: '#1f2937',
-                color: 'white',
-                fontSize: '16px',
+                padding: '8px',
+                borderRadius: '6px',
+                border: '1px solid #374151',
+                background: 'white',
+                color: '#111',
+                fontSize: '14px',
                 outline: 'none',
               }}
             />
-            <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
-              Posts will be scheduled and appear in your calendar.
-            </p>
           </div>
         )}
       </div>
