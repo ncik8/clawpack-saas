@@ -355,7 +355,25 @@ export default function CreatePostPage() {
   };
 
   const charCount = content.length;
-  const maxChars = 280;
+  
+  // Character limits per platform
+  const platformLimits: Record<string, number> = {
+    x: 280,
+    linkedin: 3000,
+    facebook: 63206,
+    instagram: 2200,
+  };
+  
+  // Show lowest limit when multiple platforms selected, or platform-specific limit
+  const maxChars = platforms.length > 0
+    ? Math.min(...platforms.map(p => platformLimits[p] || 280))
+    : 280;
+  
+  const limitLabel = platforms.length > 1
+    ? `${platforms.length} platforms (min: ${maxChars})`
+    : platforms.length === 1
+      ? `${platforms[0]} limit: ${maxChars}`
+      : 'X limit: 280';
 
   return (
     <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
@@ -555,7 +573,7 @@ export default function CreatePostPage() {
             fontSize: '12px', 
             color: charCount > maxChars ? '#ef4444' : '#6b7280' 
           }}>
-            {charCount}/{maxChars}
+            {charCount}/{maxChars} {limitLabel}
           </span>
         </div>
         <textarea
