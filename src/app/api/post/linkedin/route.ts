@@ -73,6 +73,7 @@ export async function POST(request: Request) {
 
   if (imageFile) {
     console.log('Starting LinkedIn image upload...');
+    console.log('platform_user_id:', connection.platform_user_id);
     
     // Register image upload
     const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
@@ -81,10 +82,10 @@ export async function POST(request: Request) {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'X-Restli-Protocol-Version': '2.0.0',
-        'LinkedIn-Version': '202304',
       },
       body: JSON.stringify({
         registerUploadRequest: {
+          recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
           owner: `urn:li:person:${connection.platform_user_id}`,
           serviceRelationships: [
             {
@@ -92,6 +93,7 @@ export async function POST(request: Request) {
               identifier: 'urn:li:userGeneratedContent',
             },
           ],
+          supportedUploadMechanism: ['SYNCHRONOUS_UPLOAD'],
         },
       }),
     });
@@ -116,9 +118,7 @@ export async function POST(request: Request) {
         const uploadRes = await fetch(mediaUploadUrl, {
           method: 'PUT',
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': imageFile.type || 'image/jpeg',
-            'LinkedIn-Version': '202304',
           },
           body: arrayBuffer,
         });
@@ -164,7 +164,6 @@ export async function POST(request: Request) {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       'X-Restli-Protocol-Version': '2.0.0',
-      'LinkedIn-Version': '202304',
     },
     body: JSON.stringify(postBody),
   });
