@@ -80,7 +80,7 @@ export default function BlueskyConnectPage() {
             type="text"
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
-            placeholder="yourname.bsky.social"
+            placeholder="yourname.bsky.social (NOT @yourname.bsky.social)"
             className="w-full px-4 py-3 rounded-lg bg-[#111827] border border-[#374151] text-white placeholder-[#6b7280] focus:outline-none focus:border-[#1780e3]"
             required
           />
@@ -129,10 +129,11 @@ export default function BlueskyConnectPage() {
       <div className="mt-6 p-4 rounded-lg bg-[#1f2937] border border-[#374151]">
         <p className="text-sm text-[#9ca3af]">
           <strong className="text-white">How to get an App Password:</strong><br/>
-          1. Go to.bsky.app<br/>
+          1. Go to bsky.app<br/>
           2. Settings → App Passwords<br/>
           3. Create a new app password<br/>
-          4. Copy and paste it here
+          4. Copy and paste it here<br/><br/>
+          <strong className="text-white">Handle format:</strong> use <code className="bg-[#374151] px-1 rounded">yourname.bsky.social</code> (no @ symbol)
         </p>
       </div>
     </div>
