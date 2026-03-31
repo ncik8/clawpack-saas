@@ -19,16 +19,18 @@ export async function uploadVideoToSupabase(file: File): Promise<string | null> 
     
     // Stream the file in chunks to avoid memory issues
     let buffer: Buffer;
-    if (file.stream) {
-      const chunks: Uint8Array[] = [];
-      for await (const chunk of file.stream()) {
-        chunks.push(chunk);
+    const stream = file.stream();
+    const chunks: Uint8Array[] = [];
+    const reader = stream.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
       }
       buffer = Buffer.concat(chunks);
-    } else {
-      // Fallback for environments without stream()
-      const arrayBuffer = await file.arrayBuffer();
-      buffer = Buffer.from(arrayBuffer);
+    } finally {
+      reader.releaseLock();
     }
     
     console.log('Created buffer, size:', buffer.length);
