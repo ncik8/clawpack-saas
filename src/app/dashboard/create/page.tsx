@@ -251,14 +251,21 @@ export default function CreatePostPage() {
             errors.push(`LinkedIn: ${data.error}`);
           }
         } else if (platform === 'bluesky') {
-          // Bluesky: simple text post
+          // Bluesky: text with optional image/video
+          const formData = new FormData();
+          formData.append('text', content);
+          if (imageFile) {
+            formData.append('image', imageFile);
+          } else if (videoFile) {
+            formData.append('video', videoFile);
+          }
+
           const response = await fetch('/api/post/bluesky', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ text: content }),
+            body: formData,
           });
 
           const data = await response.json();
