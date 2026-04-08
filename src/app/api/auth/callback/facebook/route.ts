@@ -60,49 +60,50 @@ export async function GET(request: Request) {
     const userRes = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${userToken}&fields=id,name`);
     const userData = await userRes.json();
 
-    // For Instagram - find page with Instagram linked (optimized - get all in one call)
+    // For Instagram - store ALL pages that have IG linked
     if (platform === 'instagram') {
-      // Get all pages WITH instagram_business_account in single call
       const pagesRes = await fetch(
         `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`
       );
       const pagesData = await pagesRes.json();
 
-      // Find first page that has Instagram linked
-      const pageWithIg = pagesData.data?.find((p: any) => p.instagram_business_account);
+      // Find all pages with Instagram linked
+      const pagesWithIg = pagesData.data?.filter((p: any) => p.instagram_business_account) || [];
 
-      if (pageWithIg) {
-        const igAccountId = pageWithIg.instagram_business_account.id;
-        const pageAccessToken = pageWithIg.access_token;
+      if (pagesWithIg.length === 0) {
+        return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=no_instagram_account`);
+      }
+
+      // Store EACH page with IG as a separate connection
+      for (const page of pagesWithIg) {
+        const igAccountId = page.instagram_business_account.id;
 
         // Get IG username
         const igRes = await fetch(
-          `https://graph.facebook.com/v18.0/${igAccountId}?fields=username&access_token=${pageAccessToken}`
+          `https://graph.facebook.com/v18.0/${igAccountId}?fields=username&access_token=${page.access_token}`
         );
         const igData = await igRes.json();
-        const igUsername = igData.username || 'Instagram';
+        const igUsername = igData.username || page.name;
 
-        // Store
+        // Upsert with platform_user_id as unique key for IG (so same IG doesn't get duplicated)
         await supabase.from('social_connections').upsert(
           {
             user_id: oauthState.user_id,
             platform: 'instagram',
             platform_user_id: igAccountId,
             platform_username: igUsername,
-            access_token: pageAccessToken,
+            access_token: page.access_token,
             refresh_token: tokens.refresh_token || null,
             expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
           },
-          { onConflict: 'user_id,platform' }
+          { onConflict: 'user_id,platform,platform_user_id' }
         );
-
-        return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram`);
-      } else {
-        return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=no_instagram_account`);
       }
+
+      return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${pagesWithIg.length}`);
     }
 
-    // For Facebook - get first page
+    // For Facebook - store ALL pages user selected
     if (platform === 'facebook') {
       const pagesRes = await fetch(
         `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token`
@@ -110,20 +111,23 @@ export async function GET(request: Request) {
       const pagesData = await pagesRes.json();
 
       if (pagesData.data && pagesData.data.length > 0) {
-        const firstPage = pagesData.data[0];
-        await supabase.from('social_connections').upsert(
-          {
-            user_id: oauthState.user_id,
-            platform: 'facebook',
-            platform_user_id: firstPage.id,
-            platform_username: firstPage.name,
-            access_token: firstPage.access_token,
-            refresh_token: tokens.refresh_token || null,
-            expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-          },
-          { onConflict: 'user_id,platform' }
-        );
+        // Store EACH page as a separate connection
+        for (const page of pagesData.data) {
+          await supabase.from('social_connections').upsert(
+            {
+              user_id: oauthState.user_id,
+              platform: 'facebook',
+              platform_user_id: page.id,
+              platform_username: page.name,
+              access_token: page.access_token,
+              refresh_token: tokens.refresh_token || null,
+              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+            },
+            { onConflict: 'user_id,platform,platform_user_id' }
+          );
+        }
       } else {
+        // No pages - just store user token
         await supabase.from('social_connections').upsert(
           {
             user_id: oauthState.user_id,
@@ -134,10 +138,10 @@ export async function GET(request: Request) {
             refresh_token: tokens.refresh_token || null,
             expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
           },
-          { onConflict: 'user_id,platform' }
+          { onConflict: 'user_id,platform,platform_user_id' }
         );
       }
-      return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=facebook`);
+      return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=facebook&count=${pagesData.data?.length || 0}`);
     }
 
     return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=unknown_platform`);
