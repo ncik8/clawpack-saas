@@ -281,6 +281,34 @@ export default function CreatePostPage() {
           } else {
             errors.push(`Bluesky: ${data.error}`);
           }
+        } else if (basePlatform === 'facebook') {
+          // Facebook: post to all connected pages
+          const fbRes = await fetch('/api/post/facebook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: content }),
+          });
+          const fbData = await fbRes.json();
+
+          if (fbRes.ok && fbData.success) {
+            results.push(`Facebook (${fbData.results?.filter((r: any) => r.success).length || 0}) ✓`);
+          } else {
+            errors.push(`Facebook: ${fbData.error || 'Post failed'}`);
+          }
+        } else if (basePlatform === 'instagram') {
+          // Instagram: post to all connected accounts
+          const igRes = await fetch('/api/post/instagram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: content }),
+          });
+          const igData = await igRes.json();
+
+          if (igRes.ok && igData.success) {
+            results.push(`Instagram (${igData.results?.filter((r: any) => r.success).length || 0}) ✓`);
+          } else {
+            errors.push(`Instagram: ${igData.error || 'Post failed'}`);
+          }
         }
       } catch (err) {
         errors.push(`${basePlatform}: Network error`);
