@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: connections } = await supabase
+  const { data: connections, error } = await supabase
     .from('social_connections')
     .select('*')
     .eq('user_id', user.id);
@@ -18,6 +18,7 @@ export async function GET() {
   return NextResponse.json({ 
     user_id: user.id,
     connections: connections || [],
-    count: connections?.length || 0
+    count: connections?.length || 0,
+    error: error?.message || null
   });
 }
