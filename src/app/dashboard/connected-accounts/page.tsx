@@ -98,8 +98,8 @@ export default function ConnectedAccountsPage() {
           'x': { name: 'X / Twitter', emoji: '🐦' },
           'linkedin': { name: 'LinkedIn', emoji: '💼' },
           'bluesky': { name: 'Bluesky', emoji: '☁️' },
-          'facebook': { name: 'Facebook', emoji: '📘' },
-          'instagram': { name: 'Instagram', emoji: '📷' },
+          'facebook': { name: 'Facebook Page', emoji: '📘' },
+          'instagram': { name: 'Instagram Page', emoji: '📷' },
         };
 
         const channelsFromOurDB = ['x', 'linkedin', 'bluesky', 'facebook', 'instagram'].map(p => ({
@@ -205,9 +205,9 @@ export default function ConnectedAccountsPage() {
       return;
     }
     
-    // Instagram - uses Meta OAuth (same as Facebook)
+    // Instagram - separate OAuth flow
     if (platform === 'instagram') {
-      window.location.href = '/api/connect/facebook';
+      window.location.href = '/api/connect/instagram';
       return;
     }
     
@@ -246,8 +246,8 @@ export default function ConnectedAccountsPage() {
     { id: 'mastodon', name: 'Mastodon', emoji: '🐘', color: '#6364FF', comingSoon: true },
     { id: 'nostr', name: 'Nostr', emoji: '⚡', color: '#FFD700', comingSoon: true },
     { id: 'threads', name: 'Threads', emoji: '🧵', color: '#000000', comingSoon: true },
-    { id: 'facebook', name: 'Facebook', emoji: '📘', color: '#1877F2', comingSoon: false },
-    { id: 'instagram', name: 'Instagram', emoji: '📷', color: '#E4405F', comingSoon: false },
+    { id: 'facebook', name: 'Facebook Page', emoji: '📘', color: '#1877F2', comingSoon: false },
+    { id: 'instagram', name: 'Instagram Page', emoji: '📷', color: '#E4405F', comingSoon: false },
     { id: 'tiktok', name: 'TikTok', emoji: '🎵', color: '#000000', comingSoon: true },
     { id: 'youtube', name: 'YouTube', emoji: '▶️', color: '#FF0000', comingSoon: true },
     { id: 'pinterest', name: 'Pinterest', emoji: '📌', color: '#BD081C', comingSoon: true },

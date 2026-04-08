@@ -20,17 +20,18 @@ export async function GET(request: Request) {
 
   const supabase = await createClient();
 
-  // Validate state
+  // Validate state - could be facebook or instagram
   const { data: oauthState, error: stateError } = await supabase
     .from('oauth_states')
     .select('*')
     .eq('state', state)
-    .eq('platform', 'facebook')
     .single();
 
   if (stateError || !oauthState) {
     return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=invalid_state`);
   }
+
+  const platform = oauthState.platform;
 
   // Delete used state immediately
   await supabase.from('oauth_states').delete().eq('state', state);
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
     return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=token_exchange_failed`);
   }
 
-  // Get Facebook user info
+  // Get user info
   const userRes = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${tokens.access_token}&fields=id,name,email`);
   const userData = await userRes.json();
 
@@ -64,19 +65,82 @@ export async function GET(request: Request) {
     return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=user_info_failed`);
   }
 
-  // Store tokens
-  await supabase.from('social_connections').upsert(
-    {
-      user_id: oauthState.user_id,
-      platform: 'facebook',
-      platform_user_id: userData.id,
-      platform_username: userData.name,
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token || null,
-      expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-    },
-    { onConflict: 'user_id,platform' }
-  );
+  // For Facebook - get pages
+  if (platform === 'facebook') {
+    const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${tokens.access_token}`);
+    const pagesData = await pagesRes.json();
 
-  return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=facebook`);
+    // Store first page access token (or store user token if no pages)
+    if (pagesData.data && pagesData.data.length > 0) {
+      // Store the first page - for multi-page, would need to show selector
+      const firstPage = pagesData.data[0];
+      await supabase.from('social_connections').upsert(
+        {
+          user_id: oauthState.user_id,
+          platform: 'facebook',
+          platform_user_id: userData.id,
+          platform_username: firstPage.name,
+          access_token: firstPage.access_token,
+          refresh_token: tokens.refresh_token || null,
+          expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+        },
+        { onConflict: 'user_id,platform' }
+      );
+    } else {
+      // No pages - store user token
+      await supabase.from('social_connections').upsert(
+        {
+          user_id: oauthState.user_id,
+          platform: 'facebook',
+          platform_user_id: userData.id,
+          platform_username: userData.name,
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token || null,
+          expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+        },
+        { onConflict: 'user_id,platform' }
+      );
+    }
+  }
+
+  // For Instagram - get IG business account
+  if (platform === 'instagram') {
+    // Get pages first to find IG account
+    const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${tokens.access_token}`);
+    const pagesData = await pagesRes.json();
+
+    let igAccountId = null;
+
+    // Find IG account linked to pages
+    if (pagesData.data) {
+      for (const page of pagesData.data) {
+        const igRes = await fetch(`https://graph.facebook.com/v18.0/${page.id}?fields=instagram_business_account&access_token=${tokens.access_token}`);
+        const igData = await igRes.json();
+        if (igData.instagram_business_account) {
+          igAccountId = igData.instagram_business_account;
+          break;
+        }
+      }
+    }
+
+    if (igAccountId) {
+      await supabase.from('social_connections').upsert(
+        {
+          user_id: oauthState.user_id,
+          platform: 'instagram',
+          platform_user_id: igAccountId,
+          platform_username: 'Instagram',
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token || null,
+          expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+        },
+        { onConflict: 'user_id,platform' }
+      );
+    } else {
+      console.error('No Instagram business account found');
+      return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=no_instagram_account`);
+    }
+  }
+
+  return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=${platform}`);
 }
