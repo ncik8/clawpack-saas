@@ -10,50 +10,45 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Get FB connection
-  const { data: connection } = await supabase
+  // Get all connections
+  const { data: connections } = await supabase
     .from('social_connections')
     .select('*')
-    .eq('user_id', user.id)
-    .eq('platform', 'facebook')
-    .single();
+    .eq('user_id', user.id);
 
-  if (!connection?.access_token) {
-    return NextResponse.json({ error: 'No Facebook connection' });
-  }
+  const result: any = { user_id: user.id, connections: [] };
 
-  const token = connection.access_token;
+  if (connections) {
+    for (const conn of connections) {
+      const entry: any = {
+        platform: conn.platform,
+        platform_user_id: conn.platform_user_id,
+        platform_username: conn.platform_username,
+        tokenPreview: conn.access_token?.substring(0, 20) + '...',
+      };
 
-  // Step 1: Get all pages
-  const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${token}`);
-  const pagesData = await pagesRes.json();
+      // For FB - check what token can access
+      if (conn.platform === 'facebook' && conn.access_token) {
+        // Check if user token
+        const meRes = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${conn.access_token}&fields=id,name`);
+        const meData = await meRes.json();
+        entry.me = meData;
 
-  const result: any = {
-    userTokenValid: pagesRes.ok,
-    pages: [],
-    instagramAccounts: []
-  };
-
-  if (pagesData.data) {
-    for (const page of pagesData.data) {
-      // Get page details with IG account
-      const pageRes = await fetch(`https://graph.facebook.com/v18.0/${page.id}?fields=id,name,instagram_business_account&access_token=${page.access_token}`);
-      const pageData = await pageRes.json();
-
-      result.pages.push({
-        id: page.id,
-        name: page.name,
-        hasIg: !!pageData.instagram_business_account,
-        igAccountId: pageData.instagram_business_account?.id || null
-      });
-
-      if (pageData.instagram_business_account) {
-        result.instagramAccounts.push({
-          pageId: page.id,
-          pageName: page.name,
-          igAccountId: pageData.instagram_business_account.id
-        });
+        // Check pages
+        const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${conn.access_token}`);
+        const pagesData = await pagesRes.json();
+        entry.pages = pagesData;
       }
+
+      // For IG - check what token can access
+      if (conn.platform === 'instagram' && conn.access_token) {
+        // Check IG account info
+        const igRes = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${conn.access_token}&fields=id,name,account_type,username`);
+        const igData = await igRes.json();
+        entry.igInfo = igData;
+      }
+
+      result.connections.push(entry);
     }
   }
 
