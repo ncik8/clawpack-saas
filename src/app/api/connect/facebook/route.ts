@@ -30,7 +30,7 @@ export async function GET() {
     response_type: 'code',
     client_id: process.env.FACEBOOK_APP_ID!,
     redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/facebook`,
-    scope: 'pages_show_list,pages_read_engagement',
+    scope: 'pages_show_list',
     state,
   });
 
