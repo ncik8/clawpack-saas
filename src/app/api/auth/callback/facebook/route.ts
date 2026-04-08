@@ -9,12 +9,18 @@ export async function GET(request: Request) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
+  console.log('=== FB Callback ===');
+  console.log('State:', state);
+  console.log('Error:', error);
+
   // User denied access
   if (error) {
+    console.log('User denied:', error);
     return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=${error}`);
   }
 
   if (!code || !state) {
+    console.log('Missing params');
     return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=missing_params`);
   }
 
@@ -27,11 +33,15 @@ export async function GET(request: Request) {
     .eq('state', state)
     .single();
 
+  console.log('OAuth State:', oauthState);
+  console.log('State Error:', stateError);
+
   if (stateError || !oauthState) {
     return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=invalid_state`);
   }
 
   const platform = oauthState.platform;
+  console.log('Platform:', platform);
 
   // Delete used state immediately
   await supabase.from('oauth_states').delete().eq('state', state);
@@ -50,6 +60,7 @@ export async function GET(request: Request) {
   });
 
   const tokens = await tokenRes.json();
+  console.log('Tokens:', JSON.stringify(tokens));
 
   if (!tokenRes.ok || !tokens.access_token) {
     console.error('Token exchange failed:', tokens);
@@ -59,6 +70,7 @@ export async function GET(request: Request) {
   // Get user info
   const userRes = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${tokens.access_token}&fields=id,name,email`);
   const userData = await userRes.json();
+  console.log('User Data:', JSON.stringify(userData));
 
   if (!userData.id) {
     console.error('Failed to get user info:', userData);
@@ -67,18 +79,20 @@ export async function GET(request: Request) {
 
   // For Facebook - get pages
   if (platform === 'facebook') {
+    console.log('Processing Facebook...');
     const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${tokens.access_token}`);
     const pagesData = await pagesRes.json();
+    console.log('Pages Data:', JSON.stringify(pagesData));
 
     // Store first page access token (or store user token if no pages)
     if (pagesData.data && pagesData.data.length > 0) {
-      // Store the first page - for multi-page, would need to show selector
       const firstPage = pagesData.data[0];
+      console.log('Storing FB page:', firstPage.name);
       await supabase.from('social_connections').upsert(
         {
           user_id: oauthState.user_id,
           platform: 'facebook',
-          platform_user_id: userData.id,
+          platform_user_id: firstPage.id,
           platform_username: firstPage.name,
           access_token: firstPage.access_token,
           refresh_token: tokens.refresh_token || null,
@@ -87,7 +101,7 @@ export async function GET(request: Request) {
         { onConflict: 'user_id,platform' }
       );
     } else {
-      // No pages - store user token
+      console.log('No pages, storing user token');
       await supabase.from('social_connections').upsert(
         {
           user_id: oauthState.user_id,
@@ -105,9 +119,11 @@ export async function GET(request: Request) {
 
   // For Instagram - get IG business account
   if (platform === 'instagram') {
+    console.log('Processing Instagram...');
     // Get pages first to find IG account
     const pagesRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${tokens.access_token}`);
     const pagesData = await pagesRes.json();
+    console.log('Pages for IG:', JSON.stringify(pagesData));
 
     let igAccountId = null;
 
@@ -116,14 +132,17 @@ export async function GET(request: Request) {
       for (const page of pagesData.data) {
         const igRes = await fetch(`https://graph.facebook.com/v18.0/${page.id}?fields=instagram_business_account&access_token=${tokens.access_token}`);
         const igData = await igRes.json();
+        console.log(`IG for page ${page.id}:`, JSON.stringify(igData));
         if (igData.instagram_business_account) {
           igAccountId = igData.instagram_business_account;
+          console.log('Found IG account:', igAccountId);
           break;
         }
       }
     }
 
     if (igAccountId) {
+      console.log('Storing Instagram connection...');
       await supabase.from('social_connections').upsert(
         {
           user_id: oauthState.user_id,
@@ -142,5 +161,6 @@ export async function GET(request: Request) {
     }
   }
 
+  console.log('Redirecting with connected=', platform);
   return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=${platform}`);
 }
