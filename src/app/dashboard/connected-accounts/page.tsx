@@ -98,9 +98,11 @@ export default function ConnectedAccountsPage() {
           'x': { name: 'X / Twitter', emoji: '🐦' },
           'linkedin': { name: 'LinkedIn', emoji: '💼' },
           'bluesky': { name: 'Bluesky', emoji: '☁️' },
+          'facebook': { name: 'Facebook', emoji: '📘' },
+          'instagram': { name: 'Instagram', emoji: '📷' },
         };
 
-        const channelsFromOurDB = ['x', 'linkedin', 'bluesky'].map(p => ({
+        const channelsFromOurDB = ['x', 'linkedin', 'bluesky', 'facebook', 'instagram'].map(p => ({
           id: p,
           platform: p,
           name: channelMap[p]?.name || p,
@@ -197,6 +199,18 @@ export default function ConnectedAccountsPage() {
       return;
     }
     
+    // Facebook - use our OAuth flow
+    if (platform === 'facebook') {
+      window.location.href = '/api/connect/facebook';
+      return;
+    }
+    
+    // Instagram - uses Meta OAuth (same as Facebook)
+    if (platform === 'instagram') {
+      window.location.href = '/api/connect/facebook';
+      return;
+    }
+    
     setConnecting(null);
   };
 
@@ -232,8 +246,8 @@ export default function ConnectedAccountsPage() {
     { id: 'mastodon', name: 'Mastodon', emoji: '🐘', color: '#6364FF', comingSoon: true },
     { id: 'nostr', name: 'Nostr', emoji: '⚡', color: '#FFD700', comingSoon: true },
     { id: 'threads', name: 'Threads', emoji: '🧵', color: '#000000', comingSoon: true },
-    { id: 'facebook', name: 'Facebook', emoji: '📘', color: '#1877F2', comingSoon: true },
-    { id: 'instagram', name: 'Instagram', emoji: '📷', color: '#E4405F', comingSoon: true },
+    { id: 'facebook', name: 'Facebook', emoji: '📘', color: '#1877F2', comingSoon: false },
+    { id: 'instagram', name: 'Instagram', emoji: '📷', color: '#E4405F', comingSoon: false },
     { id: 'tiktok', name: 'TikTok', emoji: '🎵', color: '#000000', comingSoon: true },
     { id: 'youtube', name: 'YouTube', emoji: '▶️', color: '#FF0000', comingSoon: true },
     { id: 'pinterest', name: 'Pinterest', emoji: '📌', color: '#BD081C', comingSoon: true },
