@@ -6,12 +6,10 @@ import { supabaseBrowser, uploadVideoToSupabaseBrowser, deleteVideoFromSupabaseB
 
 interface ConnectedPlatform {
   id: string;
-  platform: string;
   name: string;
   emoji: string;
   connected: boolean;
   platformUsername?: string;
-  platformUserId?: string;
 }
 
 export default function CreatePostPage() {
@@ -43,10 +41,10 @@ export default function CreatePostPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
 
-      // Fetch ALL connected accounts from social_connections table
+      // Fetch connected platforms from our social_connections table
       const { data: connections } = await supabase
         .from('social_connections')
-        .select('platform, platform_username, platform_user_id')
+        .select('platform, platform_username')
         .eq('user_id', session.user.id);
 
       const connected = connections || [];
@@ -55,24 +53,21 @@ export default function CreatePostPage() {
         'x': { name: 'X / Twitter', emoji: '🐦' },
         'linkedin': { name: 'LinkedIn', emoji: '💼' },
         'bluesky': { name: 'Bluesky', emoji: '☁️' },
-        'facebook': { name: 'Facebook Page', emoji: '📘' },
-        'instagram': { name: 'Instagram Page', emoji: '📷' },
       };
 
-      // Each connection becomes a separate selectable item
-      const platformsWithStatus: ConnectedPlatform[] = connected.map(c => ({
-        id: `${c.platform}_${c.platform_user_id}`,
-        platform: c.platform,
-        name: platformInfo[c.platform]?.name || c.platform,
-        emoji: platformInfo[c.platform]?.emoji || '📱',
-        connected: true,
-        platformUsername: c.platform_username,
-        platformUserId: c.platform_user_id,
+      const allPlatforms = ['x', 'linkedin', 'bluesky'];
+      const platformsWithStatus = allPlatforms.map(p => ({
+        id: p,
+        name: platformInfo[p]?.name || p,
+        emoji: platformInfo[p]?.emoji || '📱',
+        connected: connected.some(c => c.platform === p),
+        platformUsername: connected.find(c => c.platform === p)?.platform_username,
       }));
 
-
       setConnectedPlatforms(platformsWithStatus);
-      setPlatforms(platformsWithStatus.map(p => p.id));
+      
+      // Pre-select connected platforms
+      setPlatforms(connected.map(c => c.platform));
     } catch (err) {
       console.error('Error loading platforms:', err);
     } finally {
@@ -146,18 +141,15 @@ export default function CreatePostPage() {
     const results: string[] = [];
     const errors: string[] = [];
 
-    const getBasePlatform = (id: string) => id.split('_')[0];
-
-    for (const platformId of platforms) {
+    for (const platform of platforms) {
       try {
-        const basePlatform = getBasePlatform(platformId);
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) {
           errors.push(`Not logged in`);
           continue;
         }
 
-        if (basePlatform === 'x') {
+        if (platform === 'x') {
           // For X: upload image or video first if present, then post with media_ids
           let mediaIds: string[] = [];
 
@@ -233,7 +225,7 @@ export default function CreatePostPage() {
           } else {
             errors.push(`X: ${postData.error || 'Post failed'}`);
           }
-        } else if (basePlatform === 'linkedin') {
+        } else if (platform === 'linkedin') {
           // LinkedIn: form data with image or video
           const formData = new FormData();
           formData.append('text', content);
@@ -258,7 +250,7 @@ export default function CreatePostPage() {
           } else {
             errors.push(`LinkedIn: ${data.error}`);
           }
-        } else if (basePlatform === 'bluesky') {
+        } else if (platform === 'bluesky') {
           // Bluesky: text with optional image (video not supported on bsky.social PDS)
           const formData = new FormData();
           formData.append('text', content);
@@ -281,37 +273,9 @@ export default function CreatePostPage() {
           } else {
             errors.push(`Bluesky: ${data.error}`);
           }
-        } else if (basePlatform === 'facebook') {
-          // Facebook: post to all connected pages
-          const fbRes = await fetch('/api/post/facebook', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: content }),
-          });
-          const fbData = await fbRes.json();
-
-          if (fbRes.ok && fbData.success) {
-            results.push(`Facebook (${fbData.results?.filter((r: any) => r.success).length || 0}) ✓`);
-          } else {
-            errors.push(`Facebook: ${fbData.error || 'Post failed'}`);
-          }
-        } else if (basePlatform === 'instagram') {
-          // Instagram: post to all connected accounts
-          const igRes = await fetch('/api/post/instagram', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: content }),
-          });
-          const igData = await igRes.json();
-
-          if (igRes.ok && igData.success) {
-            results.push(`Instagram (${igData.results?.filter((r: any) => r.success).length || 0}) ✓`);
-          } else {
-            errors.push(`Instagram: ${igData.error || 'Post failed'}`);
-          }
         }
       } catch (err) {
-        errors.push(`${basePlatform}: Network error`);
+        errors.push(`${platform}: Network error`);
       }
     }
 
