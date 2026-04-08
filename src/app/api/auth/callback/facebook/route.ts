@@ -9,8 +9,6 @@ export async function GET(request: Request) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
-  const debug: any = { step: 'start', state, error };
-
   try {
     if (error) {
       return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=${error}`);
@@ -28,15 +26,11 @@ export async function GET(request: Request) {
       .eq('state', state)
       .single();
 
-    debug.oauthState = oauthState;
-    debug.step = 'got_oauth_state';
-
     if (stateError || !oauthState) {
       return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=invalid_state`);
     }
 
     const platform = oauthState.platform;
-    debug.platform = platform;
 
     await supabase.from('oauth_states').delete().eq('state', state);
 
@@ -54,74 +48,41 @@ export async function GET(request: Request) {
     });
 
     const tokens = await tokenRes.json();
-    debug.tokenSuccess = tokenRes.ok;
-    debug.hasAccessToken = !!tokens.access_token;
 
     if (!tokenRes.ok || !tokens.access_token) {
-      debug.step = 'token_exchange_failed';
-      debug.tokens = tokens;
+      console.error('Token exchange failed:', tokens);
       return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=token_exchange_failed`);
     }
 
     const userToken = tokens.access_token;
-    debug.step = 'got_user_token';
 
     // Get user info
     const userRes = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${userToken}&fields=id,name`);
     const userData = await userRes.json();
-    debug.user = userData;
 
-    // For Instagram
+    // For Instagram - find page with Instagram linked (optimized - get all in one call)
     if (platform === 'instagram') {
-      debug.step = 'processing_instagram';
-
-      // Get ALL pages with access tokens
+      // Get all pages WITH instagram_business_account in single call
       const pagesRes = await fetch(
-        `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token`
+        `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`
       );
       const pagesData = await pagesRes.json();
-      debug.pagesCount = pagesData.data?.length || 0;
-      debug.pages = pagesData.data?.map((p: any) => ({ id: p.id, name: p.name }));
 
-      let igAccountId = null;
-      let igUsername = null;
-      let pageAccessToken = null;
+      // Find first page that has Instagram linked
+      const pageWithIg = pagesData.data?.find((p: any) => p.instagram_business_account);
 
-      if (pagesData.data) {
-        for (const page of pagesData.data) {
-          debug.currentPage = page.name;
-          debug.currentPageId = page.id;
+      if (pageWithIg) {
+        const igAccountId = pageWithIg.instagram_business_account.id;
+        const pageAccessToken = pageWithIg.access_token;
 
-          // Check if this page has Instagram linked
-          const pageDetailRes = await fetch(
-            `https://graph.facebook.com/v18.0/${page.id}?fields=id,name,instagram_business_account&access_token=${page.access_token}`
-          );
-          const pageDetail = await pageDetailRes.json();
-          debug.pageDetail = pageDetail;
-          debug.hasIgField = !!pageDetail.instagram_business_account;
+        // Get IG username
+        const igRes = await fetch(
+          `https://graph.facebook.com/v18.0/${igAccountId}?fields=username&access_token=${pageAccessToken}`
+        );
+        const igData = await igRes.json();
+        const igUsername = igData.username || 'Instagram';
 
-          if (pageDetail.instagram_business_account) {
-            igAccountId = pageDetail.instagram_business_account.id;
-            pageAccessToken = page.access_token;
-
-            // Get IG username
-            const igRes = await fetch(
-              `https://graph.facebook.com/v18.0/${igAccountId}?fields=username&access_token=${page.access_token}`
-            );
-            const igData = await igRes.json();
-            igUsername = igData.username || 'Instagram';
-
-            debug.foundIgUsername = igUsername;
-            debug.foundIgId = igAccountId;
-            break;
-          }
-        }
-      }
-
-      debug.igAccountId = igAccountId;
-      debug.step = igAccountId ? 'found_ig' : 'no_ig_found';
-
-      if (igAccountId) {
+        // Store
         await supabase.from('social_connections').upsert(
           {
             user_id: oauthState.user_id,
@@ -134,15 +95,14 @@ export async function GET(request: Request) {
           },
           { onConflict: 'user_id,platform' }
         );
-        debug.step = 'stored';
+
         return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram`);
       } else {
-        debug.step = 'redirecting_no_ig';
         return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=no_instagram_account`);
       }
     }
 
-    // For Facebook
+    // For Facebook - get first page
     if (platform === 'facebook') {
       const pagesRes = await fetch(
         `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token`
@@ -182,8 +142,6 @@ export async function GET(request: Request) {
 
     return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=unknown_platform`);
   } catch (err: any) {
-    debug.error = err.message;
-    debug.step = 'error';
     console.error('Callback error:', err);
     return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=callback_error`);
   }
