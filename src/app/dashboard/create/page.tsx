@@ -6,10 +6,12 @@ import { supabaseBrowser, uploadVideoToSupabaseBrowser, deleteVideoFromSupabaseB
 
 interface ConnectedPlatform {
   id: string;
+  platform: string;
   name: string;
   emoji: string;
   connected: boolean;
   platformUsername?: string;
+  platformUserId?: string;
 }
 
 export default function CreatePostPage() {
@@ -41,10 +43,10 @@ export default function CreatePostPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
 
-      // Fetch connected platforms from our social_connections table
+      // Fetch ALL connected accounts from social_connections table
       const { data: connections } = await supabase
         .from('social_connections')
-        .select('platform, platform_username')
+        .select('platform, platform_username, platform_user_id')
         .eq('user_id', session.user.id);
 
       const connected = connections || [];
@@ -53,21 +55,24 @@ export default function CreatePostPage() {
         'x': { name: 'X / Twitter', emoji: '🐦' },
         'linkedin': { name: 'LinkedIn', emoji: '💼' },
         'bluesky': { name: 'Bluesky', emoji: '☁️' },
+        'facebook': { name: 'Facebook Page', emoji: '📘' },
+        'instagram': { name: 'Instagram Page', emoji: '📷' },
       };
 
-      const allPlatforms = ['x', 'linkedin', 'bluesky'];
-      const platformsWithStatus = allPlatforms.map(p => ({
-        id: p,
-        name: platformInfo[p]?.name || p,
-        emoji: platformInfo[p]?.emoji || '📱',
-        connected: connected.some(c => c.platform === p),
-        platformUsername: connected.find(c => c.platform === p)?.platform_username,
+      // Each connection becomes a separate selectable item
+      const platformsWithStatus: ConnectedPlatform[] = connected.map(c => ({
+        id: `${c.platform}_${c.platform_user_id}`,
+        platform: c.platform,
+        name: platformInfo[c.platform]?.name || c.platform,
+        emoji: platformInfo[c.platform]?.emoji || '📱',
+        connected: true,
+        platformUsername: c.platform_username,
+        platformUserId: c.platform_user_id,
       }));
 
+
       setConnectedPlatforms(platformsWithStatus);
-      
-      // Pre-select connected platforms
-      setPlatforms(connected.map(c => c.platform));
+      setPlatforms(platformsWithStatus.map(p => p.id));
     } catch (err) {
       console.error('Error loading platforms:', err);
     } finally {
@@ -141,15 +146,18 @@ export default function CreatePostPage() {
     const results: string[] = [];
     const errors: string[] = [];
 
-    for (const platform of platforms) {
+    const getBasePlatform = (id: string) => id.split('_')[0];
+
+    for (const platformId of platforms) {
       try {
+        const basePlatform = getBasePlatform(platformId);
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) {
           errors.push(`Not logged in`);
           continue;
         }
 
-        if (platform === 'x') {
+        if (basePlatform === 'x') {
           // For X: upload image or video first if present, then post with media_ids
           let mediaIds: string[] = [];
 
@@ -225,7 +233,7 @@ export default function CreatePostPage() {
           } else {
             errors.push(`X: ${postData.error || 'Post failed'}`);
           }
-        } else if (platform === 'linkedin') {
+        } else if (basePlatform === 'linkedin') {
           // LinkedIn: form data with image or video
           const formData = new FormData();
           formData.append('text', content);
@@ -250,7 +258,7 @@ export default function CreatePostPage() {
           } else {
             errors.push(`LinkedIn: ${data.error}`);
           }
-        } else if (platform === 'bluesky') {
+        } else if (basePlatform === 'bluesky') {
           // Bluesky: text with optional image (video not supported on bsky.social PDS)
           const formData = new FormData();
           formData.append('text', content);
@@ -275,7 +283,7 @@ export default function CreatePostPage() {
           }
         }
       } catch (err) {
-        errors.push(`${platform}: Network error`);
+        errors.push(`${basePlatform}: Network error`);
       }
     }
 
