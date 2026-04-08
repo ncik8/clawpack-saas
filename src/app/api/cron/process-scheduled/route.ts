@@ -20,7 +20,7 @@ export async function GET() {
           'Content-Type': 'application/json',
           'apikey': supabaseKey,
           'Authorization': `Bearer ${supabaseKey}`,
-          ' Prefer': 'return=representation'
+          'Prefer': 'return=representation'
         }
       }
     );
