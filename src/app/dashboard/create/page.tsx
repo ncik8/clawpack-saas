@@ -35,16 +35,21 @@ export default function CreatePostPage() {
     loadConnectedPlatforms();
   }, []);
 
+  const getBasePlatform = (platformId: string): string => {
+    // For multi-account platforms like facebook_123, returns 'facebook'
+    return platformId.split('_')[0];
+  };
+
   const loadConnectedPlatforms = async () => {
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
 
-      // Fetch connected platforms from our social_connections table
+      // Fetch ALL connected platforms from social_connections table
       const { data: connections } = await supabase
         .from('social_connections')
-        .select('platform, platform_username')
+        .select('platform, platform_username, platform_user_id')
         .eq('user_id', session.user.id);
 
       const connected = connections || [];
@@ -53,21 +58,59 @@ export default function CreatePostPage() {
         'x': { name: 'X / Twitter', emoji: '🐦' },
         'linkedin': { name: 'LinkedIn', emoji: '💼' },
         'bluesky': { name: 'Bluesky', emoji: '☁️' },
+        'facebook': { name: 'Facebook', emoji: '📘' },
+        'instagram': { name: 'Instagram', emoji: '📷' },
       };
 
-      const allPlatforms = ['x', 'linkedin', 'bluesky'];
-      const platformsWithStatus = allPlatforms.map(p => ({
-        id: p,
-        name: platformInfo[p]?.name || p,
-        emoji: platformInfo[p]?.emoji || '📱',
-        connected: connected.some(c => c.platform === p),
-        platformUsername: connected.find(c => c.platform === p)?.platform_username,
-      }));
-
-      setConnectedPlatforms(platformsWithStatus);
+      // Build platform items - for multi-account platforms (FB/IG), each account is separate
+      const platformItems: ConnectedPlatform[] = [];
+      const basePlatforms = ['x', 'linkedin', 'bluesky', 'facebook', 'instagram'];
       
-      // Pre-select connected platforms
-      setPlatforms(connected.map(c => c.platform));
+      for (const base of basePlatforms) {
+        const accountsForBase = connected.filter(c => c.platform === base);
+        
+        if (accountsForBase.length === 0) {
+          // No accounts for this platform - show as disconnected
+          platformItems.push({
+            id: base,
+            name: platformInfo[base]?.name || base,
+            emoji: platformInfo[base]?.emoji || '📱',
+            connected: false,
+          });
+        } else {
+          // Has accounts - add each as separate selectable item
+          for (const account of accountsForBase) {
+            const displayName = account.platform_username 
+              ? `${platformInfo[base]?.name || base} - ${account.platform_username}`
+              : platformInfo[base]?.name || base;
+            platformItems.push({
+              id: `${base}_${account.platform_user_id}`,
+              name: displayName,
+              emoji: platformInfo[base]?.emoji || '📱',
+              connected: true,
+              platformUsername: account.platform_username,
+            });
+          }
+        }
+      }
+
+      setConnectedPlatforms(platformItems);
+      
+      // Pre-select connected platforms (use base platform IDs for single-account platforms)
+      const selectedPlatforms: string[] = [];
+      for (const base of basePlatforms) {
+        const accountsForBase = connected.filter(c => c.platform === base);
+        if (accountsForBase.length > 0) {
+          // For multi-account platforms, use the first account's full ID
+          // For single-account platforms, use just the base name
+          if (base === 'facebook' || base === 'instagram') {
+            selectedPlatforms.push(`${base}_${accountsForBase[0].platform_user_id}`);
+          } else {
+            selectedPlatforms.push(base);
+          }
+        }
+      }
+      setPlatforms(selectedPlatforms);
     } catch (err) {
       console.error('Error loading platforms:', err);
     } finally {
@@ -273,6 +316,36 @@ export default function CreatePostPage() {
           } else {
             errors.push(`Bluesky: ${data.error}`);
           }
+        } else if (getBasePlatform(platform) === 'facebook') {
+          // Facebook: posts to all connected FB pages
+          const response = await fetch('/api/post/facebook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: content }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            results.push(`Facebook ✓`);
+          } else {
+            errors.push(`Facebook: ${data.error}`);
+          }
+        } else if (getBasePlatform(platform) === 'instagram') {
+          // Instagram: posts to all connected IG accounts
+          const response = await fetch('/api/post/instagram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: content }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            results.push(`Instagram ✓`);
+          } else {
+            errors.push(`Instagram: ${data.error}`);
+          }
         }
       } catch (err) {
         errors.push(`${platform}: Network error`);
@@ -389,9 +462,15 @@ export default function CreatePostPage() {
     instagram: 2200,
   };
   
+  // Helper to get base platform from platform ID (handles facebook_123 format)
+  const getLimitForPlatform = (platformId: string): number => {
+    const base = getBasePlatform(platformId);
+    return platformLimits[base] || 280;
+  };
+  
   // Show lowest limit when multiple platforms selected, or platform-specific limit
   const maxChars = platforms.length > 0
-    ? Math.min(...platforms.map(p => platformLimits[p] || 280))
+    ? Math.min(...platforms.map(p => getLimitForPlatform(p)))
     : 280;
   
   const limitLabel = platforms.length > 1
