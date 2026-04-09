@@ -275,109 +275,84 @@ export default function SchedulerPage() {
             );
           })}
 
-          {/* Facebook - multi-page */}
+          {/* Facebook - dropdown */}
           {isPlatformConnected('facebook') && (
             <div style={{ marginTop: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <span style={{ fontSize: '18px' }}>🐘</span>
                 <span style={{ color: '#9ca3af', fontSize: '14px' }}>Facebook Pages</span>
-                <button
-                  onClick={() => {
-                    const fbConns = getConnectionsByPlatform('facebook');
-                    const allSelected = fbConns.every(c => isPageSelected('facebook', c.platform_user_id));
-                    toggleAllPages('facebook', allSelected, fbConns.map(c => c.platform_user_id));
-                  }}
-                  style={{
-                    marginLeft: 'auto',
-                    fontSize: '12px',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    border: 'none',
-                    background: '#4b5563',
-                    color: 'white',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {getSelectedCountByPlatform('facebook') === getConnectionsByPlatform('facebook').length ? 'Deselect All' : 'Select All'}
-                </button>
               </div>
-              {getConnectionsByPlatform('facebook').map(conn => (
-                <button
-                  key={conn.platform_user_id}
-                  onClick={() => togglePlatform(`facebook:${conn.platform_user_id}`)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: isPageSelected('facebook', conn.platform_user_id) ? '2px solid #10b981' : '2px solid #374151',
-                    background: isPageSelected('facebook', conn.platform_user_id) ? '#064e3b' : '#374151',
-                    color: 'white',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '4px',
-                    textAlign: 'left',
-                  }}
-                >
-                  <span style={{ opacity: 0.5 }}>└──</span>
-                  <span style={{ flex: 1 }}>{conn.platform_username}</span>
-                  {isPageSelected('facebook', conn.platform_user_id) && <span style={{ color: '#10b981' }}>✓</span>}
-                </button>
-              ))}
+              <select
+                multiple
+                value={getConnectionsByPlatform('facebook').filter(c => isPageSelected('facebook', c.platform_user_id)).map(c => `facebook:${c.platform_user_id}`)}
+                onChange={(e) => {
+                  const selected = Array.from(e.target.selectedOptions).map(o => o.value);
+                  // Get all FB connections and set based on selection
+                  const fbConns = getConnectionsByPlatform('facebook');
+                  const newPlatforms = platforms.filter(p => !p.startsWith('facebook:'));
+                  selected.forEach(p => {
+                    if (!newPlatforms.includes(p)) newPlatforms.push(p);
+                  });
+                  setPlatforms(newPlatforms);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  border: '2px solid #374151',
+                  background: '#111827',
+                  color: 'white',
+                  fontSize: '14px',
+                  minHeight: '120px',
+                }}
+              >
+                {getConnectionsByPlatform('facebook').map(conn => (
+                  <option key={conn.platform_user_id} value={`facebook:${conn.platform_user_id}`}>
+                    {conn.platform_username}
+                  </option>
+                ))}
+              </select>
+              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>Hold Ctrl/Cmd to select multiple pages</p>
             </div>
           )}
 
-          {/* Instagram - multi-account */}
+          {/* Instagram - dropdown */}
           {isPlatformConnected('instagram') && (
             <div style={{ marginTop: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <span style={{ fontSize: '18px' }}>📷</span>
                 <span style={{ color: '#9ca3af', fontSize: '14px' }}>Instagram Accounts</span>
-                <button
-                  onClick={() => {
-                    const igConns = getConnectionsByPlatform('instagram');
-                    const allSelected = igConns.every(c => isPageSelected('instagram', c.platform_user_id));
-                    toggleAllPages('instagram', allSelected, igConns.map(c => c.platform_user_id));
-                  }}
-                  style={{
-                    marginLeft: 'auto',
-                    fontSize: '12px',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    border: 'none',
-                    background: '#4b5563',
-                    color: 'white',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {getSelectedCountByPlatform('instagram') === getConnectionsByPlatform('instagram').length ? 'Deselect All' : 'Select All'}
-                </button>
               </div>
-              {getConnectionsByPlatform('instagram').map(conn => (
-                <button
-                  key={conn.platform_user_id}
-                  onClick={() => togglePlatform(`instagram:${conn.platform_user_id}`)}
-                  style={{
-                    width: '100%',
-                    padding: '8px 16px',
-                    borderRadius: '6px',
-                    border: isPageSelected('instagram', conn.platform_user_id) ? '2px solid #10b981' : '2px solid #374151',
-                    background: isPageSelected('instagram', conn.platform_user_id) ? '#064e3b' : '#374151',
-                    color: 'white',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '4px',
-                    textAlign: 'left',
-                  }}
-                >
-                  <span style={{ opacity: 0.5 }}>└──</span>
-                  <span style={{ flex: 1 }}>@{conn.platform_username}</span>
-                  {isPageSelected('instagram', conn.platform_user_id) && <span style={{ color: '#10b981' }}>✓</span>}
-                </button>
-              ))}
+              <select
+                multiple
+                value={getConnectionsByPlatform('instagram').filter(c => isPageSelected('instagram', c.platform_user_id)).map(c => `instagram:${c.platform_user_id}`)}
+                onChange={(e) => {
+                  const selected = Array.from(e.target.selectedOptions).map(o => o.value);
+                  const igConns = getConnectionsByPlatform('instagram');
+                  const newPlatforms = platforms.filter(p => !p.startsWith('instagram:'));
+                  selected.forEach(p => {
+                    if (!newPlatforms.includes(p)) newPlatforms.push(p);
+                  });
+                  setPlatforms(newPlatforms);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  border: '2px solid #374151',
+                  background: '#111827',
+                  color: 'white',
+                  fontSize: '14px',
+                  minHeight: '80px',
+                }}
+              >
+                {getConnectionsByPlatform('instagram').map(conn => (
+                  <option key={conn.platform_user_id} value={`instagram:${conn.platform_user_id}`}>
+                    @{conn.platform_username}
+                  </option>
+                ))}
+              </select>
+              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>Hold Ctrl/Cmd to select multiple accounts</p>
             </div>
           )}
         </div>
