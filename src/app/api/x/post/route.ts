@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { uploadVideoUrlToX } from '@/lib/supabase-storage';
 import crypto from 'crypto';
 
 export const runtime = 'nodejs';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcyifihwvqxtpypphpef.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 function percentEncode(str: string): string {
   return encodeURIComponent(str).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
@@ -43,7 +45,6 @@ function buildOAuthHeaderForJson({
     oauth_token: accessToken,
   };
 
-  // For JSON: only sign OAuth params + query params, NOT body
   const baseString = [
     method.toUpperCase(),
     percentEncode(normalizeUrl(url)),
@@ -70,19 +71,39 @@ function buildOAuthHeaderForJson({
 }
 
 export async function POST(request: Request) {
+  console.log('X POST ROUTE HIT');
+  
   try {
-    const supabase = await getSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get auth header from request
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized - no auth header' }, { status: 401 });
+    }
+    
+    const token = authHeader.substring(7);
+    
+    // Use service role key to validate the user's token
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized - invalid token' }, { status: 401 });
+    }
 
-    const { data: connection } = await supabase
+    const userId = user.id;
+
+    // Get stored X connection
+    const { data: connection, error: connError } = await supabaseAdmin
       .from('social_connections')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('platform', 'x')
       .single();
 
-    if (!connection) return NextResponse.json({ error: 'X not connected' }, { status: 400 });
+    if (connError || !connection) {
+      return NextResponse.json({ error: 'X not connected' }, { status: 400 });
+    }
 
     const body = await request.json();
     const text = body.text as string;
@@ -107,7 +128,7 @@ export async function POST(request: Request) {
       payload.media = { media_ids: finalMediaIds };
     }
 
-    const authHeader = buildOAuthHeaderForJson({
+    const authHeaderOAuth = buildOAuthHeaderForJson({
       method: 'POST',
       url,
       consumerKey: process.env.X_API_KEY!,
@@ -119,7 +140,7 @@ export async function POST(request: Request) {
     const res = await fetch(url, {
       method: 'POST',
       headers: {
-        Authorization: authHeader,
+        Authorization: authHeaderOAuth,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
@@ -128,9 +149,9 @@ export async function POST(request: Request) {
     const data = await res.json();
     if (!res.ok) return NextResponse.json({ error: `Tweet failed: ${JSON.stringify(data)}` }, { status: 500 });
 
-    // Return in v2 format: { data: { id: "xxx" } }
     return NextResponse.json({ data: data.data });
   } catch (error: any) {
+    console.error('X post error:', error);
     return NextResponse.json({ error: error.message || 'Failed' }, { status: 500 });
   }
 }
