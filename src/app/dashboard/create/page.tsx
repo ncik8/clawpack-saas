@@ -217,7 +217,10 @@ export default function CreatePostPage() {
             // Now post to X with the Supabase video URL
             const postRes = await fetch('/api/x/post', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+             },
               body: JSON.stringify({
                 text: content,
                 video_url: videoUrl,
@@ -243,7 +246,10 @@ export default function CreatePostPage() {
           try {
             const postRes = await fetch('/api/x/post', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+             },
               body: JSON.stringify({
                 text: content,
                 media_ids: mediaIds,
