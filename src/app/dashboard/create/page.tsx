@@ -244,7 +244,9 @@ export default function CreatePostPage() {
 
           // Create post with media_ids
           console.log('About to post to X with media_ids');
+          console.log('DEBUG X: session:', !!session, 'token:', session?.access_token ? 'present' : 'missing');
           try {
+            console.log('DEBUG X: calling fetch...');
             const postRes = await fetch('/api/x/post', {
               method: 'POST',
               headers: {
@@ -256,8 +258,10 @@ export default function CreatePostPage() {
                 media_ids: mediaIds,
               }),
             });
+            console.log('DEBUG X: fetch returned, status:', postRes.status);
 
             const postData = await postRes.json();
+            console.log('DEBUG X: postData:', JSON.stringify(postData));
 
             if (postRes.ok && postData.data?.id) {
               results.push(`X ✓`);
