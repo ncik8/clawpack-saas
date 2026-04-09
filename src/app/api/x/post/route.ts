@@ -7,6 +7,10 @@ export const runtime = 'nodejs';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcyifihwvqxtpypphpef.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
+console.log('X POST ROUTE - Module loaded');
+console.log('SUPABASE_URL:', SUPABASE_URL ? 'SET' : 'MISSING');
+console.log('SUPABASE_SERVICE_KEY:', SUPABASE_SERVICE_KEY ? 'SET' : 'MISSING');
+
 function percentEncode(str: string): string {
   return encodeURIComponent(str).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 }
@@ -71,27 +75,38 @@ function buildOAuthHeaderForJson({
 }
 
 export async function POST(request: Request) {
+  console.log('===========================================');
   console.log('X POST ROUTE HIT');
+  console.log('Timestamp:', new Date().toISOString());
   
   try {
     // Get auth header from request
     const authHeader = request.headers.get('authorization');
+    console.log('Auth header present:', !!authHeader);
+    
     if (!authHeader?.startsWith('Bearer ')) {
+      console.log('NO AUTH HEADER - returning 401');
       return NextResponse.json({ error: 'Unauthorized - no auth header' }, { status: 401 });
     }
     
     const token = authHeader.substring(7);
+    console.log('Token length:', token.length);
     
     // Use service role key to validate the user's token
     const { createClient } = await import('@supabase/supabase-js');
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    console.log('Created Supabase admin client');
+    
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    console.log('User:', user?.id, 'Error:', userError);
     
     if (userError || !user) {
+      console.log('INVALID TOKEN - returning 401');
       return NextResponse.json({ error: 'Unauthorized - invalid token' }, { status: 401 });
     }
 
     const userId = user.id;
+    console.log('User ID:', userId);
 
     // Get stored X connection
     const { data: connection, error: connError } = await supabaseAdmin
@@ -101,14 +116,26 @@ export async function POST(request: Request) {
       .eq('platform', 'x')
       .single();
 
+    console.log('X Connection:', connection?.platform_username, 'Error:', connError);
+
     if (connError || !connection) {
+      console.log('X NOT CONNECTED - returning 400');
       return NextResponse.json({ error: 'X not connected' }, { status: 400 });
+    }
+
+    if (!connection.access_token) {
+      console.log('X connection missing access_token');
+      return NextResponse.json({ error: 'X access token missing' }, { status: 400 });
     }
 
     const body = await request.json();
     const text = body.text as string;
     const mediaIds = body.media_ids as string[] | undefined;
     const videoUrl = body.video_url as string | undefined;
+
+    console.log('Post text length:', text?.length);
+    console.log('Media IDs:', mediaIds);
+    console.log('Video URL:', videoUrl);
 
     // If video URL provided, download and upload to Twitter
     let finalMediaIds = mediaIds || [];
@@ -128,6 +155,8 @@ export async function POST(request: Request) {
       payload.media = { media_ids: finalMediaIds };
     }
 
+    console.log('Posting to X API...');
+    
     const authHeaderOAuth = buildOAuthHeaderForJson({
       method: 'POST',
       url,
@@ -147,6 +176,8 @@ export async function POST(request: Request) {
     });
 
     const data = await res.json();
+    console.log('X API response:', res.status, JSON.stringify(data));
+    
     if (!res.ok) return NextResponse.json({ error: `Tweet failed: ${JSON.stringify(data)}` }, { status: 500 });
 
     return NextResponse.json({ data: data.data });
