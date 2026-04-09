@@ -307,8 +307,8 @@ export default function CreatePostPage() {
         } else if (getBasePlatform(platform) === 'facebook') {
           // Facebook: posts to specific page IDs (not all)
           const fbPageIds = platforms
-            .filter(p => p.startsWith('facebook:'))
-            .map(p => p.split(':')[1]);
+            .filter(p => p.startsWith('facebook_'))
+            .map(p => p.replace('facebook_', ''));
           const response = await fetch('/api/post/facebook', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

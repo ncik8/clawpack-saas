@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     }
 
     // Get FB page connections - only the specific pages requested, or all if not specified
+    // Support both facebook_123 (create page) and facebook:123 (scheduler) formats
     let query = supabase
       .from('social_connections')
       .select('*')
@@ -24,7 +25,13 @@ export async function POST(request: Request) {
       .eq('platform', 'facebook');
     
     if (pageIds && pageIds.length > 0) {
-      query = query.in('platform_user_id', pageIds);
+      // Normalize page IDs (remove any prefix like 'facebook_' or 'facebook:')
+      const normalizedIds = pageIds.map((id: string) => {
+        if (id.includes(':')) return id.split(':')[1];
+        if (id.includes('_')) return id.split('_')[1];
+        return id;
+      });
+      query = query.in('platform_user_id', normalizedIds);
     }
     
     const { data: connections } = await query;
