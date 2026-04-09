@@ -8,17 +8,21 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
+    console.log('Bluesky POST - user:', user?.id);
+    
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get stored Bluesky connection
-    const { data: connection } = await supabase
+    const { data: connection, error: connError } = await supabase
       .from('social_connections')
       .select('*')
       .eq('user_id', user.id)
       .eq('platform', 'bluesky')
       .single();
+
+    console.log('Bluesky connection query result:', { connection, connError });
 
     if (!connection?.access_token) {
       console.log('Bluesky not connected - no access token found');
