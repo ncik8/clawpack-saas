@@ -75,20 +75,28 @@ export default function ConnectedAccountsPage() {
   useEffect(() => {
     const fetchChannels = async () => {
       try {
-        // Get Supabase token for authorization
+        // Get Supabase session
         const { data: { session } } = await supabase.auth.getSession();
-        const supabaseToken = session?.access_token;
         
-        if (!supabaseToken) {
+        if (!session?.user) {
           setChannels(getDefaultChannels());
           setLoading(false);
           return;
         }
 
+        // Check URL params from OAuth callback - if connected just happened, wait a moment
+        const urlParams = new URLSearchParams(window.location.search);
+        const justConnected = urlParams.get('connected');
+        
+        // Small delay if OAuth callback just happened (data might still be saving)
+        if (justConnected) {
+          await new Promise(r => setTimeout(r, 1000));
+        }
+
         // First, check our social_connections table (this is the source of truth for our OAuth)
         const { data: connections } = await supabase
           .from('social_connections')
-          .select('platform, platform_username')
+          .select('platform, platform_username, platform_user_id')
           .eq('user_id', session.user.id);
 
         const connectedPlatforms = connections || [];
