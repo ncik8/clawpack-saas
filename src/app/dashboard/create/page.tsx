@@ -180,7 +180,7 @@ export default function CreatePostPage() {
           continue;
         }
 
-        if (platform === 'x') {
+        if (getBasePlatform(platform) === 'x') {
           // For X: upload image or video first if present, then post with media_ids
           let mediaIds: string[] = [];
 
@@ -271,7 +271,7 @@ export default function CreatePostPage() {
           } catch (e: unknown) {
             errors.push(`X: Network error - ${String((e as any).message || JSON.stringify(e))}`);
           }
-        } else if (platform === 'linkedin') {
+        } else if (getBasePlatform(platform) === 'linkedin') {
           // LinkedIn: form data with image or video
           const formData = new FormData();
           formData.append('text', content);
