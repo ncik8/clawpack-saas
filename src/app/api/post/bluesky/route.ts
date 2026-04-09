@@ -24,6 +24,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Bluesky not connected' }, { status: 401 });
     }
 
+    // Check if token needs refresh (Bluesky tokens expire after 24h)
+    let accessToken = connection.access_token;
+    if (connection.expires_at && new Date(connection.expires_at) < new Date()) {
+      console.log('Bluesky token expired, refreshing...');
+      const refreshRes = await fetch(`${BLUESKY_API}/com.atproto.server.refreshSession`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${connection.refresh_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const refreshData = await refreshRes.json();
+      if (refreshRes.ok && refreshData.accessJwt) {
+        accessToken = refreshData.accessJwt;
+        // Update stored tokens
+        await supabase
+          .from('social_connections')
+          .update({
+            access_token: refreshData.accessJwt,
+            refresh_token: refreshData.refreshJwt || connection.refresh_token,
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .eq('id', connection.id);
+      }
+    }
+
     // Parse request body
     let text = '';
     let imageFile: File | null = null;
