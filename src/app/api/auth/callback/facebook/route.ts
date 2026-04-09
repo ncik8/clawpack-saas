@@ -94,21 +94,26 @@ export async function GET(request: Request) {
 
         console.log('Storing IG connection:', { igAccountId, igUsername });
 
-        const { error: upsertError } = await supabase.from('social_connections').upsert(
-          {
-            user_id: oauthState.user_id,
-            platform: 'instagram',
-            platform_user_id: igAccountId,
-            platform_username: igUsername,
-            access_token: page.access_token,
-            refresh_token: tokens.refresh_token || null,
-            expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-          },
-          { onConflict: 'user_id,platform,platform_user_id' }
-        );
+        // Delete existing and insert new
+        await supabase
+          .from('social_connections')
+          .delete()
+          .eq('user_id', oauthState.user_id)
+          .eq('platform', 'instagram')
+          .eq('platform_user_id', igAccountId);
 
-        if (upsertError) {
-          console.error('IG upsert error:', upsertError);
+        const { error: insertError } = await supabase.from('social_connections').insert({
+          user_id: oauthState.user_id,
+          platform: 'instagram',
+          platform_user_id: igAccountId,
+          platform_username: igUsername,
+          access_token: page.access_token,
+          refresh_token: tokens.refresh_token || null,
+          expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+        });
+
+        if (insertError) {
+          console.error('IG insert error:', insertError);
         }
       }
 
@@ -130,37 +135,45 @@ export async function GET(request: Request) {
         for (const page of pagesData.data) {
           console.log('Storing FB page:', page.id, page.name);
           
-          const { error: upsertError } = await supabase.from('social_connections').upsert(
-            {
-              user_id: oauthState.user_id,
-              platform: 'facebook',
-              platform_user_id: page.id,
-              platform_username: page.name,
-              access_token: page.access_token,
-              refresh_token: tokens.refresh_token || null,
-              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-            },
-            { onConflict: 'user_id,platform,platform_user_id' }
-          );
+          // Delete existing and insert new
+          await supabase
+            .from('social_connections')
+            .delete()
+            .eq('user_id', oauthState.user_id)
+            .eq('platform', 'facebook')
+            .eq('platform_user_id', page.id);
 
-          if (upsertError) {
-            console.error('FB upsert error:', upsertError);
+          const { error: insertError } = await supabase.from('social_connections').insert({
+            user_id: oauthState.user_id,
+            platform: 'facebook',
+            platform_user_id: page.id,
+            platform_username: page.name,
+            access_token: page.access_token,
+            refresh_token: tokens.refresh_token || null,
+            expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+          });
+
+          if (insertError) {
+            console.error('FB insert error:', insertError);
           }
         }
       } else {
         console.log('No FB pages, storing user token instead');
-        await supabase.from('social_connections').upsert(
-          {
-            user_id: oauthState.user_id,
-            platform: 'facebook',
-            platform_user_id: userData.id,
-            platform_username: userData.name,
-            access_token: userToken,
-            refresh_token: tokens.refresh_token || null,
-            expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-          },
-          { onConflict: 'user_id,platform,platform_user_id' }
-        );
+        await supabase
+          .from('social_connections')
+          .delete()
+          .eq('user_id', oauthState.user_id)
+          .eq('platform', 'facebook');
+          
+        await supabase.from('social_connections').insert({
+          user_id: oauthState.user_id,
+          platform: 'facebook',
+          platform_user_id: userData.id,
+          platform_username: userData.name,
+          access_token: userToken,
+          refresh_token: tokens.refresh_token || null,
+          expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+        });
       }
       return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=facebook&count=${pagesData.data?.length || 0}`);
     }
