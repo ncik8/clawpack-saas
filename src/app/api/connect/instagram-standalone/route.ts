@@ -29,7 +29,7 @@ export async function GET() {
     response_type: 'code',
     client_id: process.env.FACEBOOK_APP_ID!,
     redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/instagram-standalone`,
-    scope: 'instagram_business_account,instagram_content_publish,instagram_manage_comments,instagram_manage_insights',
+    scope: 'instagram_basic,instagram_content_publish,instagram_manage_comments,instagram_manage_insights,pages_show_list',
     state,
   });
 
