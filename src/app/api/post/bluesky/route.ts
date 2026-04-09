@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 const BLUESKY_API = 'https://bsky.social/xrpc';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcyifihwvqxtpypphpef.supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 export async function POST(request: Request) {
   console.log('===========================================');
@@ -11,23 +11,33 @@ export async function POST(request: Request) {
   console.log('Timestamp:', new Date().toISOString());
   
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: request.headers.get('authorization') || '' } }
-    });
+    // Get auth header from request
+    const authHeader = request.headers.get('authorization');
+    console.log('Auth header present:', !!authHeader);
     
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    console.log('Session:', session?.user?.id, 'Error:', sessionError);
-    
-    if (!session?.user) {
-      console.log('NO SESSION - returning 401');
-      return NextResponse.json({ error: 'Unauthorized - no session' }, { status: 401 });
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.log('NO AUTH HEADER - returning 401');
+      return NextResponse.json({ error: 'Unauthorized - no auth header' }, { status: 401 });
     }
     
-    const userId = session.user.id;
+    const token = authHeader.substring(7);
+    console.log('Token length:', token.length);
+    
+    // Use service role key to validate the user's token
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    console.log('User:', user?.id, 'Error:', userError);
+    
+    if (userError || !user) {
+      console.log('INVALID TOKEN - returning 401');
+      return NextResponse.json({ error: 'Unauthorized - invalid token' }, { status: 401 });
+    }
+    
+    const userId = user.id;
     console.log('User ID:', userId);
 
     // Get stored Bluesky connection
-    const { data: connection, error: connError } = await supabase
+    const { data: connection, error: connError } = await supabaseAdmin
       .from('social_connections')
       .select('*')
       .eq('user_id', userId)
@@ -59,7 +69,7 @@ export async function POST(request: Request) {
       if (refreshRes.ok && refreshData.accessJwt) {
         accessToken = refreshData.accessJwt;
         // Update stored tokens
-        await supabase
+        await supabaseAdmin
           .from('social_connections')
           .update({
             access_token: refreshData.accessJwt,
