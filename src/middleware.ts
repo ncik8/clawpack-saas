@@ -29,8 +29,10 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Allow Supabase OAuth callback to pass through without auth check
-  if (request.nextUrl.pathname.startsWith('/callback')) {
+  // Allow cron and API health routes to pass through without auth check
+  if (request.nextUrl.pathname.startsWith('/callback') ||
+      request.nextUrl.pathname.startsWith('/api/cron') ||
+      request.nextUrl.pathname.startsWith('/api/health')) {
     return supabaseResponse;
   }
 
