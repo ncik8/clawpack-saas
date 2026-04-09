@@ -213,9 +213,15 @@ export default function ConnectedAccountsPage() {
       return;
     }
     
-    // Instagram - separate OAuth flow
+    // Instagram - separate OAuth flow (via FB pages)
     if (platform === 'instagram') {
       window.location.href = '/api/connect/instagram';
+      return;
+    }
+    
+    // Instagram Business - standalone IG business accounts not linked to FB pages
+    if (platform === 'instagram-business') {
+      window.location.href = '/api/connect/instagram-standalone';
       return;
     }
     
@@ -256,6 +262,7 @@ export default function ConnectedAccountsPage() {
     { id: 'threads', name: 'Threads', emoji: '🧵', color: '#000000', comingSoon: true },
     { id: 'facebook', name: 'Facebook Page', emoji: '📘', color: '#1877F2', comingSoon: false },
     { id: 'instagram', name: 'Instagram Page', emoji: '📷', color: '#E4405F', comingSoon: false },
+    { id: 'instagram-business', name: 'Instagram Business', emoji: '📸', color: '#E4405F', comingSoon: false },
     { id: 'tiktok', name: 'TikTok', emoji: '🎵', color: '#000000', comingSoon: true },
     { id: 'youtube', name: 'YouTube', emoji: '▶️', color: '#FF0000', comingSoon: true },
     { id: 'pinterest', name: 'Pinterest', emoji: '📌', color: '#BD081C', comingSoon: true },
