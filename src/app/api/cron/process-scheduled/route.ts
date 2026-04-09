@@ -35,10 +35,10 @@ export async function GET(request: Request) {
     const results = { processed: 0, succeeded: 0, failed: 0 };
 
     for (const post of posts) {
-      // Get user's connections for each platform
+      // Get ALL user's connections (we need specific page tokens for FB/IG)
       const { data: connections } = await supabaseAdmin
         .from('social_connections')
-        .select('platform, access_token, refresh_token, platform_user_id, expires_at')
+        .select('id, platform, access_token, refresh_token, platform_user_id, expires_at')
         .eq('user_id', post.user_id);
 
       if (!connections || connections.length === 0) {
@@ -56,26 +56,33 @@ export async function GET(request: Request) {
         continue;
       }
 
-      const connectionMap = new Map(connections.map(c => [c.platform, c]));
       let postSucceeded = true;
       const errorMessages = [];
 
       // Post to each platform
-      for (const platform of post.platforms) {
-        const connection = connectionMap.get(platform);
-        
+      for (const platformStr of post.platforms) {
+        // Parse platform:page_id format
+        const [basePlatform, pageId] = platformStr.includes(':') 
+          ? platformStr.split(':') 
+          : [platformStr, null];
+
+        // Find the specific connection for this page/account
+        const connection = pageId 
+          ? connections.find(c => c.platform === basePlatform && c.platform_user_id === pageId)
+          : connections.find(c => c.platform === basePlatform);
+
         if (!connection) {
-          errorMessages.push(`${platform}: not connected`);
+          errorMessages.push(`${platformStr}: not connected`);
           continue;
         }
 
         try {
-          // Refresh token if needed
           let accessToken = connection.access_token;
-          if (platform === 'x' && connection.expires_at) {
+
+          // Token refresh for X
+          if (basePlatform === 'x' && connection.expires_at) {
             const expiresAt = new Date(connection.expires_at);
             if (expiresAt < new Date()) {
-              // Token expired, try to refresh
               const refreshed = await refreshXToken(connection.refresh_token);
               if (refreshed) {
                 accessToken = refreshed.access_token;
@@ -91,7 +98,8 @@ export async function GET(request: Request) {
             }
           }
 
-          if (platform === 'x') {
+          // Post based on base platform
+          if (basePlatform === 'x') {
             const twitterRes = await fetch('https://api.twitter.com/2/tweets', {
               method: 'POST',
               headers: {
@@ -107,7 +115,7 @@ export async function GET(request: Request) {
               errorMessages.push(`X: ${twitterData.detail || twitterData.title || 'Unknown error'}`);
               postSucceeded = false;
             }
-          } else if (platform === 'linkedin') {
+          } else if (basePlatform === 'linkedin') {
             const authorUrn = connection.platform_user_id 
               ? `urn:li:person:${connection.platform_user_id}`
               : null;
@@ -145,8 +153,7 @@ export async function GET(request: Request) {
               errorMessages.push(`LinkedIn: ${errorData.message}`);
               postSucceeded = false;
             }
-          } else if (platform === 'bluesky') {
-            // Bluesky uses app password
+          } else if (basePlatform === 'bluesky') {
             const blueskyRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
               method: 'POST',
               headers: {
@@ -169,9 +176,67 @@ export async function GET(request: Request) {
               errorMessages.push(`Bluesky: ${errorData.message}`);
               postSucceeded = false;
             }
+          } else if (basePlatform === 'facebook') {
+            // Post to Facebook Page
+            const fbRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/feed`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ message: post.content }),
+            });
+
+            const fbData = await fbRes.json();
+
+            if (!fbRes.ok) {
+              errorMessages.push(`Facebook: ${fbData.error?.message || 'Unknown error'}`);
+              postSucceeded = false;
+            }
+          } else if (basePlatform === 'instagram') {
+            // Post to Instagram Business Account
+            // Instagram requires a Facebook Page linked to the IG account
+            // We use the page access token to post to IG via the Graph API
+            const igRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/media`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ 
+                caption: post.content,
+                media_type: 'TEXT',
+              }),
+            });
+
+            const igData = await igRes.json();
+
+            if (!igRes.ok) {
+              errorMessages.push(`Instagram: ${igData.error?.message || 'Unknown error'}`);
+              postSucceeded = false;
+              continue;
+            }
+
+            // Publish the media item
+            const publishRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/media_publish`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ 
+                creation_id: igData.id,
+              }),
+            });
+
+            if (!publishRes.ok) {
+              const publishData = await publishRes.json();
+              errorMessages.push(`Instagram: Failed to publish - ${publishData.error?.message || 'Unknown error'}`);
+              postSucceeded = false;
+            }
           }
         } catch (err: any) {
-          errorMessages.push(`${platform}: ${err.message}`);
+          errorMessages.push(`${platformStr}: ${err.message}`);
           postSucceeded = false;
         }
       }

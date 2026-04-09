@@ -3,6 +3,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
+interface Connection {
+  platform: string;
+  platform_user_id: string;
+  platform_username: string;
+}
+
 interface ScheduledPost {
   id: string;
   content: string;
@@ -12,47 +18,93 @@ interface ScheduledPost {
   created_at: string;
 }
 
+const PLATFORM_INFO: Record<string, { name: string; emoji: string }> = {
+  'x': { name: 'X / Twitter', emoji: '🐦' },
+  'linkedin': { name: 'LinkedIn', emoji: '💼' },
+  'facebook': { name: 'Facebook', emoji: '🐘' },
+  'instagram': { name: 'Instagram', emoji: '📷' },
+  'bluesky': { name: 'Bluesky', emoji: '💙' },
+};
+
 export default function SchedulerPage() {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState('');
-  const [platforms, setPlatforms] = useState<string[]>(['x']);
+  const [platforms, setPlatforms] = useState<string[]>([]);
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
-  const [connectedPlatforms, setConnectedPlatforms] = useState<any[]>([]);
+  const [connections, setConnections] = useState<Connection[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     loadScheduledPosts();
-    loadConnectedPlatforms();
+    loadConnections();
   }, []);
 
-  const loadConnectedPlatforms = async () => {
+  const loadConnections = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return;
 
-    const { data: connections } = await supabase
+    const { data } = await supabase
       .from('social_connections')
-      .select('platform, platform_username')
+      .select('platform, platform_user_id, platform_username')
       .eq('user_id', session.user.id);
 
-    const connected = connections || [];
-    const platformInfo: Record<string, { name: string; emoji: string }> = {
-      'x': { name: 'X / Twitter', emoji: '🐦' },
-      'linkedin': { name: 'LinkedIn', emoji: '💼' },
-    };
+    if (data) {
+      setConnections(data);
+      // Pre-select first platform of each type
+      const defaultPlatforms = getDefaultPlatforms(data);
+      setPlatforms(defaultPlatforms);
+    }
+  };
 
-    const allPlatforms = ['x', 'linkedin'];
-    setConnectedPlatforms(
-      allPlatforms.map(p => ({
-        id: p,
-        name: platformInfo[p]?.name || p,
-        emoji: platformInfo[p]?.emoji || '📱',
-        connected: connected.some(c => c.platform === p),
-      }))
+  const getDefaultPlatforms = (conns: Connection[]): string[] => {
+    const platformTypes = ['x', 'linkedin', 'bluesky'];
+    const defaults: string[] = [];
+    
+    for (const type of platformTypes) {
+      const conn = conns.find(c => c.platform === type);
+      if (conn) {
+        defaults.push(`${type}:${conn.platform_user_id}`);
+      }
+    }
+    return defaults;
+  };
+
+  const getConnectionsByPlatform = (platform: string): Connection[] => {
+    return connections.filter(c => c.platform === platform);
+  };
+
+  const isPlatformConnected = (platform: string): boolean => {
+    return connections.some(c => c.platform === platform);
+  };
+
+  const togglePlatform = (platformWithId: string) => {
+    setPlatforms(prev =>
+      prev.includes(platformWithId)
+        ? prev.filter(p => p !== platformWithId)
+        : [...prev, platformWithId]
     );
-    setPlatforms(connected.map(c => c.platform));
+  };
+
+  const toggleAllPages = (platform: string, connected: boolean, pageIds: string[]) => {
+    if (connected) {
+      // Remove all pages of this platform
+      setPlatforms(prev => prev.filter(p => !pageIds.some(id => p === `${platform}:${id}`)));
+    } else {
+      // Add all pages of this platform
+      const newPages = pageIds.map(id => `${platform}:${id}`);
+      setPlatforms(prev => [...new Set([...prev, ...newPages])]);
+    }
+  };
+
+  const isPageSelected = (platform: string, pageId: string): boolean => {
+    return platforms.includes(`${platform}:${pageId}`);
+  };
+
+  const getSelectedCountByPlatform = (platform: string): number => {
+    return platforms.filter(p => p.startsWith(`${platform}:`)).length;
   };
 
   const loadScheduledPosts = async () => {
@@ -162,6 +214,14 @@ export default function SchedulerPage() {
     });
   };
 
+  const getPlatformDisplay = (p: string) => {
+    const [platform, pageId] = p.split(':');
+    const conn = connections.find(c => c.platform === platform && c.platform_user_id === pageId);
+    const info = PLATFORM_INFO[platform] || { name: platform, emoji: '📱' };
+    const username = conn?.platform_username || pageId || platform;
+    return `${info.emoji} ${info.name}: ${username}`;
+  };
+
   return (
     <div style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
       <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>
@@ -174,36 +234,152 @@ export default function SchedulerPage() {
 
         {/* Platform Selection */}
         <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', fontSize: '14px', color: '#9ca3af', marginBottom: '8px' }}>
-            Platforms
+          <label style={{ display: 'block', fontSize: '14px', color: '#9ca3af', marginBottom: '12px' }}>
+            Select Platforms
           </label>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {connectedPlatforms.map(platform => (
-              <button
-                key={platform.id}
-                onClick={() => {
-                  if (!platform.connected) return;
-                  setPlatforms(prev =>
-                    prev.includes(platform.id)
-                      ? prev.filter(p => p !== platform.id)
-                      : [...prev, platform.id]
-                  );
-                }}
-                disabled={!platform.connected}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  border: platforms.includes(platform.id) ? '2px solid #10b981' : '2px solid #374151',
-                  background: platforms.includes(platform.id) ? '#064e3b' : '#374151',
-                  color: platform.connected ? 'white' : '#6b7280',
-                  cursor: platform.connected ? 'pointer' : 'not-allowed',
-                  opacity: platform.connected ? 1 : 0.5,
-                }}
-              >
-                {platform.emoji} {platform.name}
-              </button>
-            ))}
-          </div>
+
+          {/* X / LinkedIn / Bluesky - simple toggles */}
+          {['x', 'linkedin', 'bluesky'].map(platform => {
+            const conn = getConnectionsByPlatform(platform)[0];
+            const info = PLATFORM_INFO[platform];
+            const isConnected = !!conn;
+            const platformValue = conn ? `${platform}:${conn.platform_user_id}` : '';
+            const isSelected = platforms.includes(platformValue);
+
+            return (
+              <div key={platform} style={{ marginBottom: '8px' }}>
+                <button
+                  onClick={() => isConnected && togglePlatform(platformValue)}
+                  disabled={!isConnected}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    borderRadius: '6px',
+                    border: isSelected ? '2px solid #10b981' : '2px solid #374151',
+                    background: isSelected ? '#064e3b' : '#374151',
+                    color: isConnected ? 'white' : '#6b7280',
+                    cursor: isConnected ? 'pointer' : 'not-allowed',
+                    opacity: isConnected ? 1 : 0.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }}>{info.emoji}</span>
+                  <span style={{ flex: 1 }}>{info.name}</span>
+                  {isSelected && <span style={{ color: '#10b981' }}>✓</span>}
+                  {!isConnected && <span style={{ fontSize: '12px' }}>Not connected</span>}
+                </button>
+              </div>
+            );
+          })}
+
+          {/* Facebook - multi-page */}
+          {isPlatformConnected('facebook') && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '18px' }}>🐘</span>
+                <span style={{ color: '#9ca3af', fontSize: '14px' }}>Facebook Pages</span>
+                <button
+                  onClick={() => {
+                    const fbConns = getConnectionsByPlatform('facebook');
+                    const allSelected = fbConns.every(c => isPageSelected('facebook', c.platform_user_id));
+                    toggleAllPages('facebook', allSelected, fbConns.map(c => c.platform_user_id));
+                  }}
+                  style={{
+                    marginLeft: 'auto',
+                    fontSize: '12px',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    background: '#4b5563',
+                    color: 'white',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {getSelectedCountByPlatform('facebook') === getConnectionsByPlatform('facebook').length ? 'Deselect All' : 'Select All'}
+                </button>
+              </div>
+              {getConnectionsByPlatform('facebook').map(conn => (
+                <button
+                  key={conn.platform_user_id}
+                  onClick={() => togglePlatform(`facebook:${conn.platform_user_id}`)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: isPageSelected('facebook', conn.platform_user_id) ? '2px solid #10b981' : '2px solid #374151',
+                    background: isPageSelected('facebook', conn.platform_user_id) ? '#064e3b' : '#374151',
+                    color: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '4px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span style={{ opacity: 0.5 }}>└──</span>
+                  <span style={{ flex: 1 }}>{conn.platform_username}</span>
+                  {isPageSelected('facebook', conn.platform_user_id) && <span style={{ color: '#10b981' }}>✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Instagram - multi-account */}
+          {isPlatformConnected('instagram') && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '18px' }}>📷</span>
+                <span style={{ color: '#9ca3af', fontSize: '14px' }}>Instagram Accounts</span>
+                <button
+                  onClick={() => {
+                    const igConns = getConnectionsByPlatform('instagram');
+                    const allSelected = igConns.every(c => isPageSelected('instagram', c.platform_user_id));
+                    toggleAllPages('instagram', allSelected, igConns.map(c => c.platform_user_id));
+                  }}
+                  style={{
+                    marginLeft: 'auto',
+                    fontSize: '12px',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    background: '#4b5563',
+                    color: 'white',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {getSelectedCountByPlatform('instagram') === getConnectionsByPlatform('instagram').length ? 'Deselect All' : 'Select All'}
+                </button>
+              </div>
+              {getConnectionsByPlatform('instagram').map(conn => (
+                <button
+                  key={conn.platform_user_id}
+                  onClick={() => togglePlatform(`instagram:${conn.platform_user_id}`)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: isPageSelected('instagram', conn.platform_user_id) ? '2px solid #10b981' : '2px solid #374151',
+                    background: isPageSelected('instagram', conn.platform_user_id) ? '#064e3b' : '#374151',
+                    color: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '4px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span style={{ opacity: 0.5 }}>└──</span>
+                  <span style={{ flex: 1 }}>@{conn.platform_username}</span>
+                  {isPageSelected('instagram', conn.platform_user_id) && <span style={{ color: '#10b981' }}>✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -230,7 +406,7 @@ export default function SchedulerPage() {
             }}
           />
           <div style={{ textAlign: 'right', fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-            {content.length}/280
+            {content.length}/500
           </div>
         </div>
 
@@ -336,10 +512,10 @@ export default function SchedulerPage() {
               }}
             >
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
                   {post.platforms.map(p => (
                     <span key={p} style={{ fontSize: '12px', background: '#374151', padding: '2px 8px', borderRadius: '4px' }}>
-                      {p}
+                      {getPlatformDisplay(p)}
                     </span>
                   ))}
                   <span style={{
