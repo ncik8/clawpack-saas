@@ -1,138 +1,238 @@
-import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-// This endpoint is called by Vercel Cron to process scheduled posts
-export async function GET() {
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcyifihwvqxtpypphpef.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+export async function GET(request: Request) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcyifihwvqxtpypphpef.supabase.co';
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseKey) {
-      return NextResponse.json({ error: 'Missing Supabase key' }, { status: 500 });
+    // Verify cron secret
+    const authHeader = request.headers.get('authorization');
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get scheduled posts that are due
+    // Find all pending posts that are due
     const now = new Date().toISOString();
     
-    const response = await fetch(
-      `${supabaseUrl}/rest/v1/scheduled_posts?status=eq.scheduled&scheduled_time=lte.${now}&select=*`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Prefer': 'return=representation'
-        }
-      }
-    );
+    const { data: posts, error: fetchError } = await supabaseAdmin
+      .from('scheduled_posts')
+      .select('*')
+      .eq('status', 'pending')
+      .lte('scheduled_for', now);
 
-    const posts = await response.json();
-
-    if (!Array.isArray(posts) || posts.length === 0) {
-      return NextResponse.json({ message: 'No posts to process', processed: 0 });
+    if (fetchError) {
+      console.error('Error fetching scheduled posts:', fetchError);
+      return Response.json({ error: fetchError.message }, { status: 500 });
     }
 
-    let processed = 0;
-    let errors = 0;
+    if (!posts || posts.length === 0) {
+      return Response.json({ message: 'No posts to process', processed: 0 });
+    }
+
+    const results = { processed: 0, succeeded: 0, failed: 0 };
 
     for (const post of posts) {
-      try {
-        // Get user's social connection tokens
-        const connectionRes = await fetch(
-          `${supabaseUrl}/rest/v1/social_connections?user_id=eq.${post.user_id}&platform=eq.${post.platform}&select=*`,
-          {
-            headers: {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`
-            }
-          }
-        );
+      // Get user's connections for each platform
+      const { data: connections } = await supabaseAdmin
+        .from('social_connections')
+        .select('platform, access_token, refresh_token, platform_user_id, expires_at')
+        .eq('user_id', post.user_id);
 
-        const connections = await connectionRes.json();
+      if (!connections || connections.length === 0) {
+        await supabaseAdmin
+          .from('scheduled_posts')
+          .update({ 
+            status: 'failed', 
+            error_message: 'No connected accounts found',
+            sent_at: new Date().toISOString(),
+          })
+          .eq('id', post.id);
+        
+        results.failed++;
+        results.processed++;
+        continue;
+      }
 
-        if (!connections || connections.length === 0) {
-          console.log(`No connection found for user ${post.user_id} platform ${post.platform}`);
+      const connectionMap = new Map(connections.map(c => [c.platform, c]));
+      let postSucceeded = true;
+      const errorMessages = [];
+
+      // Post to each platform
+      for (const platform of post.platforms) {
+        const connection = connectionMap.get(platform);
+        
+        if (!connection) {
+          errorMessages.push(`${platform}: not connected`);
           continue;
         }
 
-        const connection = connections[0];
+        try {
+          // Refresh token if needed
+          let accessToken = connection.access_token;
+          if (platform === 'x' && connection.expires_at) {
+            const expiresAt = new Date(connection.expires_at);
+            if (expiresAt < new Date()) {
+              // Token expired, try to refresh
+              const refreshed = await refreshXToken(connection.refresh_token);
+              if (refreshed) {
+                accessToken = refreshed.access_token;
+                await supabaseAdmin
+                  .from('social_connections')
+                  .update({
+                    access_token: refreshed.access_token,
+                    refresh_token: refreshed.refresh_token || connection.refresh_token,
+                    expires_at: refreshed.expires_at,
+                  })
+                  .eq('id', connection.id);
+              }
+            }
+          }
 
-        // Post based on platform
-        let postResult;
-        
-        if (post.platform === 'x' || post.platform === 'twitter') {
-          postResult = await postToX(post.content, connection);
-        } else if (post.platform === 'linkedin') {
-          postResult = await postToLinkedIn(post.content, connection);
-        } else if (post.platform === 'bluesky') {
-          postResult = await postToBluesky(post.content, connection);
+          if (platform === 'x') {
+            const twitterRes = await fetch('https://api.twitter.com/2/tweets', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ text: post.content }),
+            });
+
+            const twitterData = await twitterRes.json();
+
+            if (!twitterRes.ok) {
+              errorMessages.push(`X: ${twitterData.detail || twitterData.title || 'Unknown error'}`);
+              postSucceeded = false;
+            }
+          } else if (platform === 'linkedin') {
+            const authorUrn = connection.platform_user_id 
+              ? `urn:li:person:${connection.platform_user_id}`
+              : null;
+
+            if (!authorUrn) {
+              errorMessages.push('LinkedIn: missing user ID');
+              postSucceeded = false;
+              continue;
+            }
+
+            const linkedInRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'X-Restli-Protocol-Version': '2.0.0',
+              },
+              body: JSON.stringify({
+                author: authorUrn,
+                lifecycleState: 'PUBLISHED',
+                specificContent: {
+                  'com.linkedin.ugc.ShareContent': {
+                    shareCommentary: { text: post.content },
+                    shareMediaCategory: 'NONE',
+                  },
+                },
+                visibility: {
+                  'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+                },
+              }),
+            });
+
+            if (!linkedInRes.ok) {
+              const errorData = await linkedInRes.json();
+              errorMessages.push(`LinkedIn: ${errorData.message}`);
+              postSucceeded = false;
+            }
+          } else if (platform === 'bluesky') {
+            // Bluesky uses app password
+            const blueskyRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                repo: connection.platform_user_id || 'did:plc:unknown',
+                collection: 'app.bsky.feed.post',
+                record: {
+                  type: 'app.bsky.feed.post',
+                  text: post.content,
+                  createdAt: new Date().toISOString(),
+                },
+              }),
+            });
+
+            if (!blueskyRes.ok) {
+              const errorData = await blueskyRes.json();
+              errorMessages.push(`Bluesky: ${errorData.message}`);
+              postSucceeded = false;
+            }
+          }
+        } catch (err: any) {
+          errorMessages.push(`${platform}: ${err.message}`);
+          postSucceeded = false;
         }
-
-        // Update post status to published
-        await fetch(
-          `${supabaseUrl}/rest/v1/scheduled_posts?id=eq.${post.id}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`,
-              'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify({
-              status: 'published',
-              published_at: new Date().toISOString()
-            })
-          }
-        );
-
-        processed++;
-      } catch (err) {
-        console.error(`Error processing post ${post.id}:`, err);
-        errors++;
-        
-        // Mark as failed
-        await fetch(
-          `${supabaseUrl}/rest/v1/scheduled_posts?id=eq.${post.id}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`
-            },
-            body: JSON.stringify({ status: 'failed' })
-          }
-        );
       }
+
+      // Update post status
+      await supabaseAdmin
+        .from('scheduled_posts')
+        .update({ 
+          status: postSucceeded ? 'sent' : 'failed',
+          error_message: errorMessages.length > 0 ? errorMessages.join('; ') : null,
+          sent_at: new Date().toISOString(),
+        })
+        .eq('id', post.id);
+
+      if (postSucceeded) {
+        results.succeeded++;
+      } else {
+        results.failed++;
+      }
+      results.processed++;
     }
 
-    return NextResponse.json({ 
-      message: 'Processed scheduled posts',
-      processed,
-      errors 
+    return Response.json({
+      message: `Processed ${results.processed} posts`,
+      ...results,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Process scheduled error:', error);
-    return NextResponse.json({ error: 'Failed to process posts' }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }
 
-async function postToX(content: string, connection: any) {
-  // X/Twitter posting logic using OAuth 1.0a
-  // This would use the stored access_token and refresh_token
-  console.log('Posting to X:', content.substring(0, 50));
-  return { success: true };
-}
+async function refreshXToken(refreshToken: string): Promise<{access_token: string; refresh_token?: string; expires_at?: string} | null> {
+  try {
+    const res = await fetch('https://api.twitter.com/2/oauth2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${Buffer.from(
+          `${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`
+        ).toString('base64')}`,
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    });
 
-async function postToLinkedIn(content: string, connection: any) {
-  // LinkedIn posting logic
-  console.log('Posting to LinkedIn:', content.substring(0, 50));
-  return { success: true };
-}
+    const tokens = await res.json();
 
-async function postToBluesky(content: string, connection: any) {
-  // Bluesky posting logic using app password
-  console.log('Posting to Bluesky:', content.substring(0, 50));
-  return { success: true };
+    if (res.ok && tokens.access_token) {
+      return {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+      };
+    }
+    return null;
+  } catch (err) {
+    console.error('Token refresh failed:', err);
+    return null;
+  }
 }
