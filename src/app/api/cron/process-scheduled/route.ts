@@ -9,11 +9,13 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 export async function GET(request: Request) {
   try {
-    // Verify cron secret
-    const authHeader = request.headers.get('authorization');
+    // Optional: Verify cron secret if CRON_SECRET env var is set in Vercel
     const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (cronSecret) {
+      const authHeader = request.headers.get('authorization');
+      if (authHeader !== `Bearer ${cronSecret}`) {
+        return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
     // Find all pending posts that are due
