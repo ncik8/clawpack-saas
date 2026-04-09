@@ -54,15 +54,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Extract base platforms (remove :page_id suffix for FB/IG)
+    const basePlatforms = platforms.map((p: string) => p.split(':')[0]);
+    
     // Verify user has these platforms connected
     const { data: connections } = await supabaseAdmin
       .from('social_connections')
       .select('platform')
       .eq('user_id', userId)
-      .in('platform', platforms);
+      .in('platform', basePlatforms);
 
     const connectedPlatforms = connections?.map(c => c.platform) || [];
-    const unconnected = platforms.filter((p: string) => !connectedPlatforms.includes(p));
+    const unconnected = basePlatforms.filter((p: string) => !connectedPlatforms.includes(p));
 
     if (unconnected.length > 0) {
       return NextResponse.json({ 
@@ -107,15 +110,18 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Extract base platforms (remove :page_id suffix for FB/IG)
+    const basePlatforms = platforms.map((p: string) => p.split(':')[0]);
+    
     // Verify user has these platforms connected
     const { data: connections } = await supabaseAdmin
       .from('social_connections')
       .select('platform')
       .eq('user_id', userId)
-      .in('platform', platforms);
+      .in('platform', basePlatforms);
 
     const connectedPlatforms = connections?.map(c => c.platform) || [];
-    const unconnected = platforms.filter((p: string) => !connectedPlatforms.includes(p));
+    const unconnected = basePlatforms.filter((p: string) => !connectedPlatforms.includes(p));
 
     if (unconnected.length > 0) {
       return NextResponse.json({ 
