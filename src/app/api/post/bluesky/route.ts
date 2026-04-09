@@ -8,11 +8,22 @@ export async function POST(request: Request) {
   console.log('BLUESKY POST ROUTE HIT');
   console.log('Timestamp:', new Date().toISOString());
   console.log('Request URL:', request.url);
-  console.log('===========================================');
+  console.log('Request method:', request.method);
+  
+  // Check Authorization header
+  const authHeader = request.headers.get('authorization');
+  console.log('Auth header present:', !!authHeader);
+  console.log('Auth header value:', authHeader?.substring(0, 50) + '...');
   
   try {
     const supabase = await createClient();
+    
+    // Try to get session first
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('Session result:', { session: session?.user?.id, sessionError });
+    
     const { data: { user } } = await supabase.auth.getUser();
+    console.log('User from getUser():', user?.id);
     
     console.log('Bluesky POST - user:', user?.id);
     
