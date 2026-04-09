@@ -96,21 +96,9 @@ export default function CreatePostPage() {
 
       setConnectedPlatforms(platformItems);
       
-      // Pre-select connected platforms (use base platform IDs for single-account platforms)
-      const selectedPlatforms: string[] = [];
-      for (const base of basePlatforms) {
-        const accountsForBase = connected.filter(c => c.platform === base);
-        if (accountsForBase.length > 0) {
-          // For multi-account platforms, use the first account's full ID
-          // For single-account platforms, use just the base name
-          if (base === 'facebook' || base === 'instagram') {
-            selectedPlatforms.push(`${base}_${accountsForBase[0].platform_user_id}`);
-          } else {
-            selectedPlatforms.push(base);
-          }
-        }
-      }
-      setPlatforms(selectedPlatforms);
+      // Don't pre-select any platforms - user must explicitly choose
+      // This prevents accidental posts to platforms user didn't intend
+      setPlatforms([]);
     } catch (err) {
       console.error('Error loading platforms:', err);
     } finally {

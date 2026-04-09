@@ -53,11 +53,14 @@ export async function POST(request: Request) {
             postId: data.id,
           });
         } else {
+          // Facebook error might not have .error.message - log for debugging
+          console.error('Facebook API error:', data);
+          const errorMsg = data.error?.message || data.error?.type || data.error?.code || 'Unknown Facebook error';
           results.push({
             pageId: conn.platform_user_id,
             pageName: conn.platform_username || 'Facebook Page',
             success: false,
-            error: data.error?.message || 'Post failed',
+            error: errorMsg,
           });
         }
       } catch (err: any) {
