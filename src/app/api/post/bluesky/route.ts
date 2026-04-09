@@ -4,6 +4,12 @@ import { NextResponse } from 'next/server';
 const BLUESKY_API = 'https://bsky.social/xrpc';
 
 export async function POST(request: Request) {
+  console.log('===========================================');
+  console.log('BLUESKY POST ROUTE HIT');
+  console.log('Timestamp:', new Date().toISOString());
+  console.log('Request URL:', request.url);
+  console.log('===========================================');
+  
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
