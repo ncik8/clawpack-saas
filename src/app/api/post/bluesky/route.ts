@@ -21,11 +21,17 @@ export async function POST(request: Request) {
       .single();
 
     if (!connection?.access_token) {
+      console.log('Bluesky not connected - no access token found');
       return NextResponse.json({ error: 'Bluesky not connected' }, { status: 401 });
     }
 
+    console.log('Bluesky access token found, attempting to post...');
+
     // Check if token needs refresh (Bluesky tokens expire after 24h)
     let accessToken = connection.access_token;
+    console.log('Bluesky connection found, checking token...');
+    console.log('Expires at:', connection.expires_at);
+    
     if (connection.expires_at && new Date(connection.expires_at) < new Date()) {
       console.log('Bluesky token expired, refreshing...');
       const refreshRes = await fetch(`${BLUESKY_API}/com.atproto.server.refreshSession`, {
