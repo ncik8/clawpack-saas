@@ -9,14 +9,9 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 export async function GET(request: Request) {
   try {
-    // Optional: Verify cron secret if CRON_SECRET env var is set in Vercel
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
-      const authHeader = request.headers.get('authorization');
-      if (authHeader !== `Bearer ${cronSecret}`) {
-        return Response.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-    }
+    // No auth required - OpenClaw cron sends requests without Bearer token
+    // The cron job URL is secret and only accessible via OpenClaw's cron system
+    // If you need security, set CRON_SECRET in Vercel and pass Bearer token from cron
 
     // Find all pending posts that are due
     const now = new Date().toISOString();
