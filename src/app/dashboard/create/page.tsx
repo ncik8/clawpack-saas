@@ -240,21 +240,25 @@ export default function CreatePostPage() {
           }
 
           // Create post with media_ids
-          const postRes = await fetch('/api/x/post', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              text: content,
-              media_ids: mediaIds,
-            }),
-          });
+          try {
+            const postRes = await fetch('/api/x/post', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                text: content,
+                media_ids: mediaIds,
+              }),
+            });
 
-          const postData = await postRes.json();
+            const postData = await postRes.json();
 
-          if (postRes.ok && postData.data?.id) {
-            results.push(`X ✓`);
-          } else {
-            errors.push(`X: ${postData.error || 'Post failed'}`);
+            if (postRes.ok && postData.data?.id) {
+              results.push(`X ✓`);
+            } else {
+              errors.push(`X: ${postData.error || 'Post failed'}`);
+            }
+          } catch (e) {
+            errors.push(`X: Network error - ${e}`);
           }
         } else if (platform === 'linkedin') {
           // LinkedIn: form data with image or video
