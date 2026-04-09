@@ -281,7 +281,7 @@ export default function CreatePostPage() {
           } else {
             errors.push(`LinkedIn: ${data.error}`);
           }
-        } else if (platform === 'bluesky') {
+        } else if (getBasePlatform(platform) === 'bluesky') {
           // Bluesky: text with optional image (video not supported on bsky.social PDS)
           const formData = new FormData();
           formData.append('text', content);
