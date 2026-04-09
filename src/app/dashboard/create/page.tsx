@@ -258,7 +258,7 @@ export default function CreatePostPage() {
               errors.push(`X: ${postData.error || 'Post failed'}`);
             }
           } catch (e) {
-            errors.push(`X: Network error - ${e}`);
+            errors.push(`X: Network error - ${e?.message || String(e)}`);
           }
         } else if (platform === 'linkedin') {
           // LinkedIn: form data with image or video
