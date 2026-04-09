@@ -1,57 +1,49 @@
-import { createClient } from '@/utils/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 const BLUESKY_API = 'https://bsky.social/xrpc';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcyifihwvqxtpypphpef.supabase.co';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export async function POST(request: Request) {
   console.log('===========================================');
   console.log('BLUESKY POST ROUTE HIT');
   console.log('Timestamp:', new Date().toISOString());
-  console.log('Request URL:', request.url);
-  console.log('Request method:', request.method);
-  
-  // Check Authorization header
-  const authHeader = request.headers.get('authorization');
-  console.log('Auth header present:', !!authHeader);
-  console.log('Auth header value:', authHeader?.substring(0, 50) + '...');
   
   try {
-    const supabase = await createClient();
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: request.headers.get('authorization') || '' } }
+    });
     
-    // Try to get session first
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    console.log('Session result:', { session: session?.user?.id, sessionError });
+    console.log('Session:', session?.user?.id, 'Error:', sessionError);
     
-    const { data: { user } } = await supabase.auth.getUser();
-    console.log('User from getUser():', user?.id);
-    
-    console.log('Bluesky POST - user:', user?.id);
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!session?.user) {
+      console.log('NO SESSION - returning 401');
+      return NextResponse.json({ error: 'Unauthorized - no session' }, { status: 401 });
     }
+    
+    const userId = session.user.id;
+    console.log('User ID:', userId);
 
     // Get stored Bluesky connection
     const { data: connection, error: connError } = await supabase
       .from('social_connections')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('platform', 'bluesky')
       .single();
 
-    console.log('Bluesky connection query result:', { connection, connError });
+    console.log('Connection:', connection?.platform_username, 'Error:', connError);
 
     if (!connection?.access_token) {
       console.log('Bluesky not connected - no access token found');
       return NextResponse.json({ error: 'Bluesky not connected' }, { status: 401 });
     }
 
-    console.log('Bluesky access token found, attempting to post...');
-
     // Check if token needs refresh (Bluesky tokens expire after 24h)
     let accessToken = connection.access_token;
-    console.log('Bluesky connection found, checking token...');
-    console.log('Expires at:', connection.expires_at);
+    console.log('Bluesky access token found, attempting to post...');
     
     if (connection.expires_at && new Date(connection.expires_at) < new Date()) {
       console.log('Bluesky token expired, refreshing...');
@@ -115,7 +107,7 @@ export async function POST(request: Request) {
       const blobRes = await fetch(`${BLUESKY_API}/com.atproto.repo.uploadBlob`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${connection.access_token}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': imageFile.type || 'image/jpeg',
         },
         body: arrayBuffer,
@@ -148,13 +140,13 @@ export async function POST(request: Request) {
       const serviceAuthRes = await fetch(`${BLUESKY_API}/com.atproto.server.getServiceAuth`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${connection.access_token}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           aud: 'did:web:video.bsky.app',
           lxm: 'app.bsky.video.uploadVideo',
-          exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+          exp: Math.floor(Date.now() / 1000) + 3600,
         }),
       });
 
@@ -168,7 +160,6 @@ export async function POST(request: Request) {
         }, { status: serviceAuthRes.status });
       }
 
-      // Upload video with service auth
       const arrayBuffer = await videoFile.arrayBuffer();
       const uploadUrl = new URL(`https://video.bsky.app/xrpc/app.bsky.video.uploadVideo`);
       uploadUrl.searchParams.append('did', connection.platform_user_id);
@@ -193,7 +184,6 @@ export async function POST(request: Request) {
         }, { status: videoRes.status });
       }
 
-      // Video uploaded successfully - create embed with the video reference
       embed = {
         $type: 'app.bsky.embed.video',
         video: videoData.blob || videoData,
@@ -216,7 +206,7 @@ export async function POST(request: Request) {
     const postRes = await fetch(`${BLUESKY_API}/com.atproto.repo.createRecord`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${connection.access_token}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
