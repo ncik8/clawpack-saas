@@ -10,18 +10,24 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { text, imageUrl } = await request.json();
+    const { text, imageUrl, pageIds } = await request.json();
 
     if (!text && !imageUrl) {
       return Response.json({ error: 'Content or image required' }, { status: 400 });
     }
 
-    // Get all FB page connections for this user
-    const { data: connections } = await supabase
+    // Get FB page connections - only the specific pages requested, or all if not specified
+    let query = supabase
       .from('social_connections')
       .select('*')
       .eq('user_id', user.id)
       .eq('platform', 'facebook');
+    
+    if (pageIds && pageIds.length > 0) {
+      query = query.in('platform_user_id', pageIds);
+    }
+    
+    const { data: connections } = await query;
 
     if (!connections || connections.length === 0) {
       return Response.json({ error: 'No Facebook Page connected' }, { status: 400 });

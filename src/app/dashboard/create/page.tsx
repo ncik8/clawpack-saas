@@ -305,11 +305,14 @@ export default function CreatePostPage() {
             errors.push(`Bluesky: ${data.error}`);
           }
         } else if (getBasePlatform(platform) === 'facebook') {
-          // Facebook: posts to all connected FB pages
+          // Facebook: posts to specific page IDs (not all)
+          const fbPageIds = platforms
+            .filter(p => p.startsWith('facebook:'))
+            .map(p => p.split(':')[1]);
           const response = await fetch('/api/post/facebook', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: content }),
+            body: JSON.stringify({ text: content, pageIds: fbPageIds }),
           });
 
           const data = await response.json();
