@@ -1,4 +1,3 @@
-
 import { createClient } from '@/utils/supabase/server';
 
 export async function GET(request: Request) {
@@ -11,10 +10,12 @@ export async function GET(request: Request) {
 
   try {
     if (error) {
+      console.log('OAuth error:', error);
       return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=${error}`);
     }
 
     if (!code || !state) {
+      console.log('Missing code or state');
       return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=missing_params`);
     }
 
@@ -27,10 +28,12 @@ export async function GET(request: Request) {
       .single();
 
     if (stateError || !oauthState) {
+      console.log('Invalid state:', stateError);
       return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=invalid_state`);
     }
 
     const platform = oauthState.platform;
+    console.log('OAuth callback for platform:', platform);
 
     await supabase.from('oauth_states').delete().eq('state', state);
 
@@ -48,6 +51,7 @@ export async function GET(request: Request) {
     });
 
     const tokens = await tokenRes.json();
+    console.log('Token exchange response:', JSON.stringify(tokens));
 
     if (!tokenRes.ok || !tokens.access_token) {
       console.error('Token exchange failed:', tokens);
@@ -59,6 +63,7 @@ export async function GET(request: Request) {
     // Get user info
     const userRes = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${userToken}&fields=id,name`);
     const userData = await userRes.json();
+    console.log('User data:', JSON.stringify(userData));
 
     // For Instagram - store ALL pages that have IG linked
     if (platform === 'instagram') {
@@ -66,9 +71,11 @@ export async function GET(request: Request) {
         `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`
       );
       const pagesData = await pagesRes.json();
+      console.log('Instagram pages response:', JSON.stringify(pagesData));
 
       // Find all pages with Instagram linked
       const pagesWithIg = pagesData.data?.filter((p: any) => p.instagram_business_account) || [];
+      console.log('Pages with IG:', pagesWithIg.length);
 
       if (pagesWithIg.length === 0) {
         return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=no_instagram_account`);
@@ -85,8 +92,9 @@ export async function GET(request: Request) {
         const igData = await igRes.json();
         const igUsername = igData.username || page.name;
 
-        // Upsert with platform_user_id as unique key for IG (so same IG doesn't get duplicated)
-        await supabase.from('social_connections').upsert(
+        console.log('Storing IG connection:', { igAccountId, igUsername });
+
+        const { error: upsertError } = await supabase.from('social_connections').upsert(
           {
             user_id: oauthState.user_id,
             platform: 'instagram',
@@ -98,6 +106,10 @@ export async function GET(request: Request) {
           },
           { onConflict: 'user_id,platform,platform_user_id' }
         );
+
+        if (upsertError) {
+          console.error('IG upsert error:', upsertError);
+        }
       }
 
       return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${pagesWithIg.length}`);
@@ -109,11 +121,16 @@ export async function GET(request: Request) {
         `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token`
       );
       const pagesData = await pagesRes.json();
+      console.log('Facebook pages response:', JSON.stringify(pagesData));
 
       if (pagesData.data && pagesData.data.length > 0) {
+        console.log('Storing', pagesData.data.length, 'Facebook pages');
+        
         // Store EACH page as a separate connection
         for (const page of pagesData.data) {
-          await supabase.from('social_connections').upsert(
+          console.log('Storing FB page:', page.id, page.name);
+          
+          const { error: upsertError } = await supabase.from('social_connections').upsert(
             {
               user_id: oauthState.user_id,
               platform: 'facebook',
@@ -125,9 +142,13 @@ export async function GET(request: Request) {
             },
             { onConflict: 'user_id,platform,platform_user_id' }
           );
+
+          if (upsertError) {
+            console.error('FB upsert error:', upsertError);
+          }
         }
       } else {
-        // No pages - just store user token
+        console.log('No FB pages, storing user token instead');
         await supabase.from('social_connections').upsert(
           {
             user_id: oauthState.user_id,
