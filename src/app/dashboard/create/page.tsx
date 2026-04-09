@@ -243,6 +243,7 @@ export default function CreatePostPage() {
           }
 
           // Create post with media_ids
+          console.log('About to post to X with media_ids');
           try {
             const postRes = await fetch('/api/x/post', {
               method: 'POST',
@@ -264,7 +265,7 @@ export default function CreatePostPage() {
               errors.push(`X: ${postData.error || 'Post failed'}`);
             }
           } catch (e: unknown) {
-            errors.push(`X: Network error - ${String(e)}`);
+            errors.push(`X: Network error - ${e?.message || JSON.stringify(e)}`);
           }
         } else if (platform === 'linkedin') {
           // LinkedIn: form data with image or video
