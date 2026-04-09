@@ -44,19 +44,23 @@ export async function POST(request: Request) {
       }, { status: sessionRes.status });
     }
 
-    // Store the Bluesky credentials
+    // Delete existing Bluesky connection and insert new one
+    await supabase
+      .from('social_connections')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('platform', 'bluesky');
+
     const { error: storeError } = await supabase
       .from('social_connections')
-      .upsert({
+      .insert({
         user_id: user.id,
         platform: 'bluesky',
         access_token: sessionData.accessJwt,
         refresh_token: sessionData.refreshJwt,
         platform_user_id: sessionData.did,
         platform_username: handle,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
-      }, {
-        onConflict: 'user_id,platform',
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
 
     if (storeError) {
