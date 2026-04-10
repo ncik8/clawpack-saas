@@ -271,7 +271,6 @@ export default function ConnectedAccountsPage() {
     { id: 'nostr', name: 'Nostr', emoji: '⚡', color: '#FFD700', comingSoon: true },
     { id: 'threads', name: 'Threads', emoji: '🧵', color: '#000000', comingSoon: true },
     { id: 'facebook', name: 'Facebook Page', emoji: '📘', color: '#1877F2', comingSoon: false },
-    { id: 'instagram', name: 'Instagram Page', emoji: '📷', color: '#E4405F', comingSoon: false },
     { id: 'instagram-business', name: 'Instagram Business', emoji: '📸', color: '#E4405F', comingSoon: false },
     { id: 'tiktok', name: 'TikTok', emoji: '🎵', color: '#000000', comingSoon: true },
     { id: 'youtube', name: 'YouTube', emoji: '▶️', color: '#FF0000', comingSoon: true },
