@@ -223,13 +223,7 @@ export default function ConnectedAccountsPage() {
       return;
     }
     
-    // Instagram - separate OAuth flow (via FB pages)
-    if (platform === 'instagram') {
-      window.location.href = '/api/connect/instagram';
-      return;
-    }
-    
-    // Instagram Business - standalone IG business accounts not linked to FB pages
+    // Instagram Business - standalone IG business accounts
     if (platform === 'instagram-business') {
       window.location.href = '/api/connect/instagram-standalone';
       return;
