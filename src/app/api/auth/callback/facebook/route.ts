@@ -77,8 +77,46 @@ export async function GET(request: Request) {
       const pagesWithIg = pagesData.data?.filter((p: any) => p.instagram_business_account) || [];
       console.log('Pages with IG:', pagesWithIg.length);
 
+      // If no pages have IG linked, try to get IG accounts directly
       if (pagesWithIg.length === 0) {
-        return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=no_instagram_account`);
+        console.log('No pages with IG linked, trying direct IG accounts...');
+        
+        // Try to get IG accounts directly from the user
+        const igDirectRes = await fetch(
+          `https://graph.facebook.com/v18.0/${userData.id}/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`
+        );
+        const igDirectData = await igDirectRes.json();
+        console.log('Direct IG response:', JSON.stringify(igDirectData));
+        
+        // Check if any of the returned accounts are actually IG accounts (have id but no instagram_business_account means it's an IG account ID directly)
+        const directIgAccounts = igDirectData.data?.filter((p: any) => p.id && !p.instagram_business_account) || [];
+        
+        if (directIgAccounts.length > 0) {
+          console.log('Found direct IG accounts:', directIgAccounts.length);
+          for (const igAccount of directIgAccounts) {
+            await supabase
+              .from('social_connections')
+              .delete()
+              .eq('user_id', oauthState.user_id)
+              .eq('platform', 'instagram')
+              .eq('platform_user_id', igAccount.id);
+
+            await supabase.from('social_connections').insert({
+              user_id: oauthState.user_id,
+              platform: 'instagram',
+              platform_user_id: igAccount.id,
+              platform_username: igAccount.name || igAccount.id,
+              access_token: igAccount.access_token || userToken,
+              refresh_token: tokens.refresh_token || null,
+              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+            });
+            pagesWithIg.push(igAccount);
+          }
+        }
+        
+        if (pagesWithIg.length === 0) {
+          return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=no_instagram_account`);
+        }
       }
 
       // Store EACH page with IG as a separate connection
