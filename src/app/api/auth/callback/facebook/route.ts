@@ -65,8 +65,11 @@ export async function GET(request: Request) {
     const userData = await userRes.json();
     console.log('User data:', JSON.stringify(userData));
 
-    // For Instagram - store ALL pages that have IG linked
+    // For Instagram - try multiple approaches to find IG accounts
     if (platform === 'instagram') {
+      let savedCount = 0;
+      
+      // Approach 1: Get Facebook Pages and check for linked Instagram
       const pagesRes = await fetch(
         `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`
       );
@@ -76,6 +79,64 @@ export async function GET(request: Request) {
       // Find all pages with Instagram linked
       const pagesWithIg = pagesData.data?.filter((p: any) => p.instagram_business_account) || [];
       console.log('Pages with IG:', pagesWithIg.length);
+      
+      // Approach 2: If no pages with IG, try getting accounts directly (IG accounts may be returned as standalone)
+      if (pagesWithIg.length === 0) {
+        console.log('No pages with IG linked, trying standalone IG approach...');
+        
+        // Get all accounts - IG business accounts may appear here
+        const allAccountsRes = await fetch(
+          `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token`
+        );
+        const allAccountsData = await allAccountsRes.json();
+        console.log('All accounts response:', JSON.stringify(allAccountsData));
+        
+        if (allAccountsData.data && allAccountsData.data.length > 0) {
+          // Check each account - try to see if it's an IG account by checking type
+          for (const account of allAccountsData.data) {
+            // Skip obvious Facebook pages (have names we recognize)
+            // Instead, try to get IG info for each account ID
+            try {
+              const igCheckRes = await fetch(
+                `https://graph.facebook.com/v18.0/${account.id}?fields=id,username,name,instagram_business_account&access_token=${userToken}`
+              );
+              const igCheck = await igCheckRes.json();
+              console.log('Account IG check:', account.id, JSON.stringify(igCheck));
+              
+              if (igCheck.instagram_business_account || igCheck.username) {
+                // This is an Instagram account
+                const igId = igCheck.instagram_business_account?.id || account.id;
+                const igUsername = igCheck.username || igCheck.name || account.name;
+                
+                await supabase
+                  .from('social_connections')
+                  .delete()
+                  .eq('user_id', oauthState.user_id)
+                  .eq('platform', 'instagram')
+                  .eq('platform_user_id', igId);
+
+                await supabase.from('social_connections').insert({
+                  user_id: oauthState.user_id,
+                  platform: 'instagram',
+                  platform_user_id: igId,
+                  platform_username: igUsername,
+                  access_token: account.access_token || userToken,
+                  refresh_token: tokens.refresh_token || null,
+                  expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+                });
+                savedCount++;
+                console.log('Saved IG account:', igUsername);
+              }
+            } catch (e) {
+              console.log('IG check failed for account:', account.id);
+            }
+          }
+          
+          if (savedCount > 0) {
+            return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${savedCount}`);
+          }
+        }
+      }
 
       // If no pages have IG linked, try to get IG accounts via multiple approaches
       if (pagesWithIg.length === 0) {
