@@ -94,12 +94,14 @@ export default function ConnectedAccountsPage() {
           return;
         }
 
-        // Check URL params from OAuth callback - if connected just happened, force reload to get fresh data
+        // Check URL params from OAuth callback
         const urlParams = new URLSearchParams(window.location.search);
         const justConnected = urlParams.get('connected');
+        const urlCount = urlParams.get('count');
         
         // Force reload if OAuth callback just happened (ensures fresh database state)
         if (justConnected) {
+          await new Promise(r => setTimeout(r, 1500));
           window.location.href = window.location.pathname;
           return;
         }
@@ -129,6 +131,16 @@ export default function ConnectedAccountsPage() {
           connected: connectedPlatforms.some(c => getBasePlatform(c.platform) === p),
           platformUsername: connectedPlatforms.find(c => getBasePlatform(c.platform) === p)?.platform_username,
         }));
+
+        // Fallback: if URL has count for this platform, mark as connected (handles race conditions)
+        if (justConnected && urlCount) {
+          const urlPlatform = justConnected; // 'instagram' or 'facebook'
+          const idx = channelsFromOurDB.findIndex(c => c.platform === urlPlatform);
+          if (idx >= 0) {
+            channelsFromOurDB[idx].connected = true;
+            channelsFromOurDB[idx].platformUsername = `(${urlCount} accounts)`;
+          }
+        }
 
         setChannels(channelsFromOurDB);
       } catch (error) {
