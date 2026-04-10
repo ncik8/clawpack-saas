@@ -77,22 +77,63 @@ export async function GET(request: Request) {
       const pagesWithIg = pagesData.data?.filter((p: any) => p.instagram_business_account) || [];
       console.log('Pages with IG:', pagesWithIg.length);
 
-      // If no pages have IG linked, try to get IG accounts directly
+      // If no pages have IG linked, try to get IG accounts directly via instagram_business_accounts endpoint
       if (pagesWithIg.length === 0) {
-        console.log('No pages with IG linked, trying direct IG accounts...');
+        console.log('No pages with IG linked, trying instagram_business_accounts endpoint...');
         
-        // Try to get IG accounts directly from the user
+        // Try to get IG business accounts directly from the user
         const igDirectRes = await fetch(
-          `https://graph.facebook.com/v18.0/${userData.id}/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`
+          `https://graph.facebook.com/v18.0/${userData.id}?fields=instagram_business_accounts&access_token=${userToken}`
         );
         const igDirectData = await igDirectRes.json();
-        console.log('Direct IG response:', JSON.stringify(igDirectData));
+        console.log('Instagram business accounts response:', JSON.stringify(igDirectData));
+        
+        // If we got instagram_business_accounts, extract them
+        if (igDirectData.instagram_business_accounts?.data?.length > 0) {
+          console.log('Found IG business accounts via direct endpoint');
+          for (const igAccount of igDirectData.instagram_business_accounts.data) {
+            // Get IG username
+            const igInfoRes = await fetch(
+              `https://graph.facebook.com/v18.0/${igAccount.id}?fields=username,name&access_token=${userToken}`
+            );
+            const igInfo = await igInfoRes.json();
+            const igUsername = igInfo.username || igAccount.name || igAccount.id;
+            
+            console.log('Storing IG via direct endpoint:', igAccount.id, igUsername);
+            
+            await supabase
+              .from('social_connections')
+              .delete()
+              .eq('user_id', oauthState.user_id)
+              .eq('platform', 'instagram')
+              .eq('platform_user_id', igAccount.id);
+
+            await supabase.from('social_connections').insert({
+              user_id: oauthState.user_id,
+              platform: 'instagram',
+              platform_user_id: igAccount.id,
+              platform_username: igUsername,
+              access_token: userToken,
+              refresh_token: tokens.refresh_token || null,
+              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+            });
+            pagesWithIg.push({ ...igAccount, instagram_business_account: igAccount });
+          }
+          return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${igDirectData.instagram_business_accounts.data.length}`);
+        }
+        
+        // Try legacy approach - /me/accounts with instagram_business_account field
+        const legacyRes = await fetch(
+          `https://graph.facebook.com/v18.0/${userData.id}/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`
+        );
+        const legacyData = await legacyRes.json();
+        console.log('Legacy IG accounts response:', JSON.stringify(legacyData));
         
         // Check if any of the returned accounts are actually IG accounts (have id but no instagram_business_account means it's an IG account ID directly)
-        const directIgAccounts = igDirectData.data?.filter((p: any) => p.id && !p.instagram_business_account) || [];
+        const directIgAccounts = legacyData.data?.filter((p: any) => p.id && !p.instagram_business_account) || [];
         
         if (directIgAccounts.length > 0) {
-          console.log('Found direct IG accounts:', directIgAccounts.length);
+          console.log('Found direct IG accounts via legacy:', directIgAccounts.length);
           for (const igAccount of directIgAccounts) {
             await supabase
               .from('social_connections')
