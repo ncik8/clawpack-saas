@@ -94,13 +94,14 @@ export default function ConnectedAccountsPage() {
           return;
         }
 
-        // Check URL params from OAuth callback - if connected just happened, wait a moment
+        // Check URL params from OAuth callback - if connected just happened, force reload to get fresh data
         const urlParams = new URLSearchParams(window.location.search);
         const justConnected = urlParams.get('connected');
         
-        // Small delay if OAuth callback just happened (data might still be saving)
+        // Force reload if OAuth callback just happened (ensures fresh database state)
         if (justConnected) {
-          await new Promise(r => setTimeout(r, 1000));
+          window.location.href = window.location.pathname;
+          return;
         }
 
         // First, check our social_connections table (this is the source of truth for our OAuth)
