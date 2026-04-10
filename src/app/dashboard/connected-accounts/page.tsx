@@ -5,6 +5,11 @@ import { supabase } from '@/lib/supabase';
 
 const API_URL = '/api/postiz-api';
 
+// Multi-account platforms like instagram_123 are stored with underscore
+const getBasePlatform = (platformId: string): string => {
+  return platformId.split('_')[0];
+};
+
 interface Channel {
   id: string;
   platform: string;
@@ -115,8 +120,8 @@ export default function ConnectedAccountsPage() {
           platform: p,
           name: channelMap[p]?.name || p,
           emoji: channelMap[p]?.emoji || '📱',
-          connected: connectedPlatforms.some(c => c.platform === p),
-          platformUsername: connectedPlatforms.find(c => c.platform === p)?.platform_username,
+          connected: connectedPlatforms.some(c => getBasePlatform(c.platform) === p),
+          platformUsername: connectedPlatforms.find(c => getBasePlatform(c.platform) === p)?.platform_username,
         }));
 
         setChannels(channelsFromOurDB);
