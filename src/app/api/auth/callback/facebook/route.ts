@@ -77,88 +77,130 @@ export async function GET(request: Request) {
       const pagesWithIg = pagesData.data?.filter((p: any) => p.instagram_business_account) || [];
       console.log('Pages with IG:', pagesWithIg.length);
 
-      // If no pages have IG linked, try to get IG accounts directly via instagram_business_accounts endpoint
+      // If no pages have IG linked, try to get IG accounts via multiple approaches
       if (pagesWithIg.length === 0) {
-        console.log('No pages with IG linked, trying instagram_business_accounts endpoint...');
+        console.log('No pages with IG linked, trying alternate endpoints...');
         
-        // Try to get IG business accounts directly from the user
-        const igDirectRes = await fetch(
-          `https://graph.facebook.com/v18.0/${userData.id}?fields=instagram_business_accounts&access_token=${userToken}`
-        );
-        const igDirectData = await igDirectRes.json();
-        console.log('Instagram business accounts response:', JSON.stringify(igDirectData));
-        
-        // If we got instagram_business_accounts, extract them
-        if (igDirectData.instagram_business_accounts?.data?.length > 0) {
-          console.log('Found IG business accounts via direct endpoint');
-          for (const igAccount of igDirectData.instagram_business_accounts.data) {
-            // Get IG username
-            const igInfoRes = await fetch(
-              `https://graph.facebook.com/v18.0/${igAccount.id}?fields=username,name&access_token=${userToken}`
-            );
-            const igInfo = await igInfoRes.json();
-            const igUsername = igInfo.username || igAccount.name || igAccount.id;
-            
-            console.log('Storing IG via direct endpoint:', igAccount.id, igUsername);
-            
-            await supabase
-              .from('social_connections')
-              .delete()
-              .eq('user_id', oauthState.user_id)
-              .eq('platform', 'instagram')
-              .eq('platform_user_id', igAccount.id);
+        // Approach 1: Try /me/identities which returns all connected identities including Instagram
+        try {
+          const identitiesRes = await fetch(
+            `https://graph.facebook.com/v18.0/me/identities?access_token=${userToken}`
+          );
+          const identitiesData = await identitiesRes.json();
+          console.log('Identities response:', JSON.stringify(identitiesData));
+          
+          if (identitiesData.data) {
+            const igIdentities = identitiesData.data.filter((i: any) => i.type === 'INSTAGRAM');
+            if (igIdentities.length > 0) {
+              console.log('Found IG via identities:', igIdentities.length);
+              for (const ig of igIdentities) {
+                const igId = ig.id;
+                const igUsername = ig.username || igId;
+                
+                await supabase
+                  .from('social_connections')
+                  .delete()
+                  .eq('user_id', oauthState.user_id)
+                  .eq('platform', 'instagram')
+                  .eq('platform_user_id', igId);
 
-            await supabase.from('social_connections').insert({
-              user_id: oauthState.user_id,
-              platform: 'instagram',
-              platform_user_id: igAccount.id,
-              platform_username: igUsername,
-              access_token: userToken,
-              refresh_token: tokens.refresh_token || null,
-              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-            });
-            pagesWithIg.push({ ...igAccount, instagram_business_account: igAccount });
+                await supabase.from('social_connections').insert({
+                  user_id: oauthState.user_id,
+                  platform: 'instagram',
+                  platform_user_id: igId,
+                  platform_username: igUsername,
+                  access_token: userToken,
+                  refresh_token: tokens.refresh_token || null,
+                  expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+                });
+              }
+              return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${igIdentities.length}`);
+            }
           }
-          return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${igDirectData.instagram_business_accounts.data.length}`);
+        } catch (e) {
+          console.log('Identities approach failed:', e);
         }
         
-        // Try legacy approach - /me/accounts with instagram_business_account field
-        const legacyRes = await fetch(
-          `https://graph.facebook.com/v18.0/${userData.id}/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`
-        );
-        const legacyData = await legacyRes.json();
-        console.log('Legacy IG accounts response:', JSON.stringify(legacyData));
-        
-        // Check if any of the returned accounts are actually IG accounts (have id but no instagram_business_account means it's an IG account ID directly)
-        const directIgAccounts = legacyData.data?.filter((p: any) => p.id && !p.instagram_business_account) || [];
-        
-        if (directIgAccounts.length > 0) {
-          console.log('Found direct IG accounts via legacy:', directIgAccounts.length);
-          for (const igAccount of directIgAccounts) {
-            await supabase
-              .from('social_connections')
-              .delete()
-              .eq('user_id', oauthState.user_id)
-              .eq('platform', 'instagram')
-              .eq('platform_user_id', igAccount.id);
+        // Approach 2: Try /me/accounts with instagram_business_accounts field
+        try {
+          const accountsRes = await fetch(
+            `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`
+          );
+          const accountsData = await accountsRes.json();
+          console.log('Accounts response:', JSON.stringify(accountsData));
+          
+          const igAccounts = accountsData.data?.filter((p: any) => p.instagram_business_account) || [];
+          if (igAccounts.length > 0) {
+            for (const page of igAccounts) {
+              const igAccountId = page.instagram_business_account.id;
+              const igInfoRes = await fetch(
+                `https://graph.facebook.com/v18.0/${igAccountId}?fields=username,name&access_token=${userToken}`
+              );
+              const igInfo = await igInfoRes.json();
+              
+              await supabase
+                .from('social_connections')
+                .delete()
+                .eq('user_id', oauthState.user_id)
+                .eq('platform', 'instagram')
+                .eq('platform_user_id', igAccountId);
 
-            await supabase.from('social_connections').insert({
-              user_id: oauthState.user_id,
-              platform: 'instagram',
-              platform_user_id: igAccount.id,
-              platform_username: igAccount.name || igAccount.id,
-              access_token: igAccount.access_token || userToken,
-              refresh_token: tokens.refresh_token || null,
-              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-            });
+              await supabase.from('social_connections').insert({
+                user_id: oauthState.user_id,
+                platform: 'instagram',
+                platform_user_id: igAccountId,
+                platform_username: igInfo.username || igInfo.name || igAccountId,
+                access_token: page.access_token || userToken,
+                refresh_token: tokens.refresh_token || null,
+                expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+              });
+            }
+            return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${igAccounts.length}`);
           }
-          // Return success - fallback saved accounts directly
-          return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${directIgAccounts.length}`);
+        } catch (e) {
+          console.log('Accounts approach failed:', e);
         }
         
-        if (pagesWithIg.length === 0) {
-          return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=no_instagram_account`);
+        // Approach 3: For business OAuth, the IG accounts might be in the granted_scopes
+        // Try to get them via the Instagram Graph API directly
+        try {
+          const igRes = await fetch(
+            `https://graph.facebook.com/v18.0/${userData.id}?fields=instagram_business_accounts&access_token=${userToken}`
+          );
+          const igData = await igRes.json();
+          console.log('IG direct response:', JSON.stringify(igData));
+          
+          if (igData.instagram_business_accounts?.data?.length > 0) {
+            for (const igAccount of igData.instagram_business_accounts.data) {
+              const igInfoRes = await fetch(
+                `https://graph.facebook.com/v18.0/${igAccount.id}?fields=username,name&access_token=${userToken}`
+              );
+              const igInfo = await igInfoRes.json();
+              
+              await supabase
+                .from('social_connections')
+                .delete()
+                .eq('user_id', oauthState.user_id)
+                .eq('platform', 'instagram')
+                .eq('platform_user_id', igAccount.id);
+
+              await supabase.from('social_connections').insert({
+                user_id: oauthState.user_id,
+                platform: 'instagram',
+                platform_user_id: igAccount.id,
+                platform_username: igInfo.username || igAccount.name || igAccount.id,
+                access_token: userToken,
+                refresh_token: tokens.refresh_token || null,
+                expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+              });
+            }
+            return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${igData.instagram_business_accounts.data.length}`);
+          }
+        } catch (e) {
+          console.log('IG direct approach failed:', e);
         }
+        
+        return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=no_instagram_account`);
       }
 
       // Store EACH page with IG as a separate connection
