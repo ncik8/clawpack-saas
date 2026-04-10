@@ -1,4 +1,3 @@
-
 import { createClient } from '@/utils/supabase/server';
 import crypto from 'crypto';
 
@@ -26,13 +25,16 @@ export async function GET() {
     platform: 'instagram',
   });
 
+  // Use business OAuth dialog which allows selecting Instagram accounts
   const params = new URLSearchParams({
-    response_type: 'code',
     client_id: process.env.FACEBOOK_APP_ID!,
     redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/facebook`,
-    scope: 'pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish',
+    scope: 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement',
+    response_type: 'code',
     state,
+    return_scopes: 'true',
+    action: 'finish',
   });
 
-  return Response.redirect(`https://www.facebook.com/v18.0/dialog/oauth?${params}`);
+  return Response.redirect(`https://www.facebook.com/v18.0/dialog/oauth/business/?${params}`);
 }
