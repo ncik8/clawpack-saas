@@ -59,16 +59,51 @@ export async function GET(request: Request) {
 
     console.log('Instagram-standalone OAuth for user:', userData.id);
 
-    // Try to get Instagram business accounts directly
-    // This gets IG accounts that are linked to FB pages OR standalone business IG accounts
+    // First try: Get Instagram business accounts directly via dedicated endpoint
+    let savedCount = 0;
+    
+    try {
+      const igDirectRes = await fetch(
+        `https://graph.facebook.com/v18.0/${userData.id}/instagram_business_accounts?access_token=${userToken}&fields=id,username,name`
+      );
+      const igDirectData = await igDirectRes.json();
+      console.log('Instagram business accounts response:', JSON.stringify(igDirectData));
+      
+      if (igDirectData.data && igDirectData.data.length > 0) {
+        for (const igAccount of igDirectData.data) {
+          const igUsername = igAccount.username || igAccount.name || igAccount.id;
+          
+          await supabase.from('social_connections').upsert(
+            {
+              user_id: oauthState.user_id,
+              platform: 'instagram',
+              platform_user_id: igAccount.id,
+              platform_username: igUsername,
+              access_token: userToken,
+              refresh_token: tokens.refresh_token || null,
+              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+            },
+            { onConflict: 'user_id,platform,platform_user_id' }
+          );
+          savedCount++;
+          console.log('Saved IG via direct endpoint:', igUsername);
+        }
+        
+        if (savedCount > 0) {
+          return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${savedCount}`);
+        }
+      }
+    } catch (e) {
+      console.log('Instagram business accounts endpoint failed:', e);
+    }
+
+    // Second try: Get via /me/accounts
     const igAccountsRes = await fetch(
       `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`,
     );
     const igAccountsData = await igAccountsRes.json();
 
-    console.log('IG Accounts response:', JSON.stringify(igAccountsData));
-
-    let savedCount = 0;
+    console.log('IG Accounts via pages response:', JSON.stringify(igAccountsData));
 
     if (igAccountsData.data && igAccountsData.data.length > 0) {
       for (const page of igAccountsData.data) {
