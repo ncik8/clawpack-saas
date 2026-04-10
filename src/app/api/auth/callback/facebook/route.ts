@@ -110,8 +110,9 @@ export async function GET(request: Request) {
               refresh_token: tokens.refresh_token || null,
               expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
             });
-            pagesWithIg.push(igAccount);
           }
+          // Return success - fallback saved accounts directly
+          return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${directIgAccounts.length}`);
         }
         
         if (pagesWithIg.length === 0) {
