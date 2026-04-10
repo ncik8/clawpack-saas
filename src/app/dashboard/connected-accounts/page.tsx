@@ -5,8 +5,13 @@ import { supabase } from '@/lib/supabase';
 
 const API_URL = '/api/postiz-api';
 
-// Multi-account platforms like instagram_123 are stored with underscore
+// Multi-account platforms: facebook_123, x_456, instagram-standalone_789
 const getBasePlatform = (platformId: string): string => {
+  // Handle instagram-standalone → instagram
+  if (platformId.startsWith('instagram-standalone')) {
+    return 'instagram';
+  }
+  // Handle facebook_123, x_456, etc.
   return platformId.split('_')[0];
 };
 
