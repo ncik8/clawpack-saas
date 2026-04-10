@@ -1,4 +1,3 @@
-
 import { createClient } from '@/utils/supabase/server';
 import crypto from 'crypto';
 
@@ -10,7 +9,7 @@ export async function GET() {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const state = crypto.randomBytes(8).toString('base64url');
+  const state = crypto.randomBytes(16).toString('hex');
 
   // Clean up any old states for this user+platform
   await supabase
@@ -26,11 +25,19 @@ export async function GET() {
     platform: 'facebook',
   });
 
+  const scopes = [
+    'pages_show_list',
+    'pages_read_engagement',
+    'pages_manage_posts',
+    'pages_manage_metadata',
+    'business_management',
+  ].join(',');
+
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: process.env.FACEBOOK_APP_ID!,
     redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/facebook`,
-    scope: 'pages_show_list,pages_read_engagement,pages_manage_posts',
+    scope: scopes,
     state,
   });
 

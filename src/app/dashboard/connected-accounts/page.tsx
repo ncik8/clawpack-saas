@@ -223,9 +223,9 @@ export default function ConnectedAccountsPage() {
       return;
     }
     
-    // Instagram Business - standalone IG business accounts
+    // Instagram Business - use new Instagram route
     if (platform === 'instagram-business') {
-      window.location.href = '/api/connect/instagram-standalone';
+      window.location.href = '/api/connect/instagram';
       return;
     }
     

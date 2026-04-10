@@ -1,218 +1,120 @@
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import {
+  exchangeCodeForUserToken,
+  getAllPages,
+  getMe,
+} from '@/lib/meta';
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
+export async function GET(req: NextRequest) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
+  const redirectUri = `${appUrl}/api/auth/callback/facebook`;
+
+  const url = new URL(req.url);
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const error = url.searchParams.get('error');
+  const errorReason = url.searchParams.get('error_reason');
+  const errorDescription = url.searchParams.get('error_description');
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
+  if (error) {
+    console.error('[FACEBOOK CALLBACK] OAuth error', { error, errorReason, errorDescription });
+    return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=${error}`);
+  }
+
+  if (!code || !state) {
+    console.error('[FACEBOOK CALLBACK] Missing code or state');
+    return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=missing_params`);
+  }
+
+  // Verify state in database
+  const supabase = await createClient();
+  const { data: oauthState, error: stateError } = await supabase
+    .from('oauth_states')
+    .select('*')
+    .eq('state', state)
+    .eq('platform', 'facebook')
+    .single();
+
+  if (stateError || !oauthState) {
+    console.error('[FACEBOOK CALLBACK] Invalid state');
+    return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=invalid_state`);
+  }
+
+  // Clean up state
+  await supabase.from('oauth_states').delete().eq('state', state);
 
   try {
-    if (error) {
-      console.log('OAuth error:', error);
-      return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=${error}`);
-    }
-
-    if (!code || !state) {
-      console.log('Missing code or state');
-      return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=missing_params`);
-    }
-
-    const supabase = await createClient();
-
-    const { data: oauthState, error: stateError } = await supabase
-      .from('oauth_states')
-      .select('*')
-      .eq('state', state)
-      .single();
-
-    if (stateError || !oauthState) {
-      console.log('Invalid state:', stateError);
-      return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=invalid_state`);
-    }
-
-    const platform = oauthState.platform;
-    console.log('OAuth callback for platform:', platform);
-
-    await supabase.from('oauth_states').delete().eq('state', state);
-
-    // Exchange code for access token
-    const tokenRes = await fetch('https://graph.facebook.com/v18.0/oauth/access_token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: `${appUrl}/api/auth/callback/facebook`,
-        client_id: process.env.FACEBOOK_APP_ID!,
-        client_secret: process.env.FACEBOOK_APP_SECRET!,
-      }),
-    });
-
-    const tokens = await tokenRes.json();
-    console.log('Token exchange response:', JSON.stringify(tokens));
-
-    if (!tokenRes.ok || !tokens.access_token) {
-      console.error('Token exchange failed:', tokens);
-      return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=token_exchange_failed`);
-    }
-
-    const userToken = tokens.access_token;
+    // Exchange code for token
+    const tokenData = await exchangeCodeForUserToken(code, redirectUri);
+    const userAccessToken = tokenData.access_token;
 
     // Get user info
-    const userRes = await fetch(`https://graph.facebook.com/v18.0/me?access_token=${userToken}&fields=id,name`);
-    const userData = await userRes.json();
-    console.log('User data:', JSON.stringify(userData));
-
-    // For Instagram - the business dialog returns IG accounts differently
-    if (platform === 'instagram') {
-      let savedCount = 0;
-      
-      // First try: Get Instagram business accounts directly from user object
-      try {
-        const igRes = await fetch(
-          `https://graph.facebook.com/v18.0/${userData.id}/instagram_business_accounts?access_token=${userToken}&fields=id,username,name`
-        );
-        const igData = await igRes.json();
-        console.log('Instagram business accounts response:', JSON.stringify(igData));
-        
-        if (igData.data && igData.data.length > 0) {
-          for (const igAccount of igData.data) {
-            const igUsername = igAccount.username || igAccount.name || igAccount.id;
-            
-            await supabase
-              .from('social_connections')
-              .delete()
-              .eq('user_id', oauthState.user_id)
-              .eq('platform', 'instagram')
-              .eq('platform_user_id', igAccount.id);
-
-            await supabase.from('social_connections').insert({
-              user_id: oauthState.user_id,
-              platform: 'instagram',
-              platform_user_id: igAccount.id,
-              platform_username: igUsername,
-              access_token: userToken,
-              refresh_token: tokens.refresh_token || null,
-              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-            });
-            savedCount++;
-            console.log('Saved IG account:', igUsername);
-          }
-          
-          if (savedCount > 0) {
-            return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${savedCount}`);
-          }
-        }
-      } catch (e) {
-        console.log('Instagram business accounts endpoint failed:', e);
-      }
-      
-      // Second try: Get Facebook Pages and check for linked Instagram
-      const pagesRes = await fetch(
-        `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`
-      );
-      const pagesData = await pagesRes.json();
-      console.log('Instagram pages response:', JSON.stringify(pagesData));
-
-      const pagesWithIg = pagesData.data?.filter((p: any) => p.instagram_business_account) || [];
-      console.log('Pages with IG:', pagesWithIg.length);
-
-      if (pagesWithIg.length > 0) {
-        for (const page of pagesWithIg) {
-          const igAccountId = page.instagram_business_account.id;
-          const igInfoRes = await fetch(
-            `https://graph.facebook.com/v18.0/${igAccountId}?fields=username,name&access_token=${userToken}`
-          );
-          const igInfo = await igInfoRes.json();
-          const igUsername = igInfo.username || igInfo.name || igAccountId;
-          
-          await supabase
-            .from('social_connections')
-            .delete()
-            .eq('user_id', oauthState.user_id)
-            .eq('platform', 'instagram')
-            .eq('platform_user_id', igAccountId);
-
-          await supabase.from('social_connections').insert({
-            user_id: oauthState.user_id,
-            platform: 'instagram',
-            platform_user_id: igAccountId,
-            platform_username: igUsername,
-            access_token: page.access_token || userToken,
-            refresh_token: tokens.refresh_token || null,
-            expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-          });
-          savedCount++;
-        }
-        return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${savedCount}`);
-      }
-      
-      return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=no_instagram_account`);
+    const me = await getMe(userAccessToken);
+    if (me.error) {
+      throw new Error(`Failed to get user: ${me.error.message}`);
     }
 
-    // For Facebook - store ALL pages user selected
-    if (platform === 'facebook') {
-      const pagesRes = await fetch(
-        `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token`
-      );
-      const pagesData = await pagesRes.json();
-      console.log('Facebook pages response:', JSON.stringify(pagesData));
+    // Get all pages with Instagram links
+    const pages = await getAllPages(userAccessToken);
 
-      if (pagesData.data && pagesData.data.length > 0) {
-        console.log('Storing', pagesData.data.length, 'Facebook pages');
-        
-        // Store EACH page as a separate connection
-        for (const page of pagesData.data) {
-          console.log('Storing FB page:', page.id, page.name);
-          
-          // Delete existing and insert new
-          await supabase
-            .from('social_connections')
-            .delete()
-            .eq('user_id', oauthState.user_id)
-            .eq('platform', 'facebook')
-            .eq('platform_user_id', page.id);
+    console.log('[FACEBOOK CALLBACK] Pages discovered', {
+      userId: me.id,
+      pageCount: pages.length,
+      pages: pages.map((p) => ({
+        id: p.id,
+        name: p.name,
+        hasIg: !!p.instagram_business_account,
+      })),
+    });
 
-          const { error: insertError } = await supabase.from('social_connections').insert({
-            user_id: oauthState.user_id,
-            platform: 'facebook',
-            platform_user_id: page.id,
-            platform_username: page.name,
-            access_token: page.access_token,
-            refresh_token: tokens.refresh_token || null,
-            expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-          });
+    // Save each Facebook Page
+    let savedCount = 0;
+    for (const page of pages) {
+      await supabase
+        .from('social_connections')
+        .delete()
+        .eq('user_id', oauthState.user_id)
+        .eq('platform', 'facebook')
+        .eq('platform_user_id', page.id);
 
-          if (insertError) {
-            console.error('FB insert error:', insertError);
-          }
-        }
-      } else {
-        console.log('No FB pages, storing user token instead');
-        await supabase
-          .from('social_connections')
-          .delete()
-          .eq('user_id', oauthState.user_id)
-          .eq('platform', 'facebook');
-          
-        await supabase.from('social_connections').insert({
-          user_id: oauthState.user_id,
-          platform: 'facebook',
-          platform_user_id: userData.id,
-          platform_username: userData.name,
-          access_token: userToken,
-          refresh_token: tokens.refresh_token || null,
-          expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-        });
-      }
-      return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=facebook&count=${pagesData.data?.length || 0}`);
+      const { error: insertError } = await supabase.from('social_connections').insert({
+        user_id: oauthState.user_id,
+        platform: 'facebook',
+        platform_user_id: page.id,
+        platform_username: page.name,
+        access_token: page.access_token || userAccessToken,
+        refresh_token: tokenData.refresh_token || null,
+        expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
+      });
+
+      if (!insertError) savedCount++;
     }
 
-    return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=unknown_platform`);
+    // If no pages, save user token as fallback
+    if (savedCount === 0) {
+      await supabase
+        .from('social_connections')
+        .delete()
+        .eq('user_id', oauthState.user_id)
+        .eq('platform', 'facebook');
+
+      await supabase.from('social_connections').insert({
+        user_id: oauthState.user_id,
+        platform: 'facebook',
+        platform_user_id: me.id,
+        platform_username: me.name,
+        access_token: userAccessToken,
+        refresh_token: tokenData.refresh_token || null,
+        expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
+      });
+      savedCount = 1;
+    }
+
+    console.log('[FACEBOOK CALLBACK] Saved', savedCount, 'Facebook pages');
+    return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=facebook&count=${savedCount}`);
   } catch (err: any) {
-    console.error('Callback error:', err);
+    console.error('[FACEBOOK CALLBACK] Fatal error', err);
     return Response.redirect(`${appUrl}/dashboard/connected-accounts?error=callback_error`);
   }
 }

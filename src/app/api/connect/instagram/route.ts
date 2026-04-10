@@ -9,7 +9,7 @@ export async function GET() {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const state = crypto.randomBytes(8).toString('base64url');
+  const state = crypto.randomBytes(16).toString('hex');
 
   // Clean up any old states for this user+platform
   await supabase
@@ -25,16 +25,24 @@ export async function GET() {
     platform: 'instagram',
   });
 
-  // Use business OAuth dialog which allows selecting Instagram accounts
+  const scopes = [
+    'pages_show_list',
+    'pages_read_engagement',
+    'business_management',
+    'instagram_basic',
+    'instagram_content_publish',
+    'instagram_manage_comments',
+    'instagram_manage_insights',
+  ].join(',');
+
+  // Use standard OAuth dialog - Instagram accounts come through /me/accounts discovery
   const params = new URLSearchParams({
     client_id: process.env.FACEBOOK_APP_ID!,
-    redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/facebook`,
-    scope: 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement',
+    redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/callback/instagram`,
+    scope: scopes,
     response_type: 'code',
     state,
-    return_scopes: 'true',
-    action: 'finish',
   });
 
-  return Response.redirect(`https://www.facebook.com/v18.0/dialog/oauth/business/?${params}`);
+  return Response.redirect(`https://www.facebook.com/v18.0/dialog/oauth?${params}`);
 }
