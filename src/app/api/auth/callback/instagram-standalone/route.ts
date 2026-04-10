@@ -72,6 +72,7 @@ export async function GET(request: Request) {
 
     if (igAccountsData.data && igAccountsData.data.length > 0) {
       for (const page of igAccountsData.data) {
+        // Check if page has instagram_business_account linked
         if (page.instagram_business_account) {
           const igAccountId = page.instagram_business_account.id;
           
@@ -82,7 +83,7 @@ export async function GET(request: Request) {
           const igData = await igRes.json();
           const igUsername = igData.username || page.name;
 
-          console.log('Storing standalone IG:', igAccountId, igUsername);
+          console.log('Storing IG via page link:', igAccountId, igUsername);
 
           await supabase.from('social_connections').upsert(
             {
@@ -91,6 +92,27 @@ export async function GET(request: Request) {
               platform_user_id: igAccountId,
               platform_username: igUsername,
               access_token: page.access_token || userToken,
+              refresh_token: tokens.refresh_token || null,
+              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+            },
+            { onConflict: 'user_id,platform,platform_user_id' }
+          );
+          savedCount++;
+        } else if (page.access_token && page.name) {
+          // No instagram_business_account but has access_token - this IS the IG account directly
+          // The page.id is actually the Instagram account ID in this case
+          const igAccountId = page.id;
+          const igUsername = page.name;
+
+          console.log('Storing IG directly:', igAccountId, igUsername);
+
+          await supabase.from('social_connections').upsert(
+            {
+              user_id: oauthState.user_id,
+              platform: 'instagram',
+              platform_user_id: igAccountId,
+              platform_username: igUsername,
+              access_token: page.access_token,
               refresh_token: tokens.refresh_token || null,
               expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
             },
