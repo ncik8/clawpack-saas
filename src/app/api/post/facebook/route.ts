@@ -10,14 +10,13 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { text, imageUrl, pageIds } = await request.json();
+    const { text, imageUrl, pageIds, imageData } = await request.json();
 
-    if (!text && !imageUrl) {
+    if (!text && !imageUrl && !imageData) {
       return Response.json({ error: 'Content or image required' }, { status: 400 });
     }
 
-    // Get FB page connections - only the specific pages requested, or all if not specified
-    // Support both facebook_123 (create page) and facebook:123 (scheduler) formats
+    // Get FB page connections
     let query = supabase
       .from('social_connections')
       .select('*')
@@ -45,15 +44,35 @@ export async function POST(request: Request) {
     for (const conn of connections) {
       try {
         // Post to Facebook Page using page access token
-        const postData: any = { message: text };
+        // Use /photos endpoint for posts with images, /feed for text-only
+        const hasImage = imageData || imageUrl;
+        const endpoint = hasImage 
+          ? `https://graph.facebook.com/v18.0/${conn.platform_user_id}/photos`
+          : `https://graph.facebook.com/v18.0/${conn.platform_user_id}/feed`;
         
-        const response = await fetch(`https://graph.facebook.com/v18.0/${conn.platform_user_id}/feed`, {
+        let postBody: any;
+        if (hasImage) {
+          // Photo post - requires source (base64 data URL) or url
+          postBody = {
+            access_token: conn.access_token,
+          };
+          if (imageData) {
+            // imageData is a data URL (e.g. "data:image/jpeg;base64,/9j/4AAQ...")
+            postBody.source = imageData;
+            postBody.message = text;
+          } else if (imageUrl) {
+            postBody.url = imageUrl;
+            postBody.message = text;
+          }
+        } else {
+          // Text-only post
+          postBody = { message: text, access_token: conn.access_token };
+        }
+        
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: text,
-            access_token: conn.access_token,
-          }),
+          body: JSON.stringify(postBody),
         });
 
         const data = await response.json();

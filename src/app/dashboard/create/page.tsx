@@ -325,10 +325,21 @@ export default function CreatePostPage() {
           const fbPageIds = platforms
             .filter(p => p.startsWith('facebook_'))
             .map(p => p.replace('facebook_', ''));
+          
+          // If there's an image, convert to base64 for Facebook (Facebook API requires image as base64 or URL)
+          let imageData = undefined;
+          if (imageFile) {
+            imageData = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.readAsDataURL(imageFile);
+            });
+          }
+          
           const response = await fetch('/api/post/facebook', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: content, pageIds: fbPageIds }),
+            body: JSON.stringify({ text: content, pageIds: fbPageIds, imageData }),
           });
 
           const data = await response.json();
