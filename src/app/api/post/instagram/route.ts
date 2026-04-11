@@ -10,10 +10,15 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { text } = await request.json();
+    const { text, imageUrl } = await request.json();
 
     if (!text) {
       return Response.json({ error: 'Content required' }, { status: 400 });
+    }
+
+    // Instagram requires image_url or video_url
+    if (!imageUrl) {
+      return Response.json({ error: 'Instagram requires an image URL. Please paste a public image URL above.' }, { status: 400 });
     }
 
     // Get all IG account connections for this user
@@ -36,12 +41,16 @@ export async function POST(request: Request) {
       console.log(`[INSTAGRAM POST] Posting to ${conn.platform_username} (${conn.platform_user_id})`);
       try {
         // Step 1: Create media container
+        // Instagram requires either image_url or video_url (public URLs only)
         const containerRes = await fetch(
           `https://graph.facebook.com/v18.0/${conn.platform_user_id}/media?access_token=${conn.access_token}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ caption: text }),
+            body: JSON.stringify({ 
+              image_url: imageUrl,
+              caption: text,
+            }),
           }
         );
         const containerData = await containerRes.json();

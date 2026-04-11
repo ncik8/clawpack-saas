@@ -22,6 +22,7 @@ export default function CreatePostPage() {
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [instagramImageUrl, setInstagramImageUrl] = useState<string>('');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [scheduledFor, setScheduledFor] = useState<string>('');
@@ -342,7 +343,10 @@ export default function CreatePostPage() {
           const response = await fetch('/api/post/instagram', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: content }),
+            body: JSON.stringify({ 
+              text: content,
+              imageUrl: instagramImageUrl || undefined,
+            }),
           });
 
           const data = await response.json();
@@ -783,6 +787,31 @@ export default function CreatePostPage() {
           </div>
         )}
       </div>
+
+      {/* Instagram Image URL - only show when Instagram is selected */}
+      {platforms.some(p => getBasePlatform(p) === 'instagram') && (
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>
+            📷 Instagram requires an image URL
+          </div>
+          <input
+            type="url"
+            placeholder="https://... (public image URL)"
+            value={instagramImageUrl}
+            onChange={(e) => setInstagramImageUrl(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              borderRadius: '6px',
+              border: '2px solid #374151',
+              background: '#1f2937',
+              color: 'white',
+              fontSize: '14px',
+              outline: 'none',
+            }}
+          />
+        </div>
+      )}
 
       {/* Video Upload */}
       <div style={{ marginBottom: '24px' }}>
