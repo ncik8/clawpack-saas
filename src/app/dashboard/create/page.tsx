@@ -715,78 +715,38 @@ export default function CreatePostPage() {
         Images: JPG, PNG, GIF (max 20MB) • Videos: MP4, MOV (max 100MB) {platforms.includes('bluesky') && '• Bluesky: images only (video coming soon)'}
       </div>
       
-      {/* Image Upload */}
-      <div style={{ marginBottom: '24px' }}>
-        <input
-          type="file"
-          accept="image/*"
-          id="image-upload"
-          style={{ display: 'none' }}
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              setImageFile(file);
-              // Create preview
-              const reader = new FileReader();
-              reader.onload = (e) => setImagePreview(e.target?.result as string);
-              reader.readAsDataURL(file);
-            }
-          }}
-        />
-        <label
-          htmlFor="image-upload"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            borderRadius: '6px',
-            border: '2px solid #374151',
-            background: '#1f2937',
-            color: '#9ca3af',
-            cursor: 'pointer',
-            fontSize: '14px',
-          }}
-        >
-          📷 Add Image
-        </label>
-        {imagePreview && (
-          <div style={{ marginTop: '12px', position: 'relative', display: 'inline-block' }}>
-            <img
-              src={imagePreview}
-              alt="Preview"
-              style={{
-                maxWidth: '200px',
-                maxHeight: '150px',
-                borderRadius: '8px',
-                border: '2px solid #374151',
-              }}
-            />
-            <button
-              onClick={() => {
-                setImageFile(null);
-                setImagePreview(null);
-              }}
-              style={{
-                position: 'absolute',
-                top: '-8px',
-                right: '-8px',
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                border: 'none',
-                background: '#ef4444',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                lineHeight: '24px',
-              }}
-            >
-              ×
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Image Upload - hidden when Instagram is selected */}
+      {!platforms.some(p => getBasePlatform(p) === 'instagram') && (
+        <div style={{ marginBottom: '24px' }}>
+          <input
+            type="file"
+            accept="image/*"
+            id="image-upload"
+            style={{ display: 'none' }}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                setImageFile(file);
+                const reader = new FileReader();
+                reader.onload = (e) => setImagePreview(e.target?.result as string);
+                reader.readAsDataURL(file);
+              }
+            }}
+          />
+          <label
+            htmlFor="image-upload"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '6px', border: '2px solid #374151', background: '#1f2937', color: '#9ca3af', cursor: 'pointer', fontSize: '14px' }}
+          >
+            📷 Add Image
+          </label>
+          {imagePreview && (
+            <div style={{ marginTop: '12px', position: 'relative', display: 'inline-block' }}>
+              <img src={imagePreview} alt="Preview" style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '8px', border: '2px solid #374151' }} />
+              <button onClick={() => { setImageFile(null); setImagePreview(null); }} style={{ position: 'absolute', top: '-8px', right: '-8px', width: '24px', height: '24px', borderRadius: '50%', border: 'none', background: '#ef4444', color: 'white', cursor: 'pointer', fontSize: '14px', lineHeight: '24px' }}>×</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Instagram Image URL - only show when Instagram is selected */}
       {platforms.some(p => getBasePlatform(p) === 'instagram') && (
@@ -814,8 +774,9 @@ export default function CreatePostPage() {
         </div>
       )}
 
-      {/* Video Upload */}
-      <div style={{ marginBottom: '24px' }}>
+      {/* Video Upload - hidden when Instagram is selected */}
+      {!platforms.some(p => getBasePlatform(p) === 'instagram') && (
+        <div style={{ marginBottom: '24px' }}>
         <input
           type="file"
           accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm"
@@ -886,6 +847,7 @@ export default function CreatePostPage() {
           </div>
         )}
       </div>
+    )}
 
       {/* Scheduling Option */}
       <div style={{ marginBottom: '24px' }}>
