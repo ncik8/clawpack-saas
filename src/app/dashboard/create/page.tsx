@@ -792,7 +792,8 @@ export default function CreatePostPage() {
       {platforms.some(p => getBasePlatform(p) === 'instagram') && (
         <div style={{ marginBottom: '24px' }}>
           <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>
-            📷 Instagram requires an image URL
+            📷 Instagram requires a public image URL{' '}
+            <a href="https://www.image2url.com" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'underline' }}>Get one free →</a>
           </div>
           <input
             type="url"
