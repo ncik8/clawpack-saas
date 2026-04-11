@@ -33,6 +33,7 @@ export async function POST(request: Request) {
     const results: { igId: string; username: string; success: boolean; postId?: string; error?: string }[] = [];
 
     for (const conn of connections) {
+      console.log(`[INSTAGRAM POST] Posting to ${conn.platform_username} (${conn.platform_user_id})`);
       try {
         // Step 1: Create media container
         const containerRes = await fetch(
@@ -44,13 +45,14 @@ export async function POST(request: Request) {
           }
         );
         const containerData = await containerRes.json();
+        console.log(`[INSTAGRAM POST] Container response for ${conn.platform_user_id}:`, JSON.stringify(containerData));
 
         if (!containerRes.ok || !containerData.id) {
           results.push({
             igId: conn.platform_user_id,
             username: conn.platform_username || 'Instagram',
             success: false,
-            error: containerData.error?.message || 'Failed to create media',
+            error: containerData.error?.message || `HTTP ${containerRes.status}: Failed to create media`,
           });
           continue;
         }
