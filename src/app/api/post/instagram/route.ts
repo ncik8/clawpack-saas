@@ -24,8 +24,11 @@ export async function POST(request: Request) {
       .eq('platform', 'instagram');
 
     if (!connections || connections.length === 0) {
+      console.log('[INSTAGRAM POST] No connections found for user:', user.id);
       return Response.json({ error: 'No Instagram account connected' }, { status: 400 });
     }
+
+    console.log('[INSTAGRAM POST] Found connections:', connections.length, connections.map(c => c.platform_user_id));
 
     const results: { igId: string; username: string; success: boolean; postId?: string; error?: string }[] = [];
 
@@ -83,7 +86,7 @@ export async function POST(request: Request) {
           igId: conn.platform_user_id,
           username: conn.platform_username || 'Instagram',
           success: false,
-          error: err.message,
+          error: err?.message || String(err),
         });
       }
     }
@@ -96,6 +99,6 @@ export async function POST(request: Request) {
     });
   } catch (err: any) {
     console.error('IG post error:', err);
-    return Response.json({ error: err.message }, { status: 500 });
+    return Response.json({ error: err?.message || String(err) || 'Unknown error' }, { status: 500 });
   }
 }
