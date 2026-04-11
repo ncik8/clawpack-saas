@@ -167,6 +167,14 @@ export default function CreatePostPage() {
       return;
     }
 
+    // Validation: Instagram requires an image URL (public URL required for API)
+    const isInstagramSelected = platforms.some(p => getBasePlatform(p) === 'instagram');
+    if (isInstagramSelected && !instagramImageUrl) {
+      setResult({ success: false, message: 'Instagram requires an image URL. Please paste a public image URL above.' });
+      setPosting(false);
+      return;
+    }
+
     setPosting(true);
     setResult(null);
 
