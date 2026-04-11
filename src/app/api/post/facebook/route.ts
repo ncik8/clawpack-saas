@@ -50,30 +50,44 @@ export async function POST(request: Request) {
           ? `https://graph.facebook.com/v18.0/${conn.platform_user_id}/photos`
           : `https://graph.facebook.com/v18.0/${conn.platform_user_id}/feed`;
         
-        let postBody: any;
+        let response: Response;
         if (hasImage) {
-          // Photo post - requires source (base64 data URL) or url
-          postBody = {
-            access_token: conn.access_token,
-          };
+          // Photo post - use FormData for base64
+          const formData = new FormData();
+          formData.append('access_token', conn.access_token);
+          formData.append('message', text);
           if (imageData) {
-            // imageData is a data URL (e.g. "data:image/jpeg;base64,/9j/4AAQ...")
-            postBody.source = imageData;
-            postBody.message = text;
+            // Extract base64 data from data URL (e.g. "data:image/jpeg;base64,/9j/4AAQ...")
+            const base64Match = imageData.match(/^data:([^;]+);base64,(.+)$/);
+            if (base64Match) {
+              const mimeType = base64Match[1];
+              const base64Data = base64Match[2];
+              // Convert base64 to Blob
+              const byteCharacters = atob(base64Data);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: mimeType });
+              formData.append('source', blob, 'image.jpg');
+            }
           } else if (imageUrl) {
-            postBody.url = imageUrl;
-            postBody.message = text;
+            formData.append('url', imageUrl);
           }
+          
+          response = await fetch(endpoint, {
+            method: 'POST',
+            body: formData,
+          });
         } else {
           // Text-only post
-          postBody = { message: text, access_token: conn.access_token };
+          response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, access_token: conn.access_token }),
+          });
         }
-        
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(postBody),
-        });
 
         const data = await response.json();
 
