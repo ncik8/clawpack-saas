@@ -7,8 +7,8 @@ const API_URL = '/api/postiz-api';
 
 // Multi-account platforms: facebook_123, x_456, instagram-standalone_789
 const getBasePlatform = (platformId: string): string => {
-  // Handle instagram-standalone → instagram
-  if (platformId.startsWith('instagram-standalone')) {
+  // Handle instagram-standalone, instagram-business → instagram
+  if (platformId.startsWith('instagram-')) {
     return 'instagram';
   }
   // Handle facebook_123, x_456, etc.
@@ -292,7 +292,9 @@ export default function ConnectedAccountsPage() {
   ];
 
   const isConnected = (platformId: string) => {
-    const channel = channels.find(c => c.platform === platformId);
+    // Handle instagram-business → instagram for channel lookup
+    const basePlatform = platformId.startsWith('instagram-') ? 'instagram' : platformId.split('_')[0];
+    const channel = channels.find(c => c.platform === basePlatform);
     return channel?.connected || false;
   };
 
