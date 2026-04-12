@@ -60,9 +60,9 @@ export async function GET(request: Request) {
 
       // Post to each platform
       for (const platformStr of post.platforms) {
-        // Parse platform:page_id format
-        const [basePlatform, pageId] = platformStr.includes(':') 
-          ? platformStr.split(':') 
+        // Parse platform_page_id format (underscore separator)
+        const [basePlatform, pageId] = platformStr.includes('_') 
+          ? platformStr.split('_') 
           : [platformStr, null];
 
         // Find the specific connection for this page/account
