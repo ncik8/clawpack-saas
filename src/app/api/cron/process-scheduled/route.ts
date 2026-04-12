@@ -177,18 +177,40 @@ export async function GET(request: Request) {
             }
           } else if (basePlatform === 'facebook') {
             // Post to Facebook Page (with optional image)
-            const fbBody: Record<string, string> = { message: post.content };
             if (post.image_url) {
-              fbBody['url'] = post.image_url;
+              // Use Photos API for image posts
+              const fbPhotoRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/photos`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  url: post.image_url,
+                  caption: post.content,
+                }),
+              });
+              const fbPhotoData = await fbPhotoRes.json();
+              if (!fbPhotoRes.ok) {
+                errorMessages.push(`Facebook: ${fbPhotoData.error?.message || 'Unknown error'}`);
+                postSucceeded = false;
+              }
+            } else {
+              // Text-only post - use Feed API
+              const fbRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/feed`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: post.content }),
+              });
+              const fbData = await fbRes.json();
+              if (!fbRes.ok) {
+                errorMessages.push(`Facebook: ${fbData.error?.message || 'Unknown error'}`);
+                postSucceeded = false;
+              }
             }
-            const fbRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/feed`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(fbBody),
-            });
 
             const fbData = await fbRes.json();
 
