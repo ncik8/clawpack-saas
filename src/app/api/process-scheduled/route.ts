@@ -205,10 +205,18 @@ export async function POST(request: Request) {
               twitterPayload.media = { media_ids: mediaIds };
             }
             
-            const twitterRes = await fetch('https://api.twitter.com/2/tweets', {
+            const tweetUrl = 'https://api.twitter.com/2/tweets';
+            const tweetAuthHeader = buildOAuthHeader({
+              method: 'POST',
+              url: tweetUrl,
+              accessToken: connection.access_token,
+              accessTokenSecret: connection.refresh_token,
+            });
+            
+            const twitterRes = await fetch(tweetUrl, {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${connection.access_token}`,
+                'Authorization': tweetAuthHeader,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify(twitterPayload),
