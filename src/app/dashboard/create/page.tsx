@@ -465,9 +465,11 @@ export default function CreatePostPage() {
           platforms,
           scheduledFor: (() => {
             // datetime-local gives YYYY-MM-DDTHH:MM in browser's local timezone
-            // Convert to UTC: getTimezoneOffset returns (UTC - local) in minutes
-            // For HKT (UTC+8), getTimezoneOffset returns -480, so adding it subtracts 8 hours
-            const localDate = new Date(scheduledFor);
+            // Parse manually to avoid Chrome parsing naive datetime as UTC
+            const [datePart, timePart] = scheduledFor.split('T');
+            const [year, month, day] = datePart.split('-').map(Number);
+            const [hour, minute] = timePart.split(':').map(Number);
+            const localDate = new Date(year, month - 1, day, hour, minute);
             const tzOffsetMs = localDate.getTimezoneOffset() * 60 * 1000;
             const utcDate = new Date(localDate.getTime() + tzOffsetMs);
             return utcDate.toISOString();
