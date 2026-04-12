@@ -1,10 +1,75 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+function percentEncode(str: string): string {
+  return encodeURIComponent(str).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+}
+
+function normalizeUrl(input: string): string {
+  const url = new URL(input);
+  url.hash = '';
+  url.search = '';
+  if ((url.protocol === 'https:' && url.port === '443') || (url.protocol === 'http:' && url.port === '80')) {
+    url.port = '';
+  }
+  return url.toString();
+}
+
+
+function buildOAuthHeader({
+  method,
+  url,
+  accessToken,
+  accessTokenSecret,
+}: {
+  method: string;
+  url: string;
+  accessToken: string;
+  accessTokenSecret: string;
+}) {
+  const consumerKey = process.env.X_API_KEY!;
+  const consumerSecret = process.env.X_API_SECRET!;
+  
+  const oauthParams: Record<string, string> = {
+    oauth_consumer_key: consumerKey,
+    oauth_nonce: Math.random().toString(36).substring(2),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_version: '1.0',
+    oauth_token: accessToken,
+  };
+
+
+  const baseString = [
+    method.toUpperCase(),
+    percentEncode(normalizeUrl(url)),
+    percentEncode(
+      Object.keys(oauthParams)
+        .sort()
+        .map((key) => `${percentEncode(key)}=${percentEncode(oauthParams[key])}`)
+        .join('&')
+    ),
+  ].join('&');
+
+  const signingKey = `${percentEncode(consumerSecret)}&${percentEncode(accessTokenSecret)}`;
+  const signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
+
+  oauthParams.oauth_signature = signature;
+
+  return (
+    'OAuth ' +
+    Object.keys(oauthParams)
+      .sort()
+      .map((key) => `${percentEncode(key)}="${percentEncode(oauthParams[key])}"`)
+      .join(', ')
+  );
+}
 
 // Helper to delete video from Supabase storage after successful post
 async function deleteVideoFromSupabase(videoUrl: string): Promise<void> {
@@ -94,13 +159,59 @@ export async function POST(request: Request) {
 
         try {
           if (platform === 'x') {
+            let mediaIds: string[] = [];
+            
+            // If there's an image URL in the scheduled post, download and upload to Twitter
+            if (post.image_url) {
+              try {
+                // Download image from Supabase storage
+                const imageRes = await fetch(post.image_url);
+                if (imageRes.ok) {
+                  const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+                  
+                  // Upload to Twitter
+                  const mediaUploadUrl = 'https://upload.twitter.com/1.1/media/upload.json';
+                  const authHeader = buildOAuthHeader({
+                    method: 'POST',
+                    url: mediaUploadUrl,
+                    accessToken: connection.access_token,
+                    accessTokenSecret: connection.refresh_token,
+                  });
+                  
+                  const mediaRes = await fetch(mediaUploadUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': authHeader,
+                      'Content-Type': 'application/octet-stream',
+                    },
+                    body: imageBuffer,
+                  });
+                  
+                  if (mediaRes.ok) {
+                    const mediaData = await mediaRes.json();
+                    mediaIds = [mediaData.media_id_string];
+                  } else {
+                    const errText = await mediaRes.text();
+                    console.error('X media upload failed:', errText);
+                  }
+                }
+              } catch (imgErr) {
+                console.error('X image processing error:', imgErr);
+              }
+            }
+            
+            const twitterPayload: any = { text: post.content };
+            if (mediaIds.length > 0) {
+              twitterPayload.media = { media_ids: mediaIds };
+            }
+            
             const twitterRes = await fetch('https://api.twitter.com/2/tweets', {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${connection.access_token}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ text: post.content }),
+              body: JSON.stringify(twitterPayload),
             });
 
             const twitterData = await twitterRes.json();

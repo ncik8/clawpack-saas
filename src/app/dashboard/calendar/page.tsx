@@ -91,7 +91,7 @@ export default function CalendarPage() {
 
   // Group posts by date (using each post's stored timezone)
   const groupedPosts = posts.reduce((acc, post) => {
-    const tz = post.timezone || 'Asia/Hong_Kong';
+    const tz = post.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Hong_Kong';
     const date = new Date(post.scheduled_for).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -105,12 +105,13 @@ export default function CalendarPage() {
   }, {} as Record<string, ScheduledPost[]>);
 
   const formatTime = (dateStr: string, tz: string = 'Asia/Hong_Kong') => {
-    return new Date(dateStr).toLocaleTimeString('en-US', {
+    const time = new Date(dateStr).toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
       timeZone: tz
     });
+    return `${time} UTC`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -259,7 +260,7 @@ export default function CalendarPage() {
                       <div className="flex-1 min-w-0">
                         {/* Time */}
                         <p className="text-[#1780e3] text-sm font-medium mb-1">
-                          {formatTime(post.scheduled_for, Intl.DateTimeFormat().resolvedOptions().timeZone)}
+                          {formatTime(post.scheduled_for, post.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Hong_Kong')}
                         </p>
                         
                         {/* Content */}
