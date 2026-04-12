@@ -333,18 +333,27 @@ async function cleanupPostMedia(post: any): Promise<void> {
   try {
     // Delete image from Supabase storage if exists
     if (post.image_url) {
-      const fileName = post.image_url.split('/images/')[1];
-      if (fileName) {
-        await supabaseAdmin.storage.from('images').remove([fileName]);
-        console.log(`Deleted image: ${fileName}`);
+      // Extract filename from URL - handle both /images/ and /videos/ paths
+      const imageMatch = post.image_url.match(/\/images\/(.+)$/);
+      if (imageMatch && imageMatch[1]) {
+        const { error } = await supabaseAdmin.storage.from('images').remove([imageMatch[1]]);
+        if (error) {
+          console.error('Failed to delete image:', error);
+        } else {
+          console.log(`Deleted image: ${imageMatch[1]}`);
+        }
       }
     }
     // Delete video from Supabase storage if exists
     if (post.video_url) {
-      const fileName = post.video_url.split('/videos/')[1];
-      if (fileName) {
-        await supabaseAdmin.storage.from('videos').remove([fileName]);
-        console.log(`Deleted video: ${fileName}`);
+      const videoMatch = post.video_url.match(/\/videos\/(.+)$/);
+      if (videoMatch && videoMatch[1]) {
+        const { error } = await supabaseAdmin.storage.from('videos').remove([videoMatch[1]]);
+        if (error) {
+          console.error('Failed to delete video:', error);
+        } else {
+          console.log(`Deleted video: ${videoMatch[1]}`);
+        }
       }
     }
   } catch (err) {
