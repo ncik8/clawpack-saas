@@ -259,7 +259,7 @@ export default function CalendarPage() {
                       <div className="flex-1 min-w-0">
                         {/* Time */}
                         <p className="text-[#1780e3] text-sm font-medium mb-1">
-                          {formatTime(post.scheduled_for, post.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Hong_Kong')}
+                          {formatTime(post.scheduled_for, Intl.DateTimeFormat().resolvedOptions().timeZone)}
                         </p>
                         
                         {/* Content */}
