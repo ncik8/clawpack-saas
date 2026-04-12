@@ -448,7 +448,13 @@ export default function CreatePostPage() {
         body: JSON.stringify({
           content,
           platforms,
-          scheduledFor: new Date(scheduledFor).toISOString(),
+          scheduledFor: (() => {
+            // datetime-local gives YYYY-MM-DDTHH:MM in browser's local timezone (HKT = UTC+8)
+            // Convert to UTC by subtracting 8 hours before storing
+            const localDate = new Date(scheduledFor);
+            const utcDate = new Date(localDate.getTime() - 8 * 60 * 60 * 1000);
+            return utcDate.toISOString();
+          })(),
           videoUrl: videoUrl || undefined,
         }),
       });
