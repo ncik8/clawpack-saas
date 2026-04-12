@@ -126,7 +126,10 @@ export default function CalendarPage() {
   const handleEdit = (post: ScheduledPost) => {
     setEditingPost(post);
     setEditContent(post.content);
-    setEditScheduledFor(new Date(post.scheduled_for).toISOString().slice(0, 16));
+    // Convert UTC stored time back to local timezone for the datetime-local input
+    const tz = post.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Hong_Kong';
+    const localDateStr = new Date(post.scheduled_for).toLocaleString('en-CA', { timeZone: tz }).replace(', ', 'T');
+    setEditScheduledFor(localDateStr);
     setEditPlatforms([...post.platforms]);
   };
 
@@ -256,7 +259,7 @@ export default function CalendarPage() {
                       <div className="flex-1 min-w-0">
                         {/* Time */}
                         <p className="text-[#1780e3] text-sm font-medium mb-1">
-                          {formatTime(post.scheduled_for, post.timezone)}
+                          {formatTime(post.scheduled_for, post.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Hong_Kong')}
                         </p>
                         
                         {/* Content */}
