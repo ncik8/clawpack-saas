@@ -12,6 +12,7 @@ interface ScheduledPost {
   scheduled_for: string;
   status: string;
   video_url?: string;
+  image_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -194,6 +195,10 @@ export default function CalendarPage() {
     return emojis[platform] || '📱';
   };
 
+  const getBasePlatform = (platformId: string): string => {
+    return platformId.split('_')[0];
+  };
+
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center h-64">
@@ -262,14 +267,25 @@ export default function CalendarPage() {
                           {post.platforms.map((ch) => (
                             <span 
                               key={ch}
-                              className="text-lg"
-                              title={ch}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-[#374151] rounded text-xs text-white"
                             >
-                              {getPlatformEmoji(ch)}
+                              <span className="text-base">{getPlatformEmoji(getBasePlatform(ch))}</span>
+                              <span className="capitalize">{getBasePlatform(ch)}</span>
                             </span>
                           ))}
                         </div>
                       </div>
+                      
+                      {/* Image Thumbnail */}
+                      {post.image_url && (
+                        <div className="flex-shrink-0">
+                          <img 
+                            src={post.image_url} 
+                            alt="Post image" 
+                            className="w-20 h-20 object-cover rounded-lg border border-[#374151]"
+                          />
+                        </div>
+                      )}
                       
                       {/* Status */}
                       <div className="mb-2">
