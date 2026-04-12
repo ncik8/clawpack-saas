@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { uploadXImage } from '@/lib/x-oauth';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -170,34 +171,14 @@ export async function POST(request: Request) {
                   const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
                   const mimeType = 'image/jpeg'; // Default, could be detected from content-type
                   
-                  // Upload to Twitter using FormData + base64 (same method as uploadXImage)
-                  const mediaUploadUrl = 'https://upload.twitter.com/1.1/media/upload.json';
-                  const authHeader = buildOAuthHeader({
-                    method: 'POST',
-                    url: mediaUploadUrl,
+                  // Upload to Twitter using the existing uploadXImage helper
+                  const mediaId = await uploadXImage({
                     accessToken: connection.access_token,
                     accessTokenSecret: connection.refresh_token,
+                    fileBuffer: imageBuffer,
+                    mimeType,
                   });
-                  
-                  const formData = new FormData();
-                  formData.append('media_data', imageBuffer.toString('base64'));
-                  formData.append('media_category', 'tweet_image');
-                  
-                  const mediaRes = await fetch(mediaUploadUrl, {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': authHeader,
-                    },
-                    body: formData,
-                  });
-                  
-                  if (mediaRes.ok) {
-                    const mediaData = await mediaRes.json();
-                    mediaIds = [mediaData.media_id_string];
-                  } else {
-                    const errText = await mediaRes.text();
-                    console.error('X media upload failed:', errText);
-                  }
+                  mediaIds = [mediaId];
                 }
               } catch (imgErr) {
                 console.error('X image processing error:', imgErr);
