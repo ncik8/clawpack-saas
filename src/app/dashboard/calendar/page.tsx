@@ -297,6 +297,13 @@ export default function CalendarPage() {
                       <div className="mb-2">
                         {getStatusBadge(post.status)}
                       </div>
+                      
+                      {/* Error Message */}
+                      {post.status === 'failed' && post.error_message && (
+                        <p className="text-xs text-[#ef4444] mb-2 max-w-xs truncate" title={post.error_message}>
+                          ❌ {post.error_message}
+                        </p>
+                      )}
 
                       {/* Actions */}
                       <div className="flex gap-2 flex-shrink-0">
