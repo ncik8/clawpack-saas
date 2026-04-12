@@ -277,6 +277,8 @@ export async function GET(request: Request) {
         .eq('id', post.id);
 
       if (postSucceeded) {
+        // Cleanup: delete image/video from Supabase storage after successful post
+        await cleanupPostMedia(post);
         results.succeeded++;
       } else {
         results.failed++;
@@ -324,5 +326,28 @@ async function refreshXToken(refreshToken: string): Promise<{access_token: strin
   } catch (err) {
     console.error('Token refresh failed:', err);
     return null;
+  }
+}
+
+async function cleanupPostMedia(post: any): Promise<void> {
+  try {
+    // Delete image from Supabase storage if exists
+    if (post.image_url) {
+      const fileName = post.image_url.split('/images/')[1];
+      if (fileName) {
+        await supabaseAdmin.storage.from('images').remove([fileName]);
+        console.log(`Deleted image: ${fileName}`);
+      }
+    }
+    // Delete video from Supabase storage if exists
+    if (post.video_url) {
+      const fileName = post.video_url.split('/videos/')[1];
+      if (fileName) {
+        await supabaseAdmin.storage.from('videos').remove([fileName]);
+        console.log(`Deleted video: ${fileName}`);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to cleanup media:', err);
   }
 }
