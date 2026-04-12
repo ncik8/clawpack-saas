@@ -226,10 +226,12 @@ export async function POST(request: Request) {
               body: JSON.stringify(twitterPayload),
             });
 
+
             const twitterData = await twitterRes.json();
+            console.log('X tweet result:', twitterRes.status, JSON.stringify(twitterData));
 
             if (!twitterRes.ok) {
-              errorMessages.push(`Twitter: ${twitterData.detail || twitterData.title}`);
+              errorMessages.push(`Twitter: ${JSON.stringify(twitterData)}`);
               postSucceeded = false;
             }
           } else if (platform === 'linkedin') {
