@@ -211,13 +211,6 @@ export async function GET(request: Request) {
                 postSucceeded = false;
               }
             }
-
-            const fbData = await fbRes.json();
-
-            if (!fbRes.ok) {
-              errorMessages.push(`Facebook: ${fbData.error?.message || 'Unknown error'}`);
-              postSucceeded = false;
-            }
           } else if (basePlatform === 'instagram') {
             // Post to Instagram Business Account (with optional image)
             // Instagram requires a Facebook Page linked to the IG account
