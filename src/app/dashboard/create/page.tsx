@@ -26,6 +26,7 @@ export default function CreatePostPage() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [scheduledFor, setScheduledFor] = useState<string>('');
+  const [userTimezone, setUserTimezone] = useState<string>('Asia/Hong_Kong');
   
   // AI Generate state
   const [aiTopic, setAiTopic] = useState('');
@@ -33,6 +34,9 @@ export default function CreatePostPage() {
   const [aiMessages, setAiMessages] = useState<{role: 'user' | 'ai'; content: string}[]>([]);
 
   useEffect(() => {
+    // Capture user's timezone
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    setUserTimezone(tz);
     loadConnectedPlatforms();
   }, []);
 
@@ -468,6 +472,7 @@ export default function CreatePostPage() {
           })(),
           videoUrl: videoUrl || undefined,
           imageUrl: imageUrl || undefined,
+          timezone: userTimezone,
         }),
       });
 

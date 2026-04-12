@@ -88,26 +88,27 @@ export default function CalendarPage() {
     }
   };
 
-  // Group posts by date (HKT timezone)
+  // Group posts by date (using each post's stored timezone)
   const groupedPosts = posts.reduce((acc, post) => {
+    const tz = post.timezone || 'Asia/Hong_Kong';
     const date = new Date(post.scheduled_for).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-      timeZone: 'Asia/Hong_Kong'
+      timeZone: tz
     });
     if (!acc[date]) acc[date] = [];
     acc[date].push(post);
     return acc;
   }, {} as Record<string, ScheduledPost[]>);
 
-  const formatTime = (dateStr: string) => {
+  const formatTime = (dateStr: string, tz: string = 'Asia/Hong_Kong') => {
     return new Date(dateStr).toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
-      timeZone: 'Asia/Hong_Kong'
+      timeZone: tz
     });
   };
 
@@ -254,7 +255,7 @@ export default function CalendarPage() {
                       <div className="flex-1 min-w-0">
                         {/* Time */}
                         <p className="text-[#1780e3] text-sm font-medium mb-1">
-                          {formatTime(post.scheduled_for)}
+                          {formatTime(post.scheduled_for, post.timezone)}
                         </p>
                         
                         {/* Content */}

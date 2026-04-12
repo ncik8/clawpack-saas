@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS scheduled_posts (
   sent_at TIMESTAMPTZ,
   error_message TEXT,
   image_url TEXT,
+  timezone TEXT DEFAULT 'Asia/Hong_Kong',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
