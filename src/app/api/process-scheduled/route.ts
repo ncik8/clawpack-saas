@@ -123,7 +123,7 @@ export async function POST(request: Request) {
       // Get user's connections for each platform
       const { data: connections } = await supabaseAdmin
         .from('social_connections')
-        .select('platform, access_token, platform_user_id')
+        .select('platform, access_token, refresh_token, platform_user_id')
         .eq('user_id', post.user_id)
         .in('platform', post.platforms);
 
