@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS scheduled_posts (
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
   sent_at TIMESTAMPTZ,
   error_message TEXT,
+  image_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

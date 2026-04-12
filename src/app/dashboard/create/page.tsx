@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { supabaseBrowser, uploadVideoToSupabaseBrowser, deleteVideoFromSupabaseBrowser } from '@/lib/supabase-browser';
+import { supabaseBrowser, uploadVideoToSupabaseBrowser, uploadImageToSupabaseBrowser, deleteVideoFromSupabaseBrowser } from '@/lib/supabase-browser';
 
 interface ConnectedPlatform {
   id: string;
@@ -438,6 +438,17 @@ export default function CreatePostPage() {
         }
       }
 
+      // Handle image upload if present (for Facebook/Instagram which support images)
+      let imageUrl: string | null = null;
+      if (imageFile) {
+        imageUrl = await uploadImageToSupabaseBrowser(imageFile);
+        if (!imageUrl) {
+          setResult({ success: false, message: 'Failed to upload image' });
+          setPosting(false);
+          return;
+        }
+      }
+
       // Create scheduled post
       const response = await fetch('/api/schedule', {
         method: 'POST',
@@ -456,6 +467,7 @@ export default function CreatePostPage() {
             return utcDate.toISOString();
           })(),
           videoUrl: videoUrl || undefined,
+          imageUrl: imageUrl || undefined,
         }),
       });
 

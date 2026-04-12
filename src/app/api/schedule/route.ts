@@ -43,7 +43,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { content, platforms, scheduledFor, videoUrl } = await request.json();
+    const { content, platforms, scheduledFor, videoUrl, imageUrl } = await request.json();
 
     if (!content || !platforms || !scheduledFor) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -82,6 +82,7 @@ export async function POST(request: Request) {
         scheduled_for: scheduledFor,
         status: 'pending',
         video_url: videoUrl || null,
+        image_url: imageUrl || null,
       })
       .select()
       .single();

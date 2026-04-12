@@ -50,3 +50,25 @@ export async function deleteVideoFromSupabaseBrowser(videoUrl: string): Promise<
     console.error('Failed to delete video from Supabase:', err);
   }
 }
+
+export async function uploadImageToSupabaseBrowser(file: File): Promise<string | null> {
+  const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+  
+  const { data, error } = await supabaseBrowser.storage
+    .from('images')
+    .upload(fileName, file, {
+      contentType: file.type,
+      upsert: false
+    });
+
+  if (error) {
+    console.error('Supabase image upload error:', error);
+    return null;
+  }
+
+  const { data: urlData } = supabaseBrowser.storage
+    .from('images')
+    .getPublicUrl(data.path);
+
+  return urlData.publicUrl;
+}

@@ -176,14 +176,18 @@ export async function GET(request: Request) {
               postSucceeded = false;
             }
           } else if (basePlatform === 'facebook') {
-            // Post to Facebook Page
+            // Post to Facebook Page (with optional image)
+            const fbBody: Record<string, string> = { message: post.content };
+            if (post.image_url) {
+              fbBody['url'] = post.image_url;
+            }
             const fbRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/feed`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ message: post.content }),
+              body: JSON.stringify(fbBody),
             });
 
             const fbData = await fbRes.json();
@@ -193,19 +197,26 @@ export async function GET(request: Request) {
               postSucceeded = false;
             }
           } else if (basePlatform === 'instagram') {
-            // Post to Instagram Business Account
+            // Post to Instagram Business Account (with optional image)
             // Instagram requires a Facebook Page linked to the IG account
             // We use the page access token to post to IG via the Graph API
+            const igBody: Record<string, string> = { caption: post.content };
+            
+            if (post.image_url) {
+              // External image URL - use EXTERNAL_IMAGE media type
+              igBody['media_type'] = 'EXTERNAL_IMAGE';
+              igBody['external_url'] = post.image_url;
+            } else {
+              igBody['media_type'] = 'TEXT';
+            }
+
             const igRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/media`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ 
-                caption: post.content,
-                media_type: 'TEXT',
-              }),
+              body: JSON.stringify(igBody),
             });
 
             const igData = await igRes.json();
