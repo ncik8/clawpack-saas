@@ -168,8 +168,9 @@ export async function POST(request: Request) {
                 const imageRes = await fetch(post.image_url);
                 if (imageRes.ok) {
                   const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+                  const mimeType = 'image/jpeg'; // Default, could be detected from content-type
                   
-                  // Upload to Twitter
+                  // Upload to Twitter using FormData + base64 (same method as uploadXImage)
                   const mediaUploadUrl = 'https://upload.twitter.com/1.1/media/upload.json';
                   const authHeader = buildOAuthHeader({
                     method: 'POST',
@@ -178,13 +179,16 @@ export async function POST(request: Request) {
                     accessTokenSecret: connection.refresh_token,
                   });
                   
+                  const formData = new FormData();
+                  formData.append('media_data', imageBuffer.toString('base64'));
+                  formData.append('media_category', 'tweet_image');
+                  
                   const mediaRes = await fetch(mediaUploadUrl, {
                     method: 'POST',
                     headers: {
                       'Authorization': authHeader,
-                      'Content-Type': 'application/octet-stream',
                     },
-                    body: imageBuffer,
+                    body: formData,
                   });
                   
                   if (mediaRes.ok) {
