@@ -13,6 +13,7 @@ interface ScheduledPost {
   status: string;
   video_url?: string;
   image_url?: string;
+  timezone?: string;
   created_at: string;
   updated_at: string;
 }
