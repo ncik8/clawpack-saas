@@ -87,13 +87,14 @@ export default function CalendarPage() {
     }
   };
 
-  // Group posts by date
+  // Group posts by date (HKT timezone)
   const groupedPosts = posts.reduce((acc, post) => {
     const date = new Date(post.scheduled_for).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'Asia/Hong_Kong'
     });
     if (!acc[date]) acc[date] = [];
     acc[date].push(post);
@@ -104,8 +105,19 @@ export default function CalendarPage() {
     return new Date(dateStr).toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
+      timeZone: 'Asia/Hong_Kong'
     });
+  };
+
+  const getStatusBadge = (status: string) => {
+    if (status === 'sent') {
+      return <span className="px-2 py-1 text-xs font-medium bg-[#10b981]/20 text-[#10b981] rounded">Sent</span>;
+    } else if (status === 'failed') {
+      return <span className="px-2 py-1 text-xs font-medium bg-[#ef4444]/20 text-[#ef4444] rounded">Failed</span>;
+    } else {
+      return <span className="px-2 py-1 text-xs font-medium bg-[#f59e0b]/20 text-[#f59e0b] rounded">Pending</span>;
+    }
   };
 
   const handleEdit = (post: ScheduledPost) => {
@@ -193,19 +205,9 @@ export default function CalendarPage() {
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-2">Calendar</h1>
-          <p className="text-[#9ca3af] text-sm">View and manage your scheduled posts</p>
-        </div>
-        <a 
-          href={POSTIZ_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn-secondary text-sm"
-        >
-          View in Postiz ↗
-        </a>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white mb-2">Calendar</h1>
+        <p className="text-[#9ca3af] text-sm">View and manage your scheduled posts</p>
       </div>
 
       {posts.length === 0 ? (
@@ -269,6 +271,11 @@ export default function CalendarPage() {
                         </div>
                       </div>
                       
+                      {/* Status */}
+                      <div className="mb-2">
+                        {getStatusBadge(post.status)}
+                      </div>
+
                       {/* Actions */}
                       <div className="flex gap-2 flex-shrink-0">
                         <button 
