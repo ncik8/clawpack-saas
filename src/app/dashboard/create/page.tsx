@@ -464,10 +464,11 @@ export default function CreatePostPage() {
           content,
           platforms,
           scheduledFor: (() => {
-            // datetime-local gives YYYY-MM-DDTHH:MM in browser's local timezone (HKT = UTC+8)
-            // Convert to UTC by subtracting 8 hours before storing
+            // datetime-local gives YYYY-MM-DDTHH:MM in browser's local timezone
+            // Convert to UTC by adding the timezone offset
             const localDate = new Date(scheduledFor);
-            const utcDate = new Date(localDate.getTime() - 8 * 60 * 60 * 1000);
+            const tzOffset = localDate.getTimezoneOffset() * 60 * 1000;
+            const utcDate = new Date(localDate.getTime() - tzOffset);
             return utcDate.toISOString();
           })(),
           videoUrl: videoUrl || undefined,

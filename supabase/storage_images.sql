@@ -18,3 +18,6 @@ CREATE POLICY "Authenticated image upload" ON storage.objects
 
 CREATE POLICY "Authenticated image update" ON storage.objects
   FOR UPDATE USING (bucket_id = 'images');
+
+CREATE POLICY "Service role image delete" ON storage.objects
+  FOR DELETE USING (bucket_id = 'images');
