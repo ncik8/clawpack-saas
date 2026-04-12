@@ -54,8 +54,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Extract base platforms (remove :page_id suffix for FB/IG)
-    const basePlatforms = platforms.map((p: string) => p.split(':')[0]);
+    // Extract base platforms (remove _page_id suffix for FB/IG)
+    const basePlatforms = platforms.map((p: string) => p.split('_')[0]);
     
     // Verify user has these platforms connected
     const { data: connections } = await supabaseAdmin
@@ -110,8 +110,8 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Extract base platforms (remove :page_id suffix for FB/IG)
-    const basePlatforms = platforms.map((p: string) => p.split(':')[0]);
+    // Extract base platforms (remove _page_id suffix for FB/IG)
+    const basePlatforms = platforms.map((p: string) => p.split('_')[0]);
     
     // Verify user has these platforms connected
     const { data: connections } = await supabaseAdmin
