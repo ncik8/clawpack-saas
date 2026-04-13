@@ -247,7 +247,7 @@ export async function GET(request: Request) {
                     serviceRelationships: [
                       {
                         relationshipType: 'OWNER',
-                        identifierURN: 'urn:li:userGeneratedContent',
+                        identifier: 'urn:li:userGeneratedContent',
                       },
                     ],
                   },

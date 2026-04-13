@@ -111,7 +111,7 @@ export async function POST(request: Request) {
             serviceRelationships: [
               {
                 relationshipType: 'OWNER',
-                identifierURN: 'urn:li:userGeneratedContent',
+                identifier: 'urn:li:userGeneratedContent',
               },
             ],
           },
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
             serviceRelationships: [
               {
                 relationshipType: 'OWNER',
-                identifierURN: 'urn:li:userGeneratedContent',
+                identifier: 'urn:li:userGeneratedContent',
               },
             ],
           },
