@@ -121,6 +121,7 @@ async function postToX(content: string, imageUrl: string | null, connection: any
           accessToken,
           accessTokenSecret: connection.refresh_token,
           fileBuffer: imageBuffer,
+                  mimeType: 'image/jpeg',
         });
         if (mediaId) mediaIds.push(mediaId);
       }
