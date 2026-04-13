@@ -804,9 +804,8 @@ export default function CreatePostPage() {
         Images: JPG, PNG, GIF (max 20MB) • Videos: MP4, MOV (max 100MB) {platforms.includes('bluesky') && '• Bluesky: images only (video coming soon)'}
       </div>
       
-      {/* Image Upload - hidden when Instagram is selected */}
-      {!platforms.some(p => getBasePlatform(p) === 'instagram') && (
-        <div style={{ marginBottom: '24px' }}>
+      {/* Image Upload - always visible, works for all platforms including Instagram */}
+      <div style={{ marginBottom: '24px' }}>
           <input
             type="file"
             accept="image/*"
@@ -835,10 +834,9 @@ export default function CreatePostPage() {
             </div>
           )}
         </div>
-      )}
 
-      {/* Instagram Image URL - only show when Instagram is selected */}
-      {platforms.some(p => getBasePlatform(p) === 'instagram') && (
+        {/* Instagram Image URL - only show when Instagram is selected AND no image file uploaded */}
+        {platforms.some(p => getBasePlatform(p) === 'instagram') && !imageFile && (
         <div style={{ marginBottom: '24px' }}>
           <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '6px' }}>
             📷 Instagram requires a public image URL{' '}
