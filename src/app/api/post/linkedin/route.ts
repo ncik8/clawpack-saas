@@ -96,8 +96,8 @@ export async function POST(request: Request) {
     let mediaType: string | null = null;
 
     if (imageFile) {
-      // Register image asset
-      const registerRes = await fetch('https://api.linkedin.com/v2/assets', {
+      // Register image asset - use ?action=registerUpload
+      const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -106,6 +106,7 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify({
           registerUploadRequest: {
+            recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
             owner: `urn:li:person:${connection.platform_user_id}`,
             serviceRelationships: [
               {
@@ -117,25 +118,32 @@ export async function POST(request: Request) {
         }),
       });
       const registerData = await registerRes.json();
+      console.log('LinkedIn image register status:', registerRes.status, JSON.stringify(registerData));
 
       if (registerRes.ok && registerData.value?.asset) {
-        const uploadUrl = registerData.value.uploadUrl;
+        const uploadUrl = registerData.value.uploadUrl ||
+          registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
         mediaAsset = registerData.value.asset;
         mediaType = 'IMAGE';
 
-        // Upload the image binary
-        const arrayBuffer = await imageFile.arrayBuffer();
-        await fetch(uploadUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': imageFile.type || 'image/jpeg',
-          },
-          body: arrayBuffer,
-        });
+        if (uploadUrl) {
+          // Upload the image binary
+          const arrayBuffer = await imageFile.arrayBuffer();
+          const uploadRes = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': imageFile.type || 'image/jpeg',
+            },
+            body: arrayBuffer,
+          });
+          console.log('LinkedIn image upload status:', uploadRes.status);
+        } else {
+          console.error('LinkedIn: no uploadUrl found in register response');
+        }
       }
     } else if (videoFile) {
-      // Register video asset
-      const registerRes = await fetch('https://api.linkedin.com/v2/assets', {
+      // Register video asset - use ?action=registerUpload
+      const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -144,6 +152,7 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify({
           registerUploadRequest: {
+            recipes: ['urn:li:digitalmediaRecipe:feedshare-video'],
             owner: `urn:li:person:${connection.platform_user_id}`,
             serviceRelationships: [
               {
@@ -157,19 +166,22 @@ export async function POST(request: Request) {
       const registerData = await registerRes.json();
 
       if (registerRes.ok && registerData.value?.asset) {
-        const uploadUrl = registerData.value.uploadUrl;
+        const uploadUrl = registerData.value.uploadUrl ||
+          registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
         mediaAsset = registerData.value.asset;
         mediaType = 'VIDEO';
 
-        // Upload the video binary
-        const arrayBuffer = await videoFile.arrayBuffer();
-        await fetch(uploadUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': videoFile.type || 'video/mp4',
-          },
-          body: arrayBuffer,
-        });
+        if (uploadUrl) {
+          // Upload the video binary
+          const arrayBuffer = await videoFile.arrayBuffer();
+          await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': videoFile.type || 'video/mp4',
+            },
+            body: arrayBuffer,
+          });
+        }
       }
     }
 

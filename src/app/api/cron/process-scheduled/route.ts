@@ -232,8 +232,8 @@ export async function GET(request: Request) {
             
             if (post.image_url) {
               // Image post - register image first, then create post with it
-              // Step 1: Register the image
-              const registerRes = await fetch('https://api.linkedin.com/v2/assets', {
+              // Step 1: Register the image - use ?action=registerUpload
+              const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${accessToken}`,
@@ -242,6 +242,7 @@ export async function GET(request: Request) {
                 },
                 body: JSON.stringify({
                   registerUploadRequest: {
+                    recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
                     owner: authorUrn,
                     serviceRelationships: [
                       {
@@ -251,7 +252,7 @@ export async function GET(request: Request) {
                     ],
                   },
                 }),
-              });
+              });;
               
               const registerData = await registerRes.json();
               
@@ -283,7 +284,8 @@ export async function GET(request: Request) {
                 });
               } else {
                 // Step 2: Upload image binary to the uploadUrl
-                const uploadUrl = registerData.value.uploadUrl;
+                const uploadUrl = registerData.value.uploadUrl ||
+                  registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
                 const mediaAsset = registerData.value.asset;
                 
                 const imageRes = await fetch(post.image_url);
