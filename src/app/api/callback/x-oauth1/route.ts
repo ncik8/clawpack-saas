@@ -36,12 +36,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  console.log('[x-callback] user:', user.id);
+  console.log('[x-callback] looking for pending token:', oauthToken);
   const { data: pending, error: pendingError } = await supabaseAdmin
     .from('social_connections')
     .select('*')
     .eq('user_id', user.id)
     .eq('platform', 'x_oauth1_pending')
     .single();
+  console.log('[x-callback] pending query result:', { pending, pendingError });
 
   if (pendingError || !pending) {
     console.error('[x-callback] pending token not found:', { pendingError, pending });

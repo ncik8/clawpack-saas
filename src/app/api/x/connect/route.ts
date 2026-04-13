@@ -57,25 +57,24 @@ export async function GET() {
     );
   }
 
-  const { error: dbError } = await supabaseAdmin
+  console.log('[x-connect] storing pending token for user:', user.id, 'oauth_token:', parsed.oauth_token);
+  
+  // Insert-first approach: try insert first, if it fails with unique violation, try update
+  const { error: insertErr } = await supabaseAdmin
     .from('social_connections')
-    .upsert(
-      {
-        user_id: user.id,
-        platform: 'x_oauth1_pending',
-        platform_user_id: null,
-        platform_username: null,
-        access_token: parsed.oauth_token,
-        refresh_token: parsed.oauth_token_secret,
-        expires_at: null,
-      },
-      {
-        onConflict: 'user_id,platform',
-      }
-    );
-
-  if (dbError) {
-    // Fallback: try update then insert
+    .insert({
+      user_id: user.id,
+      platform: 'x_oauth1_pending',
+      platform_user_id: null,
+      platform_username: null,
+      access_token: parsed.oauth_token,
+      refresh_token: parsed.oauth_token_secret,
+      expires_at: null,
+    });
+  console.log('[x-connect] insert result:', insertErr ? `error: ${JSON.stringify(insertErr)}` : 'ok');
+  
+  if (insertErr) {
+    // Insert failed - row might already exist, try update
     const { error: updateErr } = await supabaseAdmin
       .from('social_connections')
       .update({
@@ -89,18 +88,7 @@ export async function GET() {
       })
       .eq('user_id', user.id)
       .eq('platform', 'x_oauth1_pending');
-    
-    if (updateErr) {
-      await supabaseAdmin.from('social_connections').insert({
-        user_id: user.id,
-        platform: 'x_oauth1_pending',
-        platform_user_id: null,
-        platform_username: null,
-        access_token: parsed.oauth_token,
-        refresh_token: parsed.oauth_token_secret,
-        expires_at: null,
-      });
-    }
+    console.log('[x-connect] update result:', updateErr ? `error: ${JSON.stringify(updateErr)}` : 'ok');
   }
 
   const redirectUrl = `https://api.twitter.com/oauth/authorize?oauth_token=${encodeURIComponent(parsed.oauth_token)}`;
