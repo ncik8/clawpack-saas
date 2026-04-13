@@ -238,24 +238,25 @@ export async function GET(request: Request) {
                 headers: {
                   'Authorization': `Bearer ${accessToken}`,
                   'Content-Type': 'application/json',
-                  'LinkedIn-Version': '202304',
                   'X-Restli-Protocol-Version': '2.0.0',
                 },
                 body: JSON.stringify({
                   registerUploadRequest: {
-                    serviceRelationships: [{
-                      relationshipType: 'OWNER',
-                      identifier: 'urn:li:userGeneratedContent',
-                    }],
                     owner: authorUrn,
-                    supportedUploadMechanism: ['MULTIPART_UPLOAD'],
+                    serviceRelationships: [
+                      {
+                        relationshipType: 'OWNER',
+                        identifierURN: 'urn:li:userGeneratedContent',
+                      },
+                    ],
                   },
                 }),
               });
               
               const registerData = await registerRes.json();
               
-              if (!registerRes.ok) {
+              if (!registerRes.ok || !registerData.value?.asset) {
+                console.error('LinkedIn asset registration failed:', JSON.stringify(registerData));
                 // Fallback to text-only
                 linkedInRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
                   method: 'POST',
@@ -279,23 +280,24 @@ export async function GET(request: Request) {
                   }),
                 });
               } else {
-                // Step 2: Upload image binary to the registerUploadRequest.value.asset uploadUrl
-                const uploadUrl = registerData.value.asset;
-                const uploadMechanism = registerData.value.uploadMechanism;
+                // Step 2: Upload image binary to the uploadUrl
+                const uploadUrl = registerData.value.uploadUrl;
+                const mediaAsset = registerData.value.asset;
                 
                 const imageRes = await fetch(post.image_url);
                 const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
                 
-                await fetch(uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpUri'].uploadUrl, {
+                const uploadRes = await fetch(uploadUrl, {
                   method: 'PUT',
                   headers: {
-                    'Authorization': `Bearer ${accessToken}`,
                     'Content-Type': 'image/jpeg',
                   },
                   body: imageBuffer,
                 });
                 
-                // Step 3: Create post referencing the uploaded image
+                console.log('LinkedIn image upload status:', uploadRes.status);
+                
+                // Step 3: Create post referencing the uploaded image (same structure as immediate post)
                 linkedInRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
                   method: 'POST',
                   headers: {
@@ -310,11 +312,12 @@ export async function GET(request: Request) {
                       'com.linkedin.ugc.ShareContent': {
                         shareCommentary: { text: post.content },
                         shareMediaCategory: 'IMAGE',
-                        media: [{
-                          status: 'READY',
-                          originalUrl: post.image_url,
-                          asset: uploadUrl,
-                        }],
+                        media: [
+                          {
+                            status: 'READY',
+                            media: mediaAsset,
+                          },
+                        ],
                       },
                     },
                     visibility: {
