@@ -315,6 +315,9 @@ export default function CalendarPage() {
                             src={post.image_url} 
                             alt="Post image" 
                             className="w-20 h-20 object-cover rounded-lg border border-[#374151]"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
                           />
                         </div>
                       )}
@@ -332,20 +335,12 @@ export default function CalendarPage() {
                       )}
 
                       {/* Actions */}
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button 
-                          className="px-3 py-1 text-xs bg-[#374151] text-white rounded hover:bg-[#4b5563] transition-colors"
-                          onClick={() => handleEdit(post)}
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          className="px-3 py-1 text-xs bg-[#ef4444]/20 text-[#ef4444] rounded hover:bg-[#ef4444]/30 transition-colors"
-                          onClick={() => handleDelete(post.id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <button 
+                        className="px-3 py-1 text-xs bg-[#ef4444]/20 text-[#ef4444] rounded hover:bg-[#ef4444]/30 transition-colors"
+                        onClick={() => handleDelete(post.id)}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 ))}
