@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
     .single();
 
   if (pendingError || !pending) {
+    console.error('[x-callback] pending token not found:', { pendingError, pending });
     return NextResponse.json(
       { error: 'Pending OAuth token not found' },
       { status: 400 }
