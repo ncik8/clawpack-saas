@@ -383,27 +383,17 @@ export default function CreatePostPage() {
             errors.push(`Facebook: ${data.error}`);
           }
         } else if (getBasePlatform(platform) === 'instagram') {
-          // Instagram: upload image first if present, then post
+          // Instagram: upload image to Supabase first if present, then post
           let igImageUrl = instagramImageUrl;
           
           if (imageFile) {
-            // Upload image to Supabase first (same flow as X and Facebook)
-            const uploadFormData = new FormData();
-            uploadFormData.append('file', imageFile);
-
-            const uploadRes = await fetch('/api/x/media/upload', {
-              method: 'POST',
-              body: uploadFormData,
-            });
-
-            const uploadData = await uploadRes.json();
-
-            if (!uploadRes.ok || !uploadData.media_id_string) {
-              errors.push(`Instagram: Image upload failed`);
+            // Upload image to Supabase storage (same as Facebook)
+            const uploadedUrl = await uploadImageToSupabaseBrowser(imageFile);
+            if (!uploadedUrl) {
+              errors.push(`Instagram: Image upload to storage failed`);
               continue;
             }
-
-            igImageUrl = uploadData.media_id_string;
+            igImageUrl = uploadedUrl;
           }
 
           const response = await fetch('/api/post/instagram', {
