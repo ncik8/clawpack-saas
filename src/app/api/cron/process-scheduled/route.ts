@@ -252,8 +252,13 @@ export async function GET(request: Request) {
 
             if (!linkedInRes.ok) {
               const errorData = await linkedInRes.json();
-              errorMessages.push(`LinkedIn: ${errorData.message}`);
-              postSucceeded = false;
+              // LinkedIn deduplication - if the post went through despite error, treat as success
+              if (errorData.message?.includes('duplicate') || errorData.message?.includes('Duplicate')) {
+                console.log('LinkedIn: duplicate detected, post may have already gone through');
+              } else {
+                errorMessages.push(`LinkedIn: ${errorData.message}`);
+                postSucceeded = false;
+              }
             }
           } else if (basePlatform === 'bluesky') {
             const blueskyRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
