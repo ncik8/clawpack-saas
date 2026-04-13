@@ -57,9 +57,14 @@ export async function GET() {
     );
   }
 
-  console.log('[x-connect] storing pending token for user:', user.id, 'oauth_token:', parsed.oauth_token);
-  
-  // Insert-first approach: try insert first, if it fails with unique violation, try update
+  // Clean up old pending token first (if exists)
+  await supabaseAdmin
+    .from('social_connections')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('platform', 'x_oauth1_pending');
+
+  // Store pending token
   const { error: insertErr } = await supabaseAdmin
     .from('social_connections')
     .insert({
@@ -72,24 +77,6 @@ export async function GET() {
       expires_at: null,
     });
   console.log('[x-connect] insert result:', insertErr ? `error: ${JSON.stringify(insertErr)}` : 'ok');
-  
-  if (insertErr) {
-    // Insert failed - row might already exist, try update
-    const { error: updateErr } = await supabaseAdmin
-      .from('social_connections')
-      .update({
-        user_id: user.id,
-        platform: 'x_oauth1_pending',
-        platform_user_id: null,
-        platform_username: null,
-        access_token: parsed.oauth_token,
-        refresh_token: parsed.oauth_token_secret,
-        expires_at: null,
-      })
-      .eq('user_id', user.id)
-      .eq('platform', 'x_oauth1_pending');
-    console.log('[x-connect] update result:', updateErr ? `error: ${JSON.stringify(updateErr)}` : 'ok');
-  }
 
   const redirectUrl = `https://api.twitter.com/oauth/authorize?oauth_token=${encodeURIComponent(parsed.oauth_token)}`;
   return NextResponse.redirect(redirectUrl);
