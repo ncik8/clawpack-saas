@@ -21,12 +21,12 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Instagram requires an image URL. Please paste a public image URL above.' }, { status: 400 });
     }
 
-    // Get all IG account connections for this user from social_pages
+    // Get all IG account connections for this user from social_connections
     const { data: connections } = await supabase
-      .from('social_pages')
+      .from('social_connections')
       .select('*')
       .eq('user_id', user.id)
-      .eq('platform', 'instagram');;
+      .eq('platform', 'instagram');
 
     if (!connections || connections.length === 0) {
       console.log('[INSTAGRAM POST] No connections found for user:', user.id);
