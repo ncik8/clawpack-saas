@@ -78,13 +78,31 @@ export async function GET(request: Request) {
       refresh_token: tokens.refresh_token || null,
       expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
     };
-    console.log('LinkedIn upsert data:', JSON.stringify({ ...insertData, access_token: '[HIDDEN]' }));
-    const { error: insertErr } = await supabase.from('social_connections').upsert(
-      insertData,
-      { onConflict: 'user_id,platform' }
-    );
-    if (insertErr) {
-      console.error('LinkedIn upsert error:', JSON.stringify(insertErr));
+    console.log('LinkedIn upsert attempt with data:', JSON.stringify({ ...insertData, access_token: '[HIDDEN]' }));
+    
+    // Upsert with explicit conflict handling
+    const { error: upsertErr } = await supabase
+      .from('social_connections')
+      .upsert(insertData, { onConflict: 'user_id,platform' });
+    
+    if (upsertErr) {
+      console.log('LinkedIn upsert failed, trying update...');
+      const { error: updateErr } = await supabase
+        .from('social_connections')
+        .update(insertData)
+        .eq('user_id', oauthState.user_id)
+        .eq('platform', 'linkedin');
+      console.log('LinkedIn update result:', updateErr ? `error: ${JSON.stringify(updateErr)}` : 'ok');
+      
+      if (updateErr) {
+        console.log('LinkedIn update failed, trying insert...');
+        const { error: insertErr } = await supabase
+          .from('social_connections')
+          .insert(insertData);
+        console.log('LinkedIn insert result:', insertErr ? `error: ${JSON.stringify(insertErr)}` : 'ok');
+      }
+    } else {
+      console.log('LinkedIn upsert succeeded');
     }
 
   return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=linkedin`);
