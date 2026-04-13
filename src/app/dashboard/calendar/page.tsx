@@ -3,7 +3,17 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-const POSTIZ_URL = process.env.NEXT_PUBLIC_POSTIZ_URL || 'https://post.clawpack.net';
+interface ScheduledPostTarget {
+  id: string;
+  platform: string;
+  social_page_id: string | null;
+  social_connection_id: string | null;
+  status: string;
+  scheduled_for: string;
+  published_at: string | null;
+  external_post_id: string | null;
+  error_message: string | null;
+}
 
 interface ScheduledPost {
   id: string;
@@ -17,6 +27,7 @@ interface ScheduledPost {
   error_message?: string;
   created_at: string;
   updated_at: string;
+  scheduled_post_targets?: ScheduledPostTarget[];
 }
 
 export default function CalendarPage() {
@@ -53,7 +64,25 @@ export default function CalendarPage() {
       }
 
       const data = await response.json();
-      setPosts(data);
+      
+      // Transform data - extract platforms from targets
+      const transformedPosts = (data as ScheduledPost[]).map((post: any) => {
+        const targets = post.scheduled_post_targets || [];
+        const platforms = targets.map((t: any) => {
+          if (t.social_page_id) {
+            return `${t.platform}_${t.page_id || t.ig_user_id || ''}`;
+          }
+          return t.platform;
+        });
+        
+        return {
+          ...post,
+          platforms,
+          scheduled_post_targets: targets,
+        };
+      });
+      
+      setPosts(transformedPosts);
     } catch (error) {
       console.error('Error fetching scheduled posts:', error);
     } finally {
@@ -82,7 +111,6 @@ export default function CalendarPage() {
         throw new Error(`Failed to delete post: ${response.status}`);
       }
 
-      // Remove from local state
       setPosts(posts.filter(p => p.id !== postId));
     } catch (error) {
       console.error('Error deleting post:', error);
@@ -90,7 +118,7 @@ export default function CalendarPage() {
     }
   };
 
-  // Group posts by date (using each post's stored timezone)
+  // Group posts by date
   const groupedPosts = posts.reduce((acc, post) => {
     const tz = post.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Hong_Kong';
     const date = new Date(post.scheduled_for).toLocaleDateString('en-US', {
@@ -116,7 +144,7 @@ export default function CalendarPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    if (status === 'sent') {
+    if (status === 'sent' || status === 'published') {
       return <span className="px-2 py-1 text-xs font-medium bg-[#10b981]/20 text-[#10b981] rounded">Sent</span>;
     } else if (status === 'failed') {
       return <span className="px-2 py-1 text-xs font-medium bg-[#ef4444]/20 text-[#ef4444] rounded">Failed</span>;
@@ -128,7 +156,6 @@ export default function CalendarPage() {
   const handleEdit = (post: ScheduledPost) => {
     setEditingPost(post);
     setEditContent(post.content);
-    // Convert UTC stored time back to local timezone for the datetime-local input
     const tz = post.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Hong_Kong';
     const localDateStr = new Date(post.scheduled_for).toLocaleString('en-CA', { timeZone: tz }).replace(', ', 'T');
     setEditScheduledFor(localDateStr);
@@ -167,8 +194,6 @@ export default function CalendarPage() {
       }
 
       const updatedPost = await response.json();
-      
-      // Update local state
       setPosts(posts.map(p => p.id === editingPost.id ? updatedPost : p));
       setEditingPost(null);
       
@@ -364,7 +389,7 @@ export default function CalendarPage() {
               <div>
                 <label className="block text-sm text-[#9ca3af] mb-2">Platforms</label>
                 <div className="flex flex-wrap gap-2">
-                  {['x', 'linkedin'].map((platform) => (
+                  {['x', 'linkedin', 'bluesky', 'facebook', 'instagram'].map((platform) => (
                     <button
                       key={platform}
                       type="button"
@@ -381,7 +406,7 @@ export default function CalendarPage() {
                           : 'bg-[#1f2937] border-[#374151] text-[#9ca3af]'
                       }`}
                     >
-                      {platform === 'x' ? '🐦 X' : '💼 LinkedIn'}
+                      {getPlatformEmoji(platform)} {platform.charAt(0).toUpperCase() + platform.slice(1)}
                     </button>
                   ))}
                 </div>
