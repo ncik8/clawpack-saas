@@ -21,9 +21,10 @@ export async function DELETE(request: Request) {
   try {
     const url = new URL(request.url);
     const platform = url.searchParams.get('platform');
+    const connectionId = url.searchParams.get('connection_id');
 
-    if (!platform) {
-      return NextResponse.json({ error: 'Missing platform' }, { status: 400 });
+    if (!platform && !connectionId) {
+      return NextResponse.json({ error: 'Missing platform or connection_id' }, { status: 400 });
     }
 
     const userId = await getSupabaseUser(request);
@@ -31,14 +32,36 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { error } = await supabaseAdmin
-      .from('social_connections')
-      .delete()
-      .eq('user_id', userId)
-      .eq('platform', platform);
+    // Delete from social_connections
+    if (connectionId) {
+      // Delete specific connection by ID
+      const { error } = await supabaseAdmin
+        .from('social_connections')
+        .delete()
+        .eq('id', connectionId)
+        .eq('user_id', userId);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    } else if (platform) {
+      // Delete all connections for this platform
+      const { error } = await supabaseAdmin
+        .from('social_connections')
+        .delete()
+        .eq('user_id', userId)
+        .eq('platform', platform);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      // Also delete social_pages entries for this platform
+      await supabaseAdmin
+        .from('social_pages')
+        .delete()
+        .eq('user_id', userId)
+        .eq('platform', platform);
     }
 
     return NextResponse.json({ success: true });
