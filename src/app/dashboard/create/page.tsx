@@ -60,15 +60,17 @@ export default function CreatePostPage() {
       // Fetch Facebook and Instagram pages from social_pages
       const { data: fbPages } = await supabase
         .from('social_pages')
-        .select('platform, platform_username, platform_user_id, access_token')
+        .select('platform, page_name, page_id, page_username, page_access_token, connection_id, is_default, is_active')
         .eq('user_id', session.user.id)
-        .eq('platform', 'facebook');
+        .eq('platform', 'facebook')
+        .eq('is_active', true);
       
       const { data: igAccounts } = await supabase
         .from('social_pages')
-        .select('platform, platform_username, platform_user_id, access_token')
+        .select('platform, page_name, page_id, page_username, page_access_token, connection_id, is_default, is_active')
         .eq('user_id', session.user.id)
-        .eq('platform', 'instagram');
+        .eq('platform', 'instagram')
+        .eq('is_active', true);
 
       // Combine connections with pages
       const socialPages = [...(fbPages || []), ...(igAccounts || [])];
@@ -100,15 +102,19 @@ export default function CreatePostPage() {
         } else {
           // Has accounts - add each as separate selectable item
           for (const account of accountsForBase) {
-            const displayName = account.platform_username 
-              ? `${platformInfo[base]?.name || base} - ${account.platform_username}`
+            // social_connections uses platform_username/platform_user_id
+            // social_pages uses page_name/page_id
+            const accountName = account.page_name || account.platform_username || '';
+            const accountId = account.page_id || account.platform_user_id || '';
+            const displayName = accountName
+              ? `${platformInfo[base]?.name || base} - ${accountName}`
               : platformInfo[base]?.name || base;
             platformItems.push({
-              id: `${base}_${account.platform_user_id}`,
+              id: `${base}_${accountId}`,
               name: displayName,
               emoji: platformInfo[base]?.emoji || '📱',
               connected: true,
-              platformUsername: account.platform_username,
+              platformUsername: accountName,
             });
           }
         }

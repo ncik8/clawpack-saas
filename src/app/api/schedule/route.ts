@@ -17,6 +17,14 @@ async function getSupabaseUser(request: Request): Promise<string | null> {
   return user.id;
 }
 
+function parsePlatform(platformId: string): { basePlatform: string; pageId?: string } {
+  const parts = platformId.split('_');
+  if (parts.length === 1) {
+    return { basePlatform: parts[0] };
+  }
+  return { basePlatform: parts[0], pageId: parts.slice(1).join('_') };
+}
+
 export async function GET(request: Request) {
   try {
     const userId = await getSupabaseUser(request);
@@ -24,9 +32,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data, error } = await supabaseAdmin
+    // Fetch posts with their targets
+    const { data: posts, error } = await supabaseAdmin
       .from('scheduled_posts')
-      .select('*')
+      .select('*, scheduled_post_targets(*)')
       .eq('user_id', userId)
       .order('scheduled_for', { ascending: true });
 
@@ -34,7 +43,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data || []);
+    return NextResponse.json(posts || []);
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -54,31 +63,87 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Extract base platforms (remove _page_id suffix for FB/IG)
-    const basePlatforms = platforms.map((p: string) => p.split('_')[0]);
-    
-    // Verify user has these platforms connected
-    const { data: connections } = await supabaseAdmin
-      .from('social_connections')
-      .select('platform')
-      .eq('user_id', userId)
-      .in('platform', basePlatforms);
+    // Parse platforms and look up connection/page IDs
+    const targets: Array<{
+      platform: string;
+      social_connection_id?: string;
+      social_page_id?: string;
+      scheduled_for: string;
+    }> = [];
 
-    const connectedPlatforms = connections?.map(c => c.platform) || [];
-    const unconnected = basePlatforms.filter((p: string) => !connectedPlatforms.includes(p));
+    for (const platformId of platforms) {
+      const { basePlatform, pageId } = parsePlatform(platformId);
 
-    if (unconnected.length > 0) {
-      return NextResponse.json({ 
-        error: `Platforms not connected: ${unconnected.join(', ')}` 
-      }, { status: 400 });
+      if (basePlatform === 'facebook' || basePlatform === 'instagram') {
+        // Multi-account platforms - need page_id from social_pages
+        if (!pageId) {
+          // No specific page selected, get all active pages for this platform
+          const { data: pages } = await supabaseAdmin
+            .from('social_pages')
+            .select('id, connection_id')
+            .eq('user_id', userId)
+            .eq('platform', basePlatform)
+            .eq('is_active', true);
+
+          if (pages && pages.length > 0) {
+            for (const page of pages) {
+              targets.push({
+                platform: basePlatform,
+                social_connection_id: page.connection_id,
+                social_page_id: page.id,
+                scheduled_for: scheduledFor,
+              });
+            }
+          }
+        } else {
+          // Specific page selected
+          const { data: page } = await supabaseAdmin
+            .from('social_pages')
+            .select('id, connection_id')
+            .eq('user_id', userId)
+            .eq('page_id', pageId)
+            .eq('platform', basePlatform)
+            .eq('is_active', true)
+            .single();
+
+          if (page) {
+            targets.push({
+              platform: basePlatform,
+              social_connection_id: page.connection_id,
+              social_page_id: page.id,
+              scheduled_for: scheduledFor,
+            });
+          }
+        }
+      } else {
+        // Single-account platforms (x, linkedin, bluesky) - use connection directly
+        const { data: connection } = await supabaseAdmin
+          .from('social_connections')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('platform', basePlatform)
+          .single();
+
+        if (connection) {
+          targets.push({
+            platform: basePlatform,
+            social_connection_id: connection.id,
+            scheduled_for: scheduledFor,
+          });
+        }
+      }
     }
 
-    const { data, error } = await supabaseAdmin
+    if (targets.length === 0) {
+      return NextResponse.json({ error: 'No valid targets found' }, { status: 400 });
+    }
+
+    // Create scheduled post
+    const { data: post, error: postError } = await supabaseAdmin
       .from('scheduled_posts')
       .insert({
         user_id: userId,
         content,
-        platforms,
         scheduled_for: scheduledFor,
         status: 'pending',
         video_url: videoUrl || null,
@@ -88,11 +153,35 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (postError || !post) {
+      return NextResponse.json({ error: postError?.message || 'Failed to create post' }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    // Create targets
+    const targetsToInsert = targets.map(t => ({
+      ...t,
+      scheduled_post_id: post.id,
+      user_id: userId,
+    }));
+
+    const { error: targetsError } = await supabaseAdmin
+      .from('scheduled_post_targets')
+      .insert(targetsToInsert);
+
+    if (targetsError) {
+      // Rollback: delete the post
+      await supabaseAdmin.from('scheduled_posts').delete().eq('id', post.id);
+      return NextResponse.json({ error: targetsError.message }, { status: 500 });
+    }
+
+    // Fetch the complete post with targets
+    const { data: completePost } = await supabaseAdmin
+      .from('scheduled_posts')
+      .select('*, scheduled_post_targets(*)')
+      .eq('id', post.id)
+      .single();
+
+    return NextResponse.json(completePost);
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -112,30 +201,82 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Extract base platforms (remove _page_id suffix for FB/IG)
-    const basePlatforms = platforms.map((p: string) => p.split('_')[0]);
-    
-    // Verify user has these platforms connected
-    const { data: connections } = await supabaseAdmin
-      .from('social_connections')
-      .select('platform')
-      .eq('user_id', userId)
-      .in('platform', basePlatforms);
+    // Parse platforms and build targets
+    const targets: Array<{
+      platform: string;
+      social_connection_id?: string;
+      social_page_id?: string;
+      scheduled_for: string;
+    }> = [];
 
-    const connectedPlatforms = connections?.map(c => c.platform) || [];
-    const unconnected = basePlatforms.filter((p: string) => !connectedPlatforms.includes(p));
+    for (const platformId of platforms) {
+      const { basePlatform, pageId } = parsePlatform(platformId);
 
-    if (unconnected.length > 0) {
-      return NextResponse.json({ 
-        error: `Platforms not connected: ${unconnected.join(', ')}` 
-      }, { status: 400 });
+      if (basePlatform === 'facebook' || basePlatform === 'instagram') {
+        if (!pageId) {
+          const { data: pages } = await supabaseAdmin
+            .from('social_pages')
+            .select('id, connection_id')
+            .eq('user_id', userId)
+            .eq('platform', basePlatform)
+            .eq('is_active', true);
+
+          if (pages && pages.length > 0) {
+            for (const page of pages) {
+              targets.push({
+                platform: basePlatform,
+                social_connection_id: page.connection_id,
+                social_page_id: page.id,
+                scheduled_for: scheduledFor,
+              });
+            }
+          }
+        } else {
+          const { data: page } = await supabaseAdmin
+            .from('social_pages')
+            .select('id, connection_id')
+            .eq('user_id', userId)
+            .eq('page_id', pageId)
+            .eq('platform', basePlatform)
+            .eq('is_active', true)
+            .single();
+
+          if (page) {
+            targets.push({
+              platform: basePlatform,
+              social_connection_id: page.connection_id,
+              social_page_id: page.id,
+              scheduled_for: scheduledFor,
+            });
+          }
+        }
+      } else {
+        const { data: connection } = await supabaseAdmin
+          .from('social_connections')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('platform', basePlatform)
+          .single();
+
+        if (connection) {
+          targets.push({
+            platform: basePlatform,
+            social_connection_id: connection.id,
+            scheduled_for: scheduledFor,
+          });
+        }
+      }
     }
 
-    const { data, error } = await supabaseAdmin
+    if (targets.length === 0) {
+      return NextResponse.json({ error: 'No valid targets found' }, { status: 400 });
+    }
+
+    // Update post
+    const { data: post, error: postError } = await supabaseAdmin
       .from('scheduled_posts')
       .update({
         content,
-        platforms,
         scheduled_for: scheduledFor,
         video_url: videoUrl || null,
         updated_at: new Date().toISOString(),
@@ -145,11 +286,34 @@ export async function PUT(request: Request) {
       .select()
       .single();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (postError || !post) {
+      return NextResponse.json({ error: postError?.message || 'Failed to update post' }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    // Delete old targets and insert new ones
+    await supabaseAdmin
+      .from('scheduled_post_targets')
+      .delete()
+      .eq('scheduled_post_id', id);
+
+    const targetsToInsert = targets.map(t => ({
+      ...t,
+      scheduled_post_id: post.id,
+      user_id: userId,
+    }));
+
+    await supabaseAdmin
+      .from('scheduled_post_targets')
+      .insert(targetsToInsert);
+
+    // Fetch complete post with targets
+    const { data: completePost } = await supabaseAdmin
+      .from('scheduled_posts')
+      .select('*, scheduled_post_targets(*)')
+      .eq('id', post.id)
+      .single();
+
+    return NextResponse.json(completePost);
 
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -169,6 +333,8 @@ export async function DELETE(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Targets are deleted via CASCADE
 
     const { error } = await supabaseAdmin
       .from('scheduled_posts')

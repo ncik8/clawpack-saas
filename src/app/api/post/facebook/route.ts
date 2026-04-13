@@ -1,4 +1,3 @@
-
 import { createClient } from '@/utils/supabase/server';
 
 export async function POST(request: Request) {
@@ -19,50 +18,48 @@ export async function POST(request: Request) {
     // Get FB page connections from social_pages
     let query = supabase
       .from('social_pages')
-      .select('*')
+      .select('page_id, page_name, page_access_token, is_active')
       .eq('user_id', user.id)
-      .eq('platform', 'facebook');;
+      .eq('platform', 'facebook');
     
     if (pageIds && pageIds.length > 0) {
-      // Normalize page IDs (remove any prefix like 'facebook_' or 'facebook:')
+      // Normalize page IDs (remove any prefix like 'facebook_')
       const normalizedIds = pageIds.map((id: string) => {
-        if (id.includes(':')) return id.split(':')[1];
-        if (id.includes('_')) return id.split('_')[1];
+        if (id.includes('_')) return id.split('_').slice(1).join('_');
         return id;
       });
-      query = query.in('platform_user_id', normalizedIds);
+      query = query.in('page_id', normalizedIds);
     }
     
-    const { data: connections } = await query;
+    const { data: pages } = await query;
 
-    if (!connections || connections.length === 0) {
+    if (!pages || pages.length === 0) {
       return Response.json({ error: 'No Facebook Page connected' }, { status: 400 });
     }
 
     const results: { pageId: string; pageName: string; success: boolean; postId?: string; error?: string }[] = [];
 
-    for (const conn of connections) {
+    for (const page of pages) {
       try {
+        if (!page.is_active) continue;
+
         // Post to Facebook Page using page access token
-        // Use /photos endpoint for posts with images, /feed for text-only
         const hasImage = imageData || imageUrl;
         const endpoint = hasImage 
-          ? `https://graph.facebook.com/v18.0/${conn.platform_user_id}/photos`
-          : `https://graph.facebook.com/v18.0/${conn.platform_user_id}/feed`;
+          ? `https://graph.facebook.com/v18.0/${page.page_id}/photos`
+          : `https://graph.facebook.com/v18.0/${page.page_id}/feed`;
         
         let response: Response;
         if (hasImage) {
           // Photo post - use FormData for base64
           const formData = new FormData();
-          formData.append('access_token', conn.access_token);
+          formData.append('access_token', page.page_access_token);
           formData.append('message', text);
           if (imageData) {
-            // Extract base64 data from data URL (e.g. "data:image/jpeg;base64,/9j/4AAQ...")
             const base64Match = imageData.match(/^data:([^;]+);base64,(.+)$/);
             if (base64Match) {
               const mimeType = base64Match[1];
               const base64Data = base64Match[2];
-              // Convert base64 to Blob
               const byteCharacters = atob(base64Data);
               const byteNumbers = new Array(byteCharacters.length);
               for (let i = 0; i < byteCharacters.length; i++) {
@@ -81,11 +78,10 @@ export async function POST(request: Request) {
             body: formData,
           });
         } else {
-          // Text-only post
           response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text, access_token: conn.access_token }),
+            body: JSON.stringify({ message: text, access_token: page.page_access_token }),
           });
         }
 
@@ -93,40 +89,46 @@ export async function POST(request: Request) {
 
         if (response.ok && data.id) {
           results.push({
-            pageId: conn.platform_user_id,
-            pageName: conn.platform_username || 'Facebook Page',
+            pageId: page.page_id,
+            pageName: page.page_name || 'Facebook Page',
             success: true,
             postId: data.id,
           });
         } else {
-          // Facebook error might not have .error.message - log for debugging
-          console.error('Facebook API error:', data);
-          const errorMsg = data.error?.message || data.error?.type || data.error?.code || 'Unknown Facebook error';
           results.push({
-            pageId: conn.platform_user_id,
-            pageName: conn.platform_username || 'Facebook Page',
+            pageId: page.page_id,
+            pageName: page.page_name || 'Facebook Page',
             success: false,
-            error: errorMsg,
+            error: data.error?.message || 'Post failed',
           });
         }
-      } catch (err: any) {
+      } catch (e: any) {
         results.push({
-          pageId: conn.platform_user_id,
-          pageName: conn.platform_username || 'Facebook Page',
+          pageId: page.page_id,
+          pageName: page.page_name || 'Facebook Page',
           success: false,
-          error: err.message,
+          error: e.message,
         });
       }
     }
 
-    const successful = results.filter(r => r.success).length;
+    const successfulPosts = results.filter(r => r.success);
+    
+    if (successfulPosts.length === 0) {
+      return Response.json({ 
+        error: 'All Facebook posts failed',
+        details: results 
+      }, { status: 500 });
+    }
+
     return Response.json({
-      success: successful > 0,
+      success: true,
       results,
-      message: `Posted to ${successful} of ${results.length} Facebook Pages`,
+      message: `Posted to ${successfulPosts.length} Facebook page(s)`,
     });
-  } catch (err: any) {
-    console.error('FB post error:', err);
-    return Response.json({ error: err.message }, { status: 500 });
+
+  } catch (error: any) {
+    console.error('Facebook post error:', error);
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }

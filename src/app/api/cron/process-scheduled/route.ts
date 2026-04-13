@@ -7,9 +7,11 @@ export const dynamic = 'force-dynamic';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcyifihwvqxtpypphpef.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
+// ============================================================
+// OAuth helpers for X
+// ============================================================
 function percentEncode(str: string): string {
   return encodeURIComponent(str).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
 }
@@ -25,15 +27,9 @@ function normalizeUrl(input: string): string {
 }
 
 function buildOAuthHeader({
-  method,
-  url,
-  accessToken,
-  accessTokenSecret,
+  method, url, accessToken, accessTokenSecret,
 }: {
-  method: string;
-  url: string;
-  accessToken: string;
-  accessTokenSecret: string;
+  method: string; url: string; accessToken: string; accessTokenSecret: string;
 }) {
   const consumerKey = process.env.X_API_KEY!;
   const consumerSecret = process.env.X_API_SECRET!;
@@ -50,587 +46,514 @@ function buildOAuthHeader({
   const baseString = [
     method.toUpperCase(),
     percentEncode(normalizeUrl(url)),
-    percentEncode(
-      Object.keys(oauthParams)
-        .sort()
-        .map((key) => `${percentEncode(key)}=${percentEncode(oauthParams[key])}`)
-        .join('&')
-    ),
+    percentEncode(Object.keys(oauthParams).sort()
+      .map((key) => `${percentEncode(key)}=${percentEncode(oauthParams[key])}`)
+      .join('&')),
   ].join('&');
 
   const signingKey = `${percentEncode(consumerSecret)}&${percentEncode(accessTokenSecret)}`;
   const signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
-
   oauthParams.oauth_signature = signature;
 
-
-  return (
-    'OAuth ' +
-    Object.keys(oauthParams)
-      .sort()
-      .map((key) => `${percentEncode(key)}="${percentEncode(oauthParams[key])}"`)
-      .join(', ')
-  );
-}
-
-export async function GET(request: Request) {
-  try {
-    // No auth required - OpenClaw cron sends requests without Bearer token
-    // The cron job URL is secret and only accessible via OpenClaw's cron system
-    // If you need security, set CRON_SECRET in Vercel and pass Bearer token from cron
-
-    // Find all pending posts that are due
-    const now = new Date().toISOString();
-    
-    const { data: posts, error: fetchError } = await supabaseAdmin
-      .from('scheduled_posts')
-      .select('*')
-      .eq('status', 'pending')
-      .lte('scheduled_for', now);
-
-    if (fetchError) {
-      console.error('Error fetching scheduled posts:', fetchError);
-      return Response.json({ error: fetchError.message }, { status: 500 });
-    }
-
-    if (!posts || posts.length === 0) {
-      return Response.json({ message: 'No posts to process', processed: 0 });
-    }
-
-    const results = { processed: 0, succeeded: 0, failed: 0 };
-
-    for (const post of posts) {
-      // Get ALL user's connections (we need specific page tokens for FB/IG)
-      const { data: connections } = await supabaseAdmin
-        .from('social_connections')
-        .select('id, platform, access_token, refresh_token, platform_user_id, expires_at')
-        .eq('user_id', post.user_id);
-
-      if (!connections || connections.length === 0) {
-        await supabaseAdmin
-          .from('scheduled_posts')
-          .update({ 
-            status: 'failed', 
-            error_message: 'No connected accounts found',
-            sent_at: new Date().toISOString(),
-          })
-          .eq('id', post.id);
-        
-        results.failed++;
-        results.processed++;
-        continue;
-      }
-
-      let postSucceeded = true;
-      const errorMessages = [];
-
-      // Post to each platform
-      for (const platformStr of post.platforms) {
-        // Parse platform_page_id format (underscore separator)
-        const [basePlatform, pageId] = platformStr.includes('_') 
-          ? platformStr.split('_') 
-          : [platformStr, null];
-
-        // Find the specific connection for this page/account
-        const connection = pageId 
-          ? connections.find(c => c.platform === basePlatform && c.platform_user_id === pageId)
-          : connections.find(c => c.platform === basePlatform);
-
-        if (!connection) {
-          errorMessages.push(`${platformStr}: not connected`);
-          continue;
-        }
-
-        try {
-          let accessToken = connection.access_token;
-
-          // Token refresh for X
-          if (basePlatform === 'x' && connection.expires_at) {
-            const expiresAt = new Date(connection.expires_at);
-            if (expiresAt < new Date()) {
-              const refreshed = await refreshXToken(connection.refresh_token);
-              if (refreshed) {
-                accessToken = refreshed.access_token;
-                await supabaseAdmin
-                  .from('social_connections')
-                  .update({
-                    access_token: refreshed.access_token,
-                    refresh_token: refreshed.refresh_token || connection.refresh_token,
-                    expires_at: refreshed.expires_at,
-                  })
-                  .eq('id', connection.id);
-              }
-            }
-          }
-
-          // Post based on base platform
-          if (basePlatform === 'x') {
-            let mediaIds: string[] = [];
-            
-            // Upload image if present (same as immediate post flow)
-            if (post.image_url) {
-              try {
-                const imageRes = await fetch(post.image_url);
-                if (imageRes.ok) {
-                  const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
-                  const mediaId = await uploadXImage({
-                    accessToken: connection.access_token,
-                    accessTokenSecret: connection.refresh_token,
-                    fileBuffer: imageBuffer,
-                    mimeType: 'image/jpeg',
-                  });
-                  mediaIds = [mediaId];
-                }
-              } catch (imgErr) {
-                console.error('X image upload error:', imgErr);
-              }
-            }
-            
-            // Build OAuth 1.0a header (same as working immediate post)
-            const tweetUrl = 'https://api.twitter.com/2/tweets';
-            const tweetAuthHeader = buildOAuthHeader({
-              method: 'POST',
-              url: tweetUrl,
-              accessToken: connection.access_token,
-              accessTokenSecret: connection.refresh_token,
-            });
-            
-            const tweetPayload: any = { text: post.content };
-            if (mediaIds.length > 0) {
-              tweetPayload.media = { media_ids: mediaIds };
-            }
-            
-            const twitterRes = await fetch(tweetUrl, {
-              method: 'POST',
-              headers: {
-                'Authorization': tweetAuthHeader,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(tweetPayload),
-            });
-
-
-            const twitterData = await twitterRes.json();
-            console.log('X tweet result:', twitterRes.status, JSON.stringify(twitterData));
-
-            if (!twitterRes.ok) {
-              errorMessages.push(`X: ${JSON.stringify(twitterData)}`);
-              postSucceeded = false;
-            }
-          } else if (basePlatform === 'linkedin') {
-            const authorUrn = connection.platform_user_id 
-              ? `urn:li:person:${connection.platform_user_id}`
-              : null;
-
-            if (!authorUrn) {
-              errorMessages.push('LinkedIn: missing user ID');
-              postSucceeded = false;
-              continue;
-            }
-
-            let linkedInRes;
-            
-            if (post.image_url) {
-              // Image post - register image first, then create post with it
-              // Step 1: Register the image - use ?action=registerUpload
-              const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json',
-                  'X-Restli-Protocol-Version': '2.0.0',
-                },
-                body: JSON.stringify({
-                  registerUploadRequest: {
-                    recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
-                    owner: authorUrn,
-                    serviceRelationships: [
-                      {
-                        relationshipType: 'OWNER',
-                        identifier: 'urn:li:userGeneratedContent',
-                      },
-                    ],
-                  },
-                }),
-              });;
-              
-              const registerData = await registerRes.json();
-              
-              console.log('LinkedIn asset register status:', registerRes.status, JSON.stringify(registerData));
-              
-              if (!registerRes.ok || !registerData.value?.asset) {
-                console.error('LinkedIn asset registration failed:', JSON.stringify(registerData));
-                // Fallback to text-only
-                linkedInRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                    'X-Restli-Protocol-Version': '2.0.0',
-                  },
-                  body: JSON.stringify({
-                    author: authorUrn,
-                    lifecycleState: 'PUBLISHED',
-                    specificContent: {
-                      'com.linkedin.ugc.ShareContent': {
-                        shareCommentary: { text: post.content },
-                        shareMediaCategory: 'NONE',
-                      },
-                    },
-                    visibility: {
-                      'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
-                    },
-                  }),
-                });
-              } else {
-                // Step 2: Upload image binary to the uploadUrl
-                const uploadUrl = registerData.value.uploadUrl ||
-                  registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
-                const mediaAsset = registerData.value.asset;
-                
-                const imageRes = await fetch(post.image_url);
-                console.log('LinkedIn image download status:', imageRes.status, post.image_url);
-                const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
-                
-                const uploadRes = await fetch(uploadUrl, {
-                  method: 'PUT',
-                  headers: {
-                    'Content-Type': 'image/jpeg',
-                  },
-                  body: imageBuffer,
-                });
-                
-                console.log('LinkedIn image upload status:', uploadRes.status);
-                
-                // Step 3: Create post referencing the uploaded image (same structure as immediate post)
-                linkedInRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                    'X-Restli-Protocol-Version': '2.0.0',
-                  },
-                  body: JSON.stringify({
-                    author: authorUrn,
-                    lifecycleState: 'PUBLISHED',
-                    specificContent: {
-                      'com.linkedin.ugc.ShareContent': {
-                        shareCommentary: { text: post.content },
-                        shareMediaCategory: 'IMAGE',
-                        media: [
-                          {
-                            status: 'READY',
-                            media: mediaAsset,
-                          },
-                        ],
-                      },
-                    },
-                    visibility: {
-                      'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
-                    },
-                  }),
-                });
-              }
-            } else {
-              // Text-only post
-              linkedInRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json',
-                  'X-Restli-Protocol-Version': '2.0.0',
-                },
-                body: JSON.stringify({
-                  author: authorUrn,
-                  lifecycleState: 'PUBLISHED',
-                  specificContent: {
-                    'com.linkedin.ugc.ShareContent': {
-                      shareCommentary: { text: post.content },
-                      shareMediaCategory: 'NONE',
-                    },
-                  },
-                  visibility: {
-                    'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
-                  },
-                }),
-              });
-            }
-
-            if (!linkedInRes.ok) {
-              const errorData = await linkedInRes.json();
-              // LinkedIn deduplication - if the post went through despite error, treat as success
-              if (errorData.message?.includes('duplicate') || errorData.message?.includes('Duplicate')) {
-                console.log('LinkedIn: duplicate detected, post may have already gone through');
-              } else {
-                console.error('LinkedIn post failed:', JSON.stringify(errorData));
-                errorMessages.push(`LinkedIn: ${JSON.stringify(errorData)}`);
-                postSucceeded = false;
-              }
-            } else {
-              console.log('LinkedIn post success:', linkedInRes.status);
-            }
-          } else if (basePlatform === 'bluesky') {
-            // Check if token needs refresh (Bluesky tokens expire after 24h)
-            // Try refresh if refresh_token exists
-            let blueskyAccessToken = accessToken;
-            console.log('Bluesky token check - expires_at:', connection.expires_at, 'refresh_token:', connection.refresh_token ? 'present' : 'missing');
-            if (connection.refresh_token) {
-              console.log('Bluesky token refresh attempt...');
-              const refreshRes = await fetch('https://bsky.social/xrpc/com.atproto.server.refreshSession', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${connection.refresh_token}`,
-                  'Content-Type': 'application/json',
-                },
-              });
-              const refreshData = await refreshRes.json();
-              console.log('Bluesky refresh result:', refreshRes.status, JSON.stringify(refreshData));
-              if (refreshRes.ok && refreshData.accessJwt) {
-                blueskyAccessToken = refreshData.accessJwt;
-                await supabaseAdmin
-                  .from('social_connections')
-                  .update({
-                    access_token: refreshData.accessJwt,
-                    refresh_token: refreshData.refreshJwt || connection.refresh_token,
-                    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-                  })
-                  .eq('id', connection.id);
-                console.log('Bluesky token refreshed successfully');
-              } else {
-                console.log('Bluesky refresh failed, using existing token');
-              }
-            } else {
-              console.log('Bluesky no refresh_token available');
-            }
-
-            const blueskyRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${blueskyAccessToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                repo: connection.platform_user_id || 'did:plc:unknown',
-                collection: 'app.bsky.feed.post',
-                record: {
-                  type: 'app.bsky.feed.post',
-                  text: post.content,
-                  createdAt: new Date().toISOString(),
-                },
-              }),
-            });
-
-            if (!blueskyRes.ok) {
-              const errorData = await blueskyRes.json();
-              errorMessages.push(`Bluesky: ${errorData.message}`);
-              postSucceeded = false;
-            }
-          } else if (basePlatform === 'facebook') {
-            // Look up all Facebook pages from social_pages
-            const { data: fbPages } = await supabaseAdmin
-              .from('social_pages')
-              .select('*')
-              .eq('user_id', post.user_id)
-              .eq('platform', 'facebook');
-            
-            if (!fbPages || fbPages.length === 0) {
-              errorMessages.push('Facebook: No pages connected');
-              postSucceeded = false;
-            } else {
-              // Post to each Facebook page
-              for (const page of fbPages) {
-                if (post.image_url) {
-                  const fbPhotoRes = await fetch(`https://graph.facebook.com/v18.0/${page.platform_user_id}/photos`, {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${page.access_token}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      url: post.image_url,
-                      caption: post.content,
-                    }),
-                  });
-                  const fbPhotoData = await fbPhotoRes.json();
-                  if (!fbPhotoRes.ok) {
-                    errorMessages.push(`Facebook (${page.platform_username}): ${fbPhotoData.error?.message || 'Unknown error'}`);
-                    postSucceeded = false;
-                  }
-                } else {
-                  const fbRes = await fetch(`https://graph.facebook.com/v18.0/${page.platform_user_id}/feed`, {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${page.access_token}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ message: post.content }),
-                  });
-                  const fbData = await fbRes.json();
-                  if (!fbRes.ok) {
-                    errorMessages.push(`Facebook (${page.platform_username}): ${fbData.error?.message || 'Unknown error'}`);
-                    postSucceeded = false;
-                  }
-                }
-              }
-            }
-          } else if (basePlatform === 'instagram') {
-            // Look up all Instagram accounts from social_pages
-            const { data: igAccounts } = await supabaseAdmin
-              .from('social_pages')
-              .select('*')
-              .eq('user_id', post.user_id)
-              .eq('platform', 'instagram');
-            
-            if (!igAccounts || igAccounts.length === 0) {
-              errorMessages.push('Instagram: No accounts connected');
-              postSucceeded = false;
-            } else {
-              // Post to each Instagram account
-              for (const igAccount of igAccounts) {
-                const igBody: Record<string, string> = { caption: post.content };
-                
-                if (post.image_url) {
-                  igBody['media_type'] = 'EXTERNAL_IMAGE';
-                  igBody['image_url'] = post.image_url;
-                  igBody['external_url'] = post.image_url;
-                } else {
-                  igBody['media_type'] = 'TEXT';
-                }
-
-                const igRes = await fetch(`https://graph.facebook.com/v18.0/${igAccount.platform_user_id}/media`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${igAccount.access_token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify(igBody),
-                });
-
-                const igData = await igRes.json();
-
-                if (!igRes.ok) {
-                  errorMessages.push(`Instagram (${igAccount.platform_username}): ${igData.error?.message || 'Unknown error'}`);
-                  postSucceeded = false;
-                  continue;
-                }
-
-                // Publish the media item
-                const publishRes = await fetch(`https://graph.facebook.com/v18.0/${igAccount.platform_user_id}/media_publish`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${igAccount.access_token}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ 
-                    creation_id: igData.id,
-                  }),
-                });
-
-                if (!publishRes.ok) {
-                  const publishData = await publishRes.json();
-                  errorMessages.push(`Instagram (${igAccount.platform_username}): Failed to publish - ${publishData.error?.message || 'Unknown error'}`);
-                  postSucceeded = false;
-                }
-              }
-            }
-          }
-        } catch (err: any) {
-          errorMessages.push(`${platformStr}: ${err.message}`);
-          postSucceeded = false;
-        }
-      }
-
-      // Update post status
-      await supabaseAdmin
-        .from('scheduled_posts')
-        .update({ 
-          status: postSucceeded ? 'sent' : 'failed',
-          error_message: errorMessages.length > 0 ? errorMessages.join('; ') : null,
-          sent_at: new Date().toISOString(),
-        })
-        .eq('id', post.id);
-
-      if (postSucceeded) {
-        // Cleanup: delete image/video from Supabase storage after successful post
-        await cleanupPostMedia(post);
-        results.succeeded++;
-      } else {
-        results.failed++;
-      }
-      results.processed++;
-    }
-
-    return Response.json({
-      message: `Processed ${results.processed} posts`,
-      ...results,
-    });
-
-  } catch (error: any) {
-    console.error('Process scheduled error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
-  }
+  return 'OAuth ' + Object.keys(oauthParams).sort()
+    .map((key) => `${percentEncode(key)}="${percentEncode(oauthParams[key])}"`)
+    .join(', ');
 }
 
 async function refreshXToken(refreshToken: string): Promise<{access_token: string; refresh_token?: string; expires_at?: string} | null> {
   try {
-    const res = await fetch('https://api.twitter.com/2/oauth2/token', {
+    const res = await fetch('https://api.twitter.com/oauth2/token', {
       method: 'POST',
       headers: {
+        'Authorization': `Basic ${Buffer.from(`${process.env.X_API_KEY}:${process.env.X_API_SECRET}`).toString('base64')}`,
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(
-          `${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`
-        ).toString('base64')}`,
       },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
       }),
     });
-
-    const tokens = await res.json();
-
-    if (res.ok && tokens.access_token) {
+    const data = await res.json();
+    if (res.ok && data.access_token) {
       return {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+        access_token: data.access_token,
+        refresh_token: data.refresh_token || refreshToken,
+        expires_at: new Date(Date.now() + (data.expires_in || 7200) * 1000).toISOString(),
       };
     }
-    return null;
-  } catch (err) {
-    console.error('Token refresh failed:', err);
-    return null;
+  } catch (e) {
+    console.error('X token refresh error:', e);
+  }
+  return null;
+}
+
+// ============================================================
+// Platform posting functions
+// ============================================================
+async function postToX(content: string, imageUrl: string | null, connection: any) {
+  let accessToken = connection.access_token;
+  
+  // Refresh X token if expired
+  if (connection.expires_at && new Date(connection.expires_at) < new Date()) {
+    const refreshed = await refreshXToken(connection.refresh_token);
+    if (refreshed) {
+      accessToken = refreshed.access_token;
+      await supabaseAdmin
+        .from('social_connections')
+        .update({
+          access_token: refreshed.access_token,
+          refresh_token: refreshed.refresh_token || connection.refresh_token,
+          expires_at: refreshed.expires_at,
+        })
+        .eq('id', connection.id);
+    }
+  }
+
+  let mediaIds: string[] = [];
+
+  // Upload image if present
+  if (imageUrl) {
+    try {
+      const imageRes = await fetch(imageUrl);
+      if (imageRes.ok) {
+        const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+        const mediaId = await uploadXImage({
+          accessToken,
+          accessTokenSecret: connection.refresh_token,
+          fileBuffer: imageBuffer,
+        });
+        if (mediaId) mediaIds.push(mediaId);
+      }
+    } catch (e) {
+      console.error('X image upload error:', e);
+    }
+  }
+
+  // Build tweet request
+  const tweetBody: any = { text: content };
+  if (mediaIds.length > 0) {
+    tweetBody.media = { media_ids: mediaIds };
+  }
+
+  const oauthHeader = buildOAuthHeader({
+    method: 'POST',
+    url: 'https://api.twitter.com/2/tweets',
+    accessToken,
+    accessTokenSecret: connection.refresh_token,
+  });
+
+  const tweetRes = await fetch('https://api.twitter.com/2/tweets', {
+    method: 'POST',
+    headers: {
+      'Authorization': oauthHeader,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(tweetBody),
+  });
+
+  const tweetData = await tweetRes.json();
+  console.log('X tweet result:', tweetRes.status, JSON.stringify(tweetData));
+
+  if (!tweetRes.ok) {
+    throw new Error(tweetData.detail || tweetData.error?.message || 'X post failed');
+  }
+
+  return tweetData.data?.id;
+}
+
+async function postToLinkedIn(content: string, imageUrl: string | null, connection: any) {
+  const accessToken = connection.access_token;
+  const authorUrn = connection.platform_user_id ? `urn:li:person:${connection.platform_user_id}` : null;
+
+  if (!authorUrn) {
+    throw new Error('LinkedIn: missing user ID');
+  }
+
+  let mediaAsset: string | null = null;
+  let mediaType = 'NONE';
+
+  // Image post - register and upload
+  if (imageUrl) {
+    const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+      },
+      body: JSON.stringify({
+        registerUploadRequest: {
+          recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+          owner: authorUrn,
+          serviceRelationships: [
+            { relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' },
+          ],
+        },
+      }),
+    });
+    const registerData = await registerRes.json();
+
+    if (registerRes.ok && registerData.value?.asset) {
+      const uploadUrl = registerData.value.uploadUrl ||
+        registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
+      mediaAsset = registerData.value.asset;
+
+      if (uploadUrl) {
+        const imageRes = await fetch(imageUrl);
+        const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+        await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'image/jpeg' },
+          body: imageBuffer,
+        });
+        mediaType = 'IMAGE';
+      }
+    }
+  }
+
+  const postBody = {
+    author: authorUrn,
+    lifecycleState: 'PUBLISHED',
+    specificContent: {
+      'com.linkedin.ugc.ShareContent': {
+        shareCommentary: { text: content },
+        shareMediaCategory: mediaType,
+        media: mediaAsset ? [{ status: 'READY', media: mediaAsset }] : [],
+      },
+    },
+    visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
+  };
+
+  const postRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'X-Restli-Protocol-Version': '2.0.0',
+    },
+    body: JSON.stringify(postBody),
+  });
+
+  if (!postRes.ok) {
+    const errorData = await postRes.json();
+    // LinkedIn deduplication - if duplicate error, post likely went through
+    if (!errorData.message?.includes('duplicate') && !errorData.message?.includes('Duplicate')) {
+      throw new Error(`LinkedIn: ${errorData.message}`);
+    }
+  }
+
+  return 'linkedin-post';
+}
+
+async function postToBluesky(content: string, imageUrl: string | null, connection: any) {
+  let accessToken = connection.access_token;
+
+  // Refresh Bluesky token if expired
+  if (connection.expires_at && new Date(connection.expires_at) < new Date()) {
+    if (connection.refresh_token) {
+      const refreshRes = await fetch('https://bsky.social/xrpc/com.atproto.server.refreshSession', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${connection.refresh_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const refreshData = await refreshRes.json();
+      if (refreshRes.ok && refreshData.accessJwt) {
+        accessToken = refreshData.accessJwt;
+        await supabaseAdmin
+          .from('social_connections')
+          .update({
+            access_token: refreshData.accessJwt,
+            refresh_token: refreshData.refreshJwt || connection.refresh_token,
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .eq('id', connection.id);
+      }
+    }
+  }
+
+  let embed: any = undefined;
+
+  if (imageUrl) {
+    const imageRes = await fetch(imageUrl);
+    const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+    const blobRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.uploadBlob', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'image/jpeg',
+      },
+      body: imageBuffer,
+    });
+    const blobData = await blobRes.json();
+    if (blobRes.ok && blobData.blob) {
+      embed = {
+        $type: 'app.bsky.embed.images',
+        images: [{ alt: content.substring(0, 50), image: blobData.blob }],
+      };
+    }
+  }
+
+  const record = {
+    $type: 'app.bsky.feed.post',
+    text: content,
+    createdAt: new Date().toISOString(),
+    ...(embed ? { embed } : {}),
+  };
+
+  const postRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      repo: connection.platform_user_id || 'did:plc:unknown',
+      collection: 'app.bsky.feed.post',
+      record,
+    }),
+  });
+
+  if (!postRes.ok) {
+    const errorData = await postRes.json();
+    throw new Error(errorData.message || 'Bluesky post failed');
+  }
+
+  const postData = await postRes.json();
+  return postData.uri;
+}
+
+async function postToFacebook(content: string, imageUrl: string | null, page: any) {
+  if (imageUrl) {
+    const fbPhotoRes = await fetch(`https://graph.facebook.com/v18.0/${page.page_id}/photos`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${page.page_access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url: imageUrl, caption: content }),
+    });
+    const fbPhotoData = await fbPhotoRes.json();
+    if (!fbPhotoRes.ok) {
+      throw new Error(fbPhotoData.error?.message || 'Facebook photo post failed');
+    }
+    return fbPhotoData.id;
+  } else {
+    const fbRes = await fetch(`https://graph.facebook.com/v18.0/${page.page_id}/feed`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${page.page_access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message: content }),
+    });
+    const fbData = await fbRes.json();
+    if (!fbRes.ok) {
+      throw new Error(fbData.error?.message || 'Facebook post failed');
+    }
+    return fbData.id;
   }
 }
 
-async function cleanupPostMedia(post: any): Promise<void> {
+async function postToInstagram(content: string, imageUrl: string | null, page: any) {
+  // Instagram requires creating media then publishing
+  const igBody: Record<string, string> = { caption: content };
+  
+  if (imageUrl) {
+    igBody['media_type'] = 'EXTERNAL_IMAGE';
+    igBody['image_url'] = imageUrl;
+    igBody['external_url'] = imageUrl;
+  } else {
+    igBody['media_type'] = 'TEXT';
+  }
+
+  // Create media
+  const igRes = await fetch(`https://graph.facebook.com/v18.0/${page.page_id}/media`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${page.page_access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(igBody),
+  });
+  const igData = await igRes.json();
+
+  if (!igRes.ok) {
+    throw new Error(igData.error?.message || 'Instagram media creation failed');
+  }
+
+  // Publish media
+  const publishRes = await fetch(`https://graph.facebook.com/v18.0/${page.page_id}/media_publish`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${page.page_access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ creation_id: igData.id }),
+  });
+
+  if (!publishRes.ok) {
+    const publishData = await publishRes.json();
+    throw new Error(publishData.error?.message || 'Instagram publish failed');
+  }
+
+  return igData.id;
+}
+
+// ============================================================
+// Main cron handler
+// ============================================================
+export async function GET(request: Request) {
   try {
-    // Delete image from Supabase storage if exists
-    if (post.image_url) {
-      // Extract filename from URL - handle both /images/ and /videos/ paths
-      const imageMatch = post.image_url.match(/\/images\/(.+)$/);
-      if (imageMatch && imageMatch[1]) {
-        const { error } = await supabaseAdmin.storage.from('images').remove([imageMatch[1]]);
-        if (error) {
-          console.error('Failed to delete image:', error);
-        } else {
-          console.log(`Deleted image: ${imageMatch[1]}`);
+    // Fetch all pending targets that are due
+    const now = new Date().toISOString();
+    
+    const { data: targets, error: fetchError } = await supabaseAdmin
+      .from('scheduled_post_targets')
+      .select('*, scheduled_posts(content, image_url, user_id)')
+      .eq('status', 'pending')
+      .lte('scheduled_for', now);
+
+    if (fetchError) {
+      console.error('Error fetching targets:', fetchError);
+      return Response.json({ error: fetchError.message }, { status: 500 });
+    }
+
+    if (!targets || targets.length === 0) {
+      return Response.json({ message: 'No targets to process', processed: 0 });
+    }
+
+    const results = { processed: 0, succeeded: 0, failed: 0 };
+
+    for (const target of targets) {
+      const post = target.scheduled_posts;
+      if (!post) {
+        await supabaseAdmin
+          .from('scheduled_post_targets')
+          .update({ status: 'failed', error_message: 'Post not found' })
+          .eq('id', target.id);
+        results.failed++;
+        results.processed++;
+        continue;
+      }
+
+      // Get connection/page data
+      let connection = null;
+      let page = null;
+
+      if (target.social_page_id) {
+        // Multi-account platform - get page with tokens
+        const { data: pageData } = await supabaseAdmin
+          .from('social_pages')
+          .select('*, social_connections(access_token, refresh_token, expires_at, platform_user_id)')
+          .eq('id', target.social_page_id)
+          .single();
+        page = pageData;
+        connection = pageData?.social_connections;
+      } else if (target.social_connection_id) {
+        // Single-account platform
+        const { data: connData } = await supabaseAdmin
+          .from('social_connections')
+          .select('*')
+          .eq('id', target.social_connection_id)
+          .single();
+        connection = connData;
+      }
+
+      if (!connection) {
+        await supabaseAdmin
+          .from('scheduled_post_targets')
+          .update({ status: 'failed', error_message: `${target.platform}: connection not found` })
+          .eq('id', target.id);
+        results.failed++;
+        results.processed++;
+        continue;
+      }
+
+      // Post to the platform
+      try {
+        let externalPostId: string | undefined;
+
+        if (target.platform === 'x') {
+          externalPostId = await postToX(post.content, post.image_url, connection);
+        } else if (target.platform === 'linkedin') {
+          externalPostId = await postToLinkedIn(post.content, post.image_url, connection);
+        } else if (target.platform === 'bluesky') {
+          externalPostId = await postToBluesky(post.content, post.image_url, connection);
+        } else if (target.platform === 'facebook') {
+          if (!page) throw new Error('Facebook page not found');
+          externalPostId = await postToFacebook(post.content, post.image_url, page);
+        } else if (target.platform === 'instagram') {
+          if (!page) throw new Error('Instagram account not found');
+          externalPostId = await postToInstagram(post.content, post.image_url, page);
         }
+
+        // Mark target as published
+        await supabaseAdmin
+          .from('scheduled_post_targets')
+          .update({
+            status: 'published',
+            published_at: new Date().toISOString(),
+            external_post_id: externalPostId,
+          })
+          .eq('id', target.id);
+
+        results.succeeded++;
+
+      } catch (err: any) {
+        console.error(`Error posting to ${target.platform}:`, err.message);
+        await supabaseAdmin
+          .from('scheduled_post_targets')
+          .update({ status: 'failed', error_message: err.message })
+          .eq('id', target.id);
+        results.failed++;
+      }
+
+      results.processed++;
+
+      // Check if all targets for this post are done
+      const { data: remainingTargets } = await supabaseAdmin
+        .from('scheduled_post_targets')
+        .select('status')
+        .eq('scheduled_post_id', target.scheduled_post_id)
+        .neq('status', 'published');
+
+      if (!remainingTargets || remainingTargets.length === 0) {
+        // All targets processed - update post status
+        const { data: allTargets } = await supabaseAdmin
+          .from('scheduled_post_targets')
+          .select('status')
+          .eq('scheduled_post_id', target.scheduled_post_id);
+
+        const allPublished = allTargets?.every(t => t.status === 'published') ?? false;
+        
+        await supabaseAdmin
+          .from('scheduled_posts')
+          .update({
+            status: allPublished ? 'published' : 'failed',
+            published_at: new Date().toISOString(),
+          })
+          .eq('id', target.scheduled_post_id);
+      }
+
+      // Cleanup image from storage after successful post
+      if (post.image_url) {
+        try {
+          const urlParts = post.image_url.split('/');
+          const fileName = urlParts[urlParts.length - 1];
+          await supabaseAdmin.storage.from('images').remove([fileName]);
+        } catch (e) {}
       }
     }
-    // Delete video from Supabase storage if exists
-    if (post.video_url) {
-      const videoMatch = post.video_url.match(/\/videos\/(.+)$/);
-      if (videoMatch && videoMatch[1]) {
-        const { error } = await supabaseAdmin.storage.from('videos').remove([videoMatch[1]]);
-        if (error) {
-          console.error('Failed to delete video:', error);
-        } else {
-          console.log(`Deleted video: ${videoMatch[1]}`);
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Failed to cleanup media:', err);
+
+    return Response.json({
+      message: `Processed ${results.processed} targets`,
+      ...results,
+    });
+
+  } catch (error: any) {
+    console.error('Process scheduled error:', error);
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }

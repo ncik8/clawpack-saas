@@ -59,9 +59,40 @@ export async function GET(request: Request) {
 
     console.log('Instagram-standalone OAuth for user:', userData.id);
 
-    // First try: Get Instagram business accounts directly via dedicated endpoint
+    // Step 1: Save/update Instagram connection in social_connections
+    const { data: connection, error: connError } = await supabase
+      .from('social_connections')
+      .upsert(
+        {
+          user_id: oauthState.user_id,
+          platform: 'instagram',
+          platform_user_id: userData.id,
+          platform_username: userData.name,
+          access_token: userToken,
+          refresh_token: tokens.refresh_token || null,
+          expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+        },
+        { onConflict: 'user_id,platform' }
+      )
+      .select()
+      .single();
+
+    if (connError || !connection) {
+      console.error('Failed to save Instagram connection:', connError);
+      throw new Error('Failed to save Instagram connection');
+    }
+
+    // Step 2: Save Instagram accounts to social_pages
     let savedCount = 0;
-    
+
+    // First, deactivate all existing Instagram pages for this connection
+    await supabase
+      .from('social_pages')
+      .update({ is_active: false })
+      .eq('connection_id', connection.id)
+      .eq('platform', 'instagram');
+
+    // Try to get Instagram business accounts
     try {
       const igDirectRes = await fetch(
         `https://graph.facebook.com/v18.0/${userData.id}/instagram_business_accounts?access_token=${userToken}&fields=id,username,name`
@@ -72,105 +103,63 @@ export async function GET(request: Request) {
       if (igDirectData.data && igDirectData.data.length > 0) {
         for (const igAccount of igDirectData.data) {
           const igUsername = igAccount.username || igAccount.name || igAccount.id;
+          const isDefault = savedCount === 0;
           
           await supabase.from('social_pages').upsert(
             {
               user_id: oauthState.user_id,
+              connection_id: connection.id,
               platform: 'instagram',
-              platform_user_id: igAccount.id,
-              platform_username: igUsername,
-              access_token: userToken,
-              refresh_token: tokens.refresh_token || null,
-              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+              page_id: igAccount.id,
+              page_name: igUsername,
+              page_username: igUsername,
+              is_default: isDefault,
+              is_active: true,
             },
-            { onConflict: 'user_id,platform,platform_user_id' }
+            { onConflict: 'connection_id,page_id' }
           );
           savedCount++;
-          console.log('Saved IG via direct endpoint:', igUsername);
-        }
-        
-        if (savedCount > 0) {
-          return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=instagram&count=${savedCount}`);
+          console.log('Saved IG account:', igUsername);
         }
       }
     } catch (e) {
       console.log('Instagram business accounts endpoint failed:', e);
     }
 
-    // Second try: Get via /me/accounts
-    const igAccountsRes = await fetch(
-      `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`,
-    );
-    const igAccountsData = await igAccountsRes.json();
-
-    console.log('IG Accounts via pages response:', JSON.stringify(igAccountsData));
-
-    if (igAccountsData.data && igAccountsData.data.length > 0) {
-      for (const page of igAccountsData.data) {
-        // Check if page has instagram_business_account linked - ONLY save actual IG accounts
-        if (page.instagram_business_account) {
-          const igAccountId = page.instagram_business_account.id;
-          
-          // Get IG username
-          const igRes = await fetch(
-            `https://graph.facebook.com/v18.0/${igAccountId}?fields=username,name&access_token=${page.access_token || userToken}`
-          );
-          const igData = await igRes.json();
-          const igUsername = igData.username || page.name;
-
-          console.log('Storing IG via page link:', igAccountId, igUsername);
-
-          await supabase.from('social_pages').upsert(
-            {
-              user_id: oauthState.user_id,
-              platform: 'instagram',
-              platform_user_id: igAccountId,
-              platform_username: igUsername,
-              access_token: page.access_token || userToken,
-              refresh_token: tokens.refresh_token || null,
-              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-            },
-            { onConflict: 'user_id,platform,platform_user_id' }
-          );
-          savedCount++;
-        }
-        // DO NOT save Facebook Pages as Instagram accounts!
-      }
-    }
-
-    // If no IG accounts found via pages, try to get them directly from the user's Instagram business accounts
+    // If no IG accounts found, try via pages
     if (savedCount === 0) {
-      // Try Instagram Graph API endpoint for business accounts
-      const directIgRes = await fetch(
-        `https://graph.facebook.com/v18.0/${userData.id}?fields=instagram_business_accounts&access_token=${userToken}`
+      const igAccountsRes = await fetch(
+        `https://graph.facebook.com/v18.0/me/accounts?access_token=${userToken}&fields=id,name,access_token,instagram_business_account`
       );
-      const directIgData = await directIgRes.json();
-      
-      console.log('Direct IG business accounts:', JSON.stringify(directIgData));
+      const igAccountsData = await igAccountsRes.json();
 
-      if (directIgData.instagram_business_accounts?.data?.length > 0) {
-        for (const igAccount of directIgData.instagram_business_accounts.data) {
-          // Get IG username
-          const igRes = await fetch(
-            `https://graph.facebook.com/v18.0/${igAccount.id}?fields=username,name&access_token=${userToken}`
-          );
-          const igData = await igRes.json();
+      if (igAccountsData.data && igAccountsData.data.length > 0) {
+        for (const page of igAccountsData.data) {
+          if (page.instagram_business_account) {
+            const igAccountId = page.instagram_business_account.id;
+            
+            const igRes = await fetch(
+              `https://graph.facebook.com/v18.0/${igAccountId}?fields=username,name&access_token=${page.access_token || userToken}`
+            );
+            const igData = await igRes.json();
+            const igUsername = igData.username || page.name;
+            const isDefault = savedCount === 0;
 
-          console.log('Storing direct IG business account:', igAccount.id, igData.username);
-
-          await supabase.from('social_pages').upsert(
-            {
-              user_id: oauthState.user_id,
-              platform: 'instagram',
-              platform_user_id: igAccount.id,
-              platform_username: igData.username || igAccount.id,
-              access_token: userToken,
-              refresh_token: tokens.refresh_token || null,
-              expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-            },
-            { onConflict: 'user_id,platform,platform_user_id' }
-          );
-          savedCount++;
+            await supabase.from('social_pages').upsert(
+              {
+                user_id: oauthState.user_id,
+                connection_id: connection.id,
+                platform: 'instagram',
+                page_id: igAccountId,
+                page_name: igUsername,
+                page_username: igUsername,
+                is_default: isDefault,
+                is_active: true,
+              },
+              { onConflict: 'connection_id,page_id' }
+            );
+            savedCount++;
+          }
         }
       }
     }
