@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildOAuthHeaderUrlEncoded } from '@/lib/x-oauth';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcyifihwvqxtpypphpef.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 function parseFormEncoded(body: string): Record<string, string> {
   const params = new URLSearchParams(body);
@@ -31,7 +36,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: pending, error: pendingError } = await supabase
+  const { data: pending, error: pendingError } = await supabaseAdmin
     .from('social_connections')
     .select('*')
     .eq('user_id', user.id)
@@ -101,7 +106,7 @@ export async function GET(request: NextRequest) {
 
   console.log('[x-callback] storing tokens for user:', user.id);
 
-  const { error: upsertError } = await supabase
+  const { error: upsertError } = await supabaseAdmin
     .from('social_connections')
     .upsert(
       {
@@ -125,7 +130,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  await supabase
+  await supabaseAdmin
     .from('social_connections')
     .delete()
     .eq('user_id', user.id)

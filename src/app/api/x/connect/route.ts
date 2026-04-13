@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { buildOAuthHeaderUrlEncoded } from '@/lib/x-oauth';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcyifihwvqxtpypphpef.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 function parseFormEncoded(body: string): Record<string, string> {
   const params = new URLSearchParams(body);
@@ -52,7 +57,7 @@ export async function GET() {
     );
   }
 
-  const { error: dbError } = await supabase
+  const { error: dbError } = await supabaseAdmin
     .from('social_connections')
     .upsert(
       {
@@ -71,7 +76,7 @@ export async function GET() {
 
   if (dbError) {
     // Fallback: try update then insert
-    const { error: updateErr } = await supabase
+    const { error: updateErr } = await supabaseAdmin
       .from('social_connections')
       .update({
         user_id: user.id,
@@ -86,7 +91,7 @@ export async function GET() {
       .eq('platform', 'x_oauth1_pending');
     
     if (updateErr) {
-      await supabase.from('social_connections').insert({
+      await supabaseAdmin.from('social_connections').insert({
         user_id: user.id,
         platform: 'x_oauth1_pending',
         platform_user_id: null,
