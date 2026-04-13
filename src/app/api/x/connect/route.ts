@@ -70,7 +70,32 @@ export async function GET() {
     );
 
   if (dbError) {
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+    // Fallback: try update then insert
+    const { error: updateErr } = await supabase
+      .from('social_connections')
+      .update({
+        user_id: user.id,
+        platform: 'x_oauth1_pending',
+        platform_user_id: null,
+        platform_username: null,
+        access_token: parsed.oauth_token,
+        refresh_token: parsed.oauth_token_secret,
+        expires_at: null,
+      })
+      .eq('user_id', user.id)
+      .eq('platform', 'x_oauth1_pending');
+    
+    if (updateErr) {
+      await supabase.from('social_connections').insert({
+        user_id: user.id,
+        platform: 'x_oauth1_pending',
+        platform_user_id: null,
+        platform_username: null,
+        access_token: parsed.oauth_token,
+        refresh_token: parsed.oauth_token_secret,
+        expires_at: null,
+      });
+    }
   }
 
   const redirectUrl = `https://api.twitter.com/oauth/authorize?oauth_token=${encodeURIComponent(parsed.oauth_token)}`;

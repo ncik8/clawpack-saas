@@ -71,18 +71,32 @@ export async function GET(request: Request) {
   }
 
   // Store tokens
-  await supabase.from('social_connections').upsert(
-    {
-      user_id: oauthState.user_id,
-      platform: 'x',
-      platform_user_id: userData.data.id,
-      platform_username: userData.data.username,
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token || null,
-      expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-    },
-    { onConflict: 'user_id,platform' }
-  );
+  const insertData = {
+    user_id: oauthState.user_id,
+    platform: 'x',
+    platform_user_id: userData.data.id,
+    platform_username: userData.data.username,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token || null,
+    expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+  };
+  const { error: upsertErr } = await supabase
+    .from('social_connections')
+    .upsert(insertData, { onConflict: 'user_id,platform' });
+  
+  if (upsertErr) {
+    // Fallback: try update then insert
+    const { data: updateData, error: updateErr } = await supabase
+      .from('social_connections')
+      .update(insertData)
+      .eq('user_id', oauthState.user_id)
+      .eq('platform', 'x')
+      .select();
+    
+    if (!updateData || updateData.length === 0) {
+      await supabase.from('social_connections').insert(insertData);
+    }
+  }
 
   return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=x`);
 }
