@@ -121,7 +121,7 @@ async function postToX(content: string, imageUrl: string | null, connection: any
           accessToken,
           accessTokenSecret: connection.refresh_token,
           fileBuffer: imageBuffer,
-                  mimeType: 'image/jpeg',
+          mimeType: 'image/jpeg',
         });
         if (mediaId) mediaIds.push(mediaId);
       }
@@ -237,7 +237,7 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
 
   if (!postRes.ok) {
     const errorData = await postRes.json();
-    // LinkedIn deduplication - if duplicate error, post likely went through
+    // LinkedIn deduplication
     if (!errorData.message?.includes('duplicate') && !errorData.message?.includes('Duplicate')) {
       throw new Error(`LinkedIn: ${errorData.message}`);
     }
@@ -357,40 +357,44 @@ async function postToFacebook(content: string, imageUrl: string | null, page: an
   }
 }
 
-async function postToInstagram(content: string, imageUrl: string | null, page: any) {
-  // Instagram requires creating media then publishing
-  const igBody: Record<string, string> = { caption: content };
+async function postToInstagram(content: string, imageUrl: string | null, connection: any) {
+  // Instagram uses connection from social_connections (NOT social_pages)
+  // IG accounts are stored in social_connections, not social_pages
+  const accessToken = connection.access_token;
+  const igUserId = connection.platform_user_id;
   
-  if (imageUrl) {
-    igBody['media_type'] = 'EXTERNAL_IMAGE';
-    igBody['image_url'] = imageUrl;
-    igBody['external_url'] = imageUrl;
-  } else {
-    igBody['media_type'] = 'TEXT';
+  if (!accessToken || !igUserId) {
+    throw new Error('Instagram: missing access token or user ID');
   }
 
-  // Create media
-  const igRes = await fetch(`https://graph.facebook.com/v18.0/${page.page_id}/media`, {
+  // Create media container with FormData (Instagram API requires FormData for image_url)
+  const formData = new FormData();
+  formData.append('caption', content);
+  
+  if (imageUrl) {
+    formData.append('media_type', 'EXTERNAL_IMAGE');
+    formData.append('image_url', imageUrl);
+  } else {
+    formData.append('media_type', 'TEXT');
+  }
+
+  const igRes = await fetch(`https://graph.facebook.com/v18.0/${igUserId}/media`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${page.page_access_token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(igBody),
+    body: formData,
   });
   const igData = await igRes.json();
 
-  if (!igRes.ok) {
+  if (!igRes.ok || !igData.id) {
     throw new Error(igData.error?.message || 'Instagram media creation failed');
   }
 
+  // Wait for processing
+  await new Promise(resolve => setTimeout(resolve, 5000));
+
   // Publish media
-  const publishRes = await fetch(`https://graph.facebook.com/v18.0/${page.page_id}/media_publish`, {
+  const publishRes = await fetch(`https://graph.facebook.com/v18.0/${igUserId}/media_publish`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${page.page_access_token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ creation_id: igData.id }),
   });
 
@@ -486,8 +490,8 @@ export async function GET(request: Request) {
           if (!page) throw new Error('Facebook page not found');
           externalPostId = await postToFacebook(post.content, post.image_url, page);
         } else if (target.platform === 'instagram') {
-          if (!page) throw new Error('Instagram account not found');
-          externalPostId = await postToInstagram(post.content, post.image_url, page);
+          // Instagram uses connection directly (IG accounts are in social_connections, not social_pages)
+          externalPostId = await postToInstagram(post.content, post.image_url, connection);
         }
 
         // Mark target as published

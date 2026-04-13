@@ -74,21 +74,21 @@ export async function POST(request: Request) {
     for (const platformId of platforms) {
       const { basePlatform, pageId } = parsePlatform(platformId);
 
-      if (basePlatform === 'facebook' || basePlatform === 'instagram') {
-        // Multi-account platforms - need page_id from social_pages
+      if (basePlatform === 'facebook') {
+        // Facebook - use social_pages (multi-account)
         if (!pageId) {
           // No specific page selected, get all active pages for this platform
           const { data: pages } = await supabaseAdmin
             .from('social_pages')
             .select('id, connection_id')
             .eq('user_id', userId)
-            .eq('platform', basePlatform)
+            .eq('platform', 'facebook')
             .eq('is_active', true);
 
           if (pages && pages.length > 0) {
             for (const page of pages) {
               targets.push({
-                platform: basePlatform,
+                platform: 'facebook',
                 social_connection_id: page.connection_id,
                 social_page_id: page.id,
                 scheduled_for: scheduledFor,
@@ -102,15 +102,53 @@ export async function POST(request: Request) {
             .select('id, connection_id')
             .eq('user_id', userId)
             .eq('page_id', pageId)
-            .eq('platform', basePlatform)
+            .eq('platform', 'facebook')
             .eq('is_active', true)
             .single();
 
           if (page) {
             targets.push({
-              platform: basePlatform,
+              platform: 'facebook',
               social_connection_id: page.connection_id,
               social_page_id: page.id,
+              scheduled_for: scheduledFor,
+            });
+          }
+        }
+      } else if (basePlatform === 'instagram') {
+        // Instagram - use social_connections directly (IG accounts are in social_connections, NOT social_pages)
+        // pageId here is actually the Instagram account's platform_user_id from social_connections
+        if (!pageId) {
+          // No specific account selected, get all active IG connections
+          const { data: connections } = await supabaseAdmin
+            .from('social_connections')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('platform', 'instagram');
+
+          if (connections && connections.length > 0) {
+            for (const conn of connections) {
+              targets.push({
+                platform: 'instagram',
+                social_connection_id: conn.id,
+                scheduled_for: scheduledFor,
+              });
+            }
+          }
+        } else {
+          // Specific account selected - find by platform_user_id
+          const { data: connection } = await supabaseAdmin
+            .from('social_connections')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('platform', 'instagram')
+            .eq('platform_user_id', pageId)
+            .single();
+
+          if (connection) {
+            targets.push({
+              platform: 'instagram',
+              social_connection_id: connection.id,
               scheduled_for: scheduledFor,
             });
           }
@@ -212,19 +250,19 @@ export async function PUT(request: Request) {
     for (const platformId of platforms) {
       const { basePlatform, pageId } = parsePlatform(platformId);
 
-      if (basePlatform === 'facebook' || basePlatform === 'instagram') {
+      if (basePlatform === 'facebook') {
         if (!pageId) {
           const { data: pages } = await supabaseAdmin
             .from('social_pages')
             .select('id, connection_id')
             .eq('user_id', userId)
-            .eq('platform', basePlatform)
+            .eq('platform', 'facebook')
             .eq('is_active', true);
 
           if (pages && pages.length > 0) {
             for (const page of pages) {
               targets.push({
-                platform: basePlatform,
+                platform: 'facebook',
                 social_connection_id: page.connection_id,
                 social_page_id: page.id,
                 scheduled_for: scheduledFor,
@@ -237,15 +275,49 @@ export async function PUT(request: Request) {
             .select('id, connection_id')
             .eq('user_id', userId)
             .eq('page_id', pageId)
-            .eq('platform', basePlatform)
+            .eq('platform', 'facebook')
             .eq('is_active', true)
             .single();
 
           if (page) {
             targets.push({
-              platform: basePlatform,
+              platform: 'facebook',
               social_connection_id: page.connection_id,
               social_page_id: page.id,
+              scheduled_for: scheduledFor,
+            });
+          }
+        }
+      } else if (basePlatform === 'instagram') {
+        // Instagram - use social_connections directly
+        if (!pageId) {
+          const { data: connections } = await supabaseAdmin
+            .from('social_connections')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('platform', 'instagram');
+          if (connections && connections.length > 0) {
+            for (const conn of connections) {
+              targets.push({
+                platform: 'instagram',
+                social_connection_id: conn.id,
+                scheduled_for: scheduledFor,
+              });
+            }
+          }
+        } else {
+          const { data: connection } = await supabaseAdmin
+            .from('social_connections')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('platform', 'instagram')
+            .eq('platform_user_id', pageId)
+            .single();
+
+          if (connection) {
+            targets.push({
+              platform: 'instagram',
+              social_connection_id: connection.id,
               scheduled_for: scheduledFor,
             });
           }
