@@ -1,4 +1,3 @@
-
 import { createClient } from '@/utils/supabase/server';
 
 export async function POST(request: Request) {
@@ -16,9 +15,8 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Content required' }, { status: 400 });
     }
 
-    // Instagram requires image_url or video_url
     if (!imageUrl) {
-      return Response.json({ error: 'Instagram requires an image URL. Please paste a public image URL above.' }, { status: 400 });
+      return Response.json({ error: 'Image URL required' }, { status: 400 });
     }
 
     // Get all IG account connections for this user from social_connections
@@ -35,22 +33,37 @@ export async function POST(request: Request) {
 
     console.log('[INSTAGRAM POST] Found connections:', connections.length, connections.map(c => c.platform_user_id));
 
+    // Download image from URL (handle Supabase signed URLs)
+    let imageBuffer: ArrayBuffer | null = null;
+    let imageContentType = 'image/jpeg';
+
+    try {
+      const imageRes = await fetch(imageUrl);
+      if (!imageRes.ok) {
+        return Response.json({ error: `Failed to fetch image: ${imageRes.status}` }, { status: 400 });
+      }
+      imageBuffer = await imageRes.arrayBuffer();
+      imageContentType = imageRes.headers.get('content-type') || 'image/jpeg';
+      console.log('[INSTAGRAM POST] Image fetched, size:', imageBuffer.byteLength, 'type:', imageContentType);
+    } catch (e) {
+      return Response.json({ error: 'Failed to download image from URL' }, { status: 400 });
+    }
+
     const results: { igId: string; username: string; success: boolean; postId?: string; error?: string }[] = [];
 
     for (const conn of connections) {
       console.log(`[INSTAGRAM POST] Posting to ${conn.platform_username} (${conn.platform_user_id})`);
       try {
-        // Step 1: Create media container
-        // Instagram requires either image_url or video_url (public URLs only)
+        // Step 1: Create media container with binary upload (Instagram processes it directly)
+        const formData = new FormData();
+        formData.append('image', new Blob([imageBuffer!], { type: imageContentType }), 'image.jpg');
+        formData.append('caption', text);
+
         const containerRes = await fetch(
           `https://graph.facebook.com/v18.0/${conn.platform_user_id}/media?access_token=${conn.access_token}`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              image_url: imageUrl,
-              caption: text,
-            }),
+            body: formData,
           }
         );
         const containerData = await containerRes.json();
@@ -66,7 +79,9 @@ export async function POST(request: Request) {
           continue;
         }
 
-        // Step 2: Publish media container
+        // Step 2: Wait for Instagram to process the container, then publish
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
         const publishRes = await fetch(
           `https://graph.facebook.com/v18.0/${conn.platform_user_id}/media_publish?access_token=${conn.access_token}`,
           {
@@ -108,6 +123,7 @@ export async function POST(request: Request) {
       results,
       message: `Posted to ${successful} of ${results.length} Instagram accounts`,
     });
+
   } catch (err: any) {
     console.error('IG post error:', err);
     return Response.json({ error: err?.message || String(err) || 'Unknown error' }, { status: 500 });
