@@ -38,12 +38,13 @@ export async function GET(request: NextRequest) {
 
   console.log('[x-callback] user:', user.id);
   console.log('[x-callback] looking for pending token:', oauthToken);
+  // Query only by token + platform, not user_id (session may differ on callback)
   const { data: pending, error: pendingError } = await supabaseAdmin
     .from('social_connections')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('access_token', oauthToken)
     .eq('platform', 'x_oauth1_pending')
-    .single();
+    .maybeSingle();
   console.log('[x-callback] pending query result:', { pending, pendingError });
 
   if (pendingError || !pending) {
