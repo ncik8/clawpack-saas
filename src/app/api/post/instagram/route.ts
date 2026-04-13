@@ -20,6 +20,11 @@ export async function POST(request: Request) {
     }
 
     // Get all IG account connections for this user from social_connections
+    // Get the specific IG accounts selected (format: instagram_<platform_user_id>)
+    const selectedIgIds = platforms
+      .filter(p => p.startsWith('instagram_'))
+      .map(p => p.replace('instagram_', ''));
+    
     const { data: connections } = await supabase
       .from('social_connections')
       .select('*')
@@ -31,7 +36,12 @@ export async function POST(request: Request) {
       return Response.json({ error: 'No Instagram account connected' }, { status: 400 });
     }
 
-    console.log('[INSTAGRAM POST] Found connections:', connections.length, connections.map(c => c.platform_user_id));
+    // Filter to only selected accounts
+    const filteredConnections = selectedIgIds.length > 0
+      ? connections.filter(c => selectedIgIds.includes(c.platform_user_id))
+      : connections;
+
+    console.log('[INSTAGRAM POST] Found connections:', connections.length, 'selected:', filteredConnections.length, filteredConnections.map(c => c.platform_user_id));
 
     const results: { igId: string; username: string; success: boolean; postId?: string; error?: string }[] = [];
 
