@@ -36,46 +36,36 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  console.log('[x-callback] user:', user.id);
-  console.log('[x-callback] looking for pending token:', oauthToken);
-  
-  // Look for pending token under both old ('x') and new ('x_oauth1_pending') platform values
-  const { data: pending, error: pendingError } = await supabaseAdmin
-    .from('social_connections')
-    .select('*')
-    .eq('access_token', oauthToken)
-    .in('platform', ['x_oauth1_pending', 'x'])
-    .maybeSingle();
-  
-  console.log('[x-callback] pending query result:', { pending, pendingError });
+  console.log('[x-callback] user:', user.id, 'oauth_token:', oauthToken);
 
-  if (pendingError || !pending) {
-    console.error('[x-callback] pending token not found:', { pendingError, pending });
+  // Look up pending token in oauth_temp_tokens by request_oauth_token
+  const { data: tempToken, error: tempError } = await supabaseAdmin
+    .from('oauth_temp_tokens')
+    .select('*')
+    .eq('request_oauth_token', oauthToken)
+    .eq('platform', 'x')
+    .is('used_at', null)
+    .maybeSingle();
+
+  if (tempError || !tempToken) {
+    console.error('[x-callback] temp token not found:', { tempError, tempToken });
     return NextResponse.json(
       { error: 'Pending OAuth token not found' },
       { status: 400 }
     );
   }
 
-  if (pending.access_token !== oauthToken) {
-    return NextResponse.json(
-      { error: 'OAuth token mismatch' },
-      { status: 400 }
-    );
-  }
-
+  // Exchange for access token
   const accessUrl = 'https://api.twitter.com/oauth/access_token';
-  const bodyParams = {
-    oauth_verifier: oauthVerifier,
-  };
+  const bodyParams = { oauth_verifier: oauthVerifier };
 
   const authHeader = buildOAuthHeaderUrlEncoded({
     method: 'POST',
     url: accessUrl,
     consumerKey: process.env.X_API_KEY!,
     consumerSecret: process.env.X_API_SECRET!,
-    accessToken: pending.access_token,
-    accessTokenSecret: pending.refresh_token,
+    accessToken: tempToken.request_oauth_token,
+    accessTokenSecret: tempToken.request_oauth_token_secret,
     bodyParams,
   });
 
@@ -113,7 +103,13 @@ export async function GET(request: NextRequest) {
 
   console.log('[x-callback] storing tokens for user:', user.id);
 
-  // Try upsert first, if it fails due to constraint fall back to update
+  // Mark temp token as used
+  await supabaseAdmin
+    .from('oauth_temp_tokens')
+    .update({ used_at: new Date().toISOString() })
+    .eq('id', tempToken.id);
+
+  // Save final tokens to social_connections using upsert
   const { error: upsertError } = await supabaseAdmin
     .from('social_connections')
     .upsert(
@@ -132,34 +128,12 @@ export async function GET(request: NextRequest) {
     );
 
   if (upsertError) {
-    console.error('[x-callback] upsert failed, trying update:', upsertError);
-    // Fall back: try update first, if 0 rows then insert
-    const { error: updateErr } = await supabaseAdmin
-      .from('social_connections')
-      .update({
-        platform_user_id: parsed.user_id,
-        platform_username: parsed.screen_name,
-        access_token: parsed.oauth_token,
-        refresh_token: parsed.oauth_token_secret,
-        expires_at: null,
-      })
-      .eq('user_id', user.id)
-      .eq('platform', 'x');
-
-    if (updateErr) {
-      console.error('[x-callback] update also failed:', updateErr);
-      return NextResponse.json(
-        { error: `Failed to save tokens: ${upsertError.message}` },
-        { status: 500 }
-      );
-    }
+    console.error('[x-callback] upsert failed:', upsertError);
+    return NextResponse.json(
+      { error: `Failed to save tokens: ${upsertError.message}` },
+      { status: 500 }
+    );
   }
-
-  await supabaseAdmin
-    .from('social_connections')
-    .delete()
-    .eq('user_id', user.id)
-    .eq('platform', 'x');
 
   return NextResponse.redirect(new URL('/dashboard/connected-accounts?connected=x', request.url));
 }
