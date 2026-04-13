@@ -57,27 +57,54 @@ export async function GET() {
     );
   }
 
-  // Clean up old pending token first (if exists)
+  const oauthToken = parsed.oauth_token;
+  const oauthSecret = parsed.oauth_token_secret;
+
+  console.log('[x-connect] user:', user.id);
+  console.log('[x-connect] token:', oauthToken);
+  console.log('[x-connect] secret:', oauthSecret);
+
+  // Clean up old pending tokens for this user (both platforms)
   await supabaseAdmin
     .from('social_connections')
     .delete()
     .eq('user_id', user.id)
-    .eq('platform', 'x_oauth1_pending');
+    .in('platform', ['x_oauth1_pending', 'x']);
 
-  // Store pending token
-  const { error: insertErr } = await supabaseAdmin
+  // Insert pending token with explicit columns
+  const insertResult = await supabaseAdmin
     .from('social_connections')
     .insert({
       user_id: user.id,
       platform: 'x_oauth1_pending',
       platform_user_id: null,
       platform_username: null,
-      access_token: parsed.oauth_token,
-      refresh_token: parsed.oauth_token_secret,
+      access_token: oauthToken,
+      refresh_token: oauthSecret,
       expires_at: null,
-    });
-  console.log('[x-connect] insert result:', insertErr ? `error: ${JSON.stringify(insertErr)}` : 'ok');
+    })
+    .select();
 
-  const redirectUrl = `https://api.twitter.com/oauth/authorize?oauth_token=${encodeURIComponent(parsed.oauth_token)}`;
+  console.log('[x-connect] insert result:', JSON.stringify(insertResult));
+
+  if (insertResult.error) {
+    console.error('[x-connect] insert failed:', insertResult.error);
+    return NextResponse.json(
+      { error: `Failed to store pending token: ${insertResult.error.message}` },
+      { status: 500 }
+    );
+  }
+
+  // Verify it was stored
+  const { data: verify } = await supabaseAdmin
+    .from('social_connections')
+    .select('id, platform, access_token')
+    .eq('user_id', user.id)
+    .eq('platform', 'x_oauth1_pending')
+    .maybeSingle();
+
+  console.log('[x-connect] verify after insert:', verify);
+
+  const redirectUrl = `https://api.twitter.com/oauth/authorize?oauth_token=${encodeURIComponent(oauthToken)}`;
   return NextResponse.redirect(redirectUrl);
 }
