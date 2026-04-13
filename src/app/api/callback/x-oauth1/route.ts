@@ -113,6 +113,7 @@ export async function GET(request: NextRequest) {
 
   console.log('[x-callback] storing tokens for user:', user.id);
 
+  // Try upsert first, if it fails due to constraint fall back to update
   const { error: upsertError } = await supabaseAdmin
     .from('social_connections')
     .upsert(
@@ -131,10 +132,27 @@ export async function GET(request: NextRequest) {
     );
 
   if (upsertError) {
-    return NextResponse.json(
-      { error: upsertError.message },
-      { status: 500 }
-    );
+    console.error('[x-callback] upsert failed, trying update:', upsertError);
+    // Fall back: try update first, if 0 rows then insert
+    const { error: updateErr } = await supabaseAdmin
+      .from('social_connections')
+      .update({
+        platform_user_id: parsed.user_id,
+        platform_username: parsed.screen_name,
+        access_token: parsed.oauth_token,
+        refresh_token: parsed.oauth_token_secret,
+        expires_at: null,
+      })
+      .eq('user_id', user.id)
+      .eq('platform', 'x');
+
+    if (updateErr) {
+      console.error('[x-callback] update also failed:', updateErr);
+      return NextResponse.json(
+        { error: `Failed to save tokens: ${upsertError.message}` },
+        { status: 500 }
+      );
+    }
   }
 
   await supabaseAdmin
