@@ -38,13 +38,15 @@ export async function GET(request: NextRequest) {
 
   console.log('[x-callback] user:', user.id);
   console.log('[x-callback] looking for pending token:', oauthToken);
-  // Query only by token + platform, not user_id (session may differ on callback)
+  
+  // Look for pending token under both old ('x') and new ('x_oauth1_pending') platform values
   const { data: pending, error: pendingError } = await supabaseAdmin
     .from('social_connections')
     .select('*')
     .eq('access_token', oauthToken)
-    .eq('platform', 'x_oauth1_pending')
+    .in('platform', ['x_oauth1_pending', 'x'])
     .maybeSingle();
+  
   console.log('[x-callback] pending query result:', { pending, pendingError });
 
   if (pendingError || !pending) {
@@ -139,7 +141,7 @@ export async function GET(request: NextRequest) {
     .from('social_connections')
     .delete()
     .eq('user_id', user.id)
-    .eq('platform', 'x_oauth1_pending');
+    .eq('platform', 'x');
 
   return NextResponse.redirect(new URL('/dashboard/connected-accounts?connected=x', request.url));
 }
