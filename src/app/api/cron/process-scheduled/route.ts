@@ -228,27 +228,125 @@ export async function GET(request: Request) {
               continue;
             }
 
-            const linkedInRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-                'X-Restli-Protocol-Version': '2.0.0',
-              },
-              body: JSON.stringify({
-                author: authorUrn,
-                lifecycleState: 'PUBLISHED',
-                specificContent: {
-                  'com.linkedin.ugc.ShareContent': {
-                    shareCommentary: { text: post.content },
-                    shareMediaCategory: 'NONE',
+            let linkedInRes;
+            
+            if (post.image_url) {
+              // Image post - register image first, then create post with it
+              // Step 1: Register the image
+              const registerRes = await fetch('https://api.linkedin.com/v2/assets', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                  'LinkedIn-Version': '202304',
+                  'X-Restli-Protocol-Version': '2.0.0',
+                },
+                body: JSON.stringify({
+                  registerUploadRequest: {
+                    serviceRelationships: [{
+                      relationshipType: 'OWNER',
+                      identifier: 'urn:li:userGeneratedContent',
+                    }],
+                    owner: authorUrn,
+                    supportedUploadMechanism: ['MULTIPART_UPLOAD'],
                   },
+                }),
+              });
+              
+              const registerData = await registerRes.json();
+              
+              if (!registerRes.ok) {
+                // Fallback to text-only
+                linkedInRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'X-Restli-Protocol-Version': '2.0.0',
+                  },
+                  body: JSON.stringify({
+                    author: authorUrn,
+                    lifecycleState: 'PUBLISHED',
+                    specificContent: {
+                      'com.linkedin.ugc.ShareContent': {
+                        shareCommentary: { text: post.content },
+                        shareMediaCategory: 'NONE',
+                      },
+                    },
+                    visibility: {
+                      'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+                    },
+                  }),
+                });
+              } else {
+                // Step 2: Upload image binary to the registerUploadRequest.value.asset uploadUrl
+                const uploadUrl = registerData.value.asset;
+                const uploadMechanism = registerData.value.uploadMechanism;
+                
+                const imageRes = await fetch(post.image_url);
+                const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+                
+                await fetch(uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpUri'].uploadUrl, {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'image/jpeg',
+                  },
+                  body: imageBuffer,
+                });
+                
+                // Step 3: Create post referencing the uploaded image
+                linkedInRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'X-Restli-Protocol-Version': '2.0.0',
+                  },
+                  body: JSON.stringify({
+                    author: authorUrn,
+                    lifecycleState: 'PUBLISHED',
+                    specificContent: {
+                      'com.linkedin.ugc.ShareContent': {
+                        shareCommentary: { text: post.content },
+                        shareMediaCategory: 'IMAGE',
+                        media: [{
+                          status: 'READY',
+                          originalUrl: post.image_url,
+                          asset: uploadUrl,
+                        }],
+                      },
+                    },
+                    visibility: {
+                      'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+                    },
+                  }),
+                });
+              }
+            } else {
+              // Text-only post
+              linkedInRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                  'X-Restli-Protocol-Version': '2.0.0',
                 },
-                visibility: {
-                  'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
-                },
-              }),
-            });
+                body: JSON.stringify({
+                  author: authorUrn,
+                  lifecycleState: 'PUBLISHED',
+                  specificContent: {
+                    'com.linkedin.ugc.ShareContent': {
+                      shareCommentary: { text: post.content },
+                      shareMediaCategory: 'NONE',
+                    },
+                  },
+                  visibility: {
+                    'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+                  },
+                }),
+              });
+            }
 
             if (!linkedInRes.ok) {
               const errorData = await linkedInRes.json();
