@@ -370,10 +370,36 @@ export async function GET(request: Request) {
               console.log('LinkedIn post success:', linkedInRes.status);
             }
           } else if (basePlatform === 'bluesky') {
+            // Check if token needs refresh (Bluesky tokens expire after 24h)
+            let blueskyAccessToken = accessToken;
+            if (connection.expires_at && new Date(connection.expires_at) < new Date()) {
+              console.log('Bluesky token expired, refreshing...');
+              const refreshRes = await fetch('https://bsky.social/xrpc/com.atproto.server.refreshSession', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${connection.refresh_token}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+              const refreshData = await refreshRes.json();
+              if (refreshRes.ok && refreshData.accessJwt) {
+                blueskyAccessToken = refreshData.accessJwt;
+                await supabase
+                  .from('social_connections')
+                  .update({
+                    access_token: refreshData.accessJwt,
+                    refresh_token: refreshData.refreshJwt || connection.refresh_token,
+                    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                  })
+                  .eq('id', connection.id);
+                console.log('Bluesky token refreshed successfully');
+              }
+            }
+
             const blueskyRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${accessToken}`,
+                'Authorization': `Bearer ${blueskyAccessToken}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
