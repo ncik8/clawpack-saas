@@ -371,9 +371,11 @@ export async function GET(request: Request) {
             }
           } else if (basePlatform === 'bluesky') {
             // Check if token needs refresh (Bluesky tokens expire after 24h)
+            // Try refresh if refresh_token exists
             let blueskyAccessToken = accessToken;
-            if (connection.expires_at && new Date(connection.expires_at) < new Date()) {
-              console.log('Bluesky token expired, refreshing...');
+            console.log('Bluesky token check - expires_at:', connection.expires_at, 'refresh_token:', connection.refresh_token ? 'present' : 'missing');
+            if (connection.refresh_token) {
+              console.log('Bluesky token refresh attempt...');
               const refreshRes = await fetch('https://bsky.social/xrpc/com.atproto.server.refreshSession', {
                 method: 'POST',
                 headers: {
@@ -382,6 +384,7 @@ export async function GET(request: Request) {
                 },
               });
               const refreshData = await refreshRes.json();
+              console.log('Bluesky refresh result:', refreshRes.status, JSON.stringify(refreshData));
               if (refreshRes.ok && refreshData.accessJwt) {
                 blueskyAccessToken = refreshData.accessJwt;
                 await supabaseAdmin
@@ -393,7 +396,11 @@ export async function GET(request: Request) {
                   })
                   .eq('id', connection.id);
                 console.log('Bluesky token refreshed successfully');
+              } else {
+                console.log('Bluesky refresh failed, using existing token');
               }
+            } else {
+              console.log('Bluesky no refresh_token available');
             }
 
             const blueskyRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
