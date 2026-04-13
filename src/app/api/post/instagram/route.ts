@@ -33,30 +33,14 @@ export async function POST(request: Request) {
 
     console.log('[INSTAGRAM POST] Found connections:', connections.length, connections.map(c => c.platform_user_id));
 
-    // Download image from URL (handle Supabase signed URLs)
-    let imageBuffer: ArrayBuffer | null = null;
-    let imageContentType = 'image/jpeg';
-
-    try {
-      const imageRes = await fetch(imageUrl);
-      if (!imageRes.ok) {
-        return Response.json({ error: `Failed to fetch image: ${imageRes.status}` }, { status: 400 });
-      }
-      imageBuffer = await imageRes.arrayBuffer();
-      imageContentType = imageRes.headers.get('content-type') || 'image/jpeg';
-      console.log('[INSTAGRAM POST] Image fetched, size:', imageBuffer.byteLength, 'type:', imageContentType);
-    } catch (e) {
-      return Response.json({ error: 'Failed to download image from URL' }, { status: 400 });
-    }
-
     const results: { igId: string; username: string; success: boolean; postId?: string; error?: string }[] = [];
 
     for (const conn of connections) {
       console.log(`[INSTAGRAM POST] Posting to ${conn.platform_username} (${conn.platform_user_id})`);
       try {
-        // Step 1: Create media container with binary upload (Instagram processes it directly)
+        // Step 1: Create media container with FormData (URL approach)
         const formData = new FormData();
-        formData.append('image', new Blob([imageBuffer!], { type: imageContentType }), 'image.jpg');
+        formData.append('image_url', imageUrl);
         formData.append('caption', text);
 
         const containerRes = await fetch(
@@ -79,8 +63,8 @@ export async function POST(request: Request) {
           continue;
         }
 
-        // Step 2: Wait for Instagram to process the container, then publish
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Step 2: Wait for Instagram to process, then publish
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
         const publishRes = await fetch(
           `https://graph.facebook.com/v18.0/${conn.platform_user_id}/media_publish?access_token=${conn.access_token}`,
