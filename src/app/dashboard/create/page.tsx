@@ -383,7 +383,7 @@ export default function CreatePostPage() {
             errors.push(`Facebook: ${data.error}`);
           }
         } else if (getBasePlatform(platform) === 'instagram') {
-          // Instagram: only post to selected accounts
+          // Instagram: only post to selected accounts - pass platforms array for filtering
           const response = await fetch('/api/post/instagram', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

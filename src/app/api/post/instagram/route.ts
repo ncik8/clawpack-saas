@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { text, imageUrl } = await request.json();
+    const { text, imageUrl, platforms } = await request.json();
 
     if (!text) {
       return Response.json({ error: 'Content required' }, { status: 400 });
@@ -19,11 +19,10 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Image URL required' }, { status: 400 });
     }
 
-    // Get all IG account connections for this user from social_connections
     // Get the specific IG accounts selected (format: instagram_<platform_user_id>)
     const selectedIgIds = platforms
-      .filter(p => p.startsWith('instagram_'))
-      .map(p => p.replace('instagram_', ''));
+      ? platforms.filter((p: string) => p.startsWith('instagram_')).map((p: string) => p.replace('instagram_', ''))
+      : [];
     
     const { data: connections } = await supabase
       .from('social_connections')
@@ -45,7 +44,7 @@ export async function POST(request: Request) {
 
     const results: { igId: string; username: string; success: boolean; postId?: string; error?: string }[] = [];
 
-    for (const conn of connections) {
+    for (const conn of filteredConnections) {
       console.log(`[INSTAGRAM POST] Posting to ${conn.platform_username} (${conn.platform_user_id})`);
       try {
         // Step 1: Create media container with FormData (URL approach)
