@@ -104,8 +104,8 @@ export default function CreatePostPage() {
           for (const account of accountsForBase) {
             // social_connections uses platform_username/platform_user_id
             // social_pages uses page_name/page_id
-            const accountName = (account as any).page_name || (account as any).platform_username || '';
-            const accountId = (account as any).page_id || (account as any).platform_user_id || '';
+            const accountName = (account as { page_name?: string; platform_username?: string }).page_name || (account as { platform_username?: string }).platform_username || '';
+            const accountId = (account as { page_id?: string; platform_user_id?: string }).page_id || (account as { platform_user_id?: string }).platform_user_id || '';
             const displayName = accountName
               ? `${platformInfo[base]?.name || base} - ${accountName}`
               : platformInfo[base]?.name || base;
