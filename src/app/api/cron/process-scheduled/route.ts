@@ -1,11 +1,77 @@
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
+import { uploadXImage } from '@/lib/x-oauth';
 
 export const dynamic = 'force-dynamic';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcyifihwvqxtpypphpef.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
+
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+
+function percentEncode(str: string): string {
+  return encodeURIComponent(str).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+}
+
+function normalizeUrl(input: string): string {
+  const url = new URL(input);
+  url.hash = '';
+  url.search = '';
+  if ((url.protocol === 'https:' && url.port === '443') || (url.protocol === 'http:' && url.port === '80')) {
+    url.port = '';
+  }
+  return url.toString();
+}
+
+function buildOAuthHeader({
+  method,
+  url,
+  accessToken,
+  accessTokenSecret,
+}: {
+  method: string;
+  url: string;
+  accessToken: string;
+  accessTokenSecret: string;
+}) {
+  const consumerKey = process.env.X_API_KEY!;
+  const consumerSecret = process.env.X_API_SECRET!;
+  
+  const oauthParams: Record<string, string> = {
+    oauth_consumer_key: consumerKey,
+    oauth_nonce: Math.random().toString(36).substring(2),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_version: '1.0',
+    oauth_token: accessToken,
+  };
+
+  const baseString = [
+    method.toUpperCase(),
+    percentEncode(normalizeUrl(url)),
+    percentEncode(
+      Object.keys(oauthParams)
+        .sort()
+        .map((key) => `${percentEncode(key)}=${percentEncode(oauthParams[key])}`)
+        .join('&')
+    ),
+  ].join('&');
+
+  const signingKey = `${percentEncode(consumerSecret)}&${percentEncode(accessTokenSecret)}`;
+  const signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
+
+  oauthParams.oauth_signature = signature;
+
+
+  return (
+    'OAuth ' +
+    Object.keys(oauthParams)
+      .sort()
+      .map((key) => `${percentEncode(key)}="${percentEncode(oauthParams[key])}"`)
+      .join(', ')
+  );
+}
 
 export async function GET(request: Request) {
   try {
@@ -99,19 +165,56 @@ export async function GET(request: Request) {
 
           // Post based on base platform
           if (basePlatform === 'x') {
-            const twitterRes = await fetch('https://api.twitter.com/2/tweets', {
+            let mediaIds: string[] = [];
+            
+            // Upload image if present (same as immediate post flow)
+            if (post.image_url) {
+              try {
+                const imageRes = await fetch(post.image_url);
+                if (imageRes.ok) {
+                  const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+                  const mediaId = await uploadXImage({
+                    accessToken: connection.access_token,
+                    accessTokenSecret: connection.refresh_token,
+                    fileBuffer: imageBuffer,
+                    mimeType: 'image/jpeg',
+                  });
+                  mediaIds = [mediaId];
+                }
+              } catch (imgErr) {
+                console.error('X image upload error:', imgErr);
+              }
+            }
+            
+            // Build OAuth 1.0a header (same as working immediate post)
+            const tweetUrl = 'https://api.twitter.com/2/tweets';
+            const tweetAuthHeader = buildOAuthHeader({
+              method: 'POST',
+              url: tweetUrl,
+              accessToken: connection.access_token,
+              accessTokenSecret: connection.refresh_token,
+            });
+            
+            const tweetPayload: any = { text: post.content };
+            if (mediaIds.length > 0) {
+              tweetPayload.media = { media_ids: mediaIds };
+            }
+            
+            const twitterRes = await fetch(tweetUrl, {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${accessToken}`,
+                'Authorization': tweetAuthHeader,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({ text: post.content }),
+              body: JSON.stringify(tweetPayload),
             });
 
+
             const twitterData = await twitterRes.json();
+            console.log('X tweet result:', twitterRes.status, JSON.stringify(twitterData));
 
             if (!twitterRes.ok) {
-              errorMessages.push(`X: ${twitterData.detail || twitterData.title || 'Unknown error'}`);
+              errorMessages.push(`X: ${JSON.stringify(twitterData)}`);
               postSucceeded = false;
             }
           } else if (basePlatform === 'linkedin') {
