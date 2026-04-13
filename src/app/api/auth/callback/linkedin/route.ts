@@ -69,8 +69,7 @@ export async function GET(request: Request) {
   }
 
   // Store tokens
-  await supabase.from('social_connections').upsert(
-    {
+    const insertData = {
       user_id: oauthState.user_id,
       platform: 'linkedin',
       platform_user_id: userData.sub,
@@ -78,9 +77,15 @@ export async function GET(request: Request) {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token || null,
       expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-    },
-    { onConflict: 'user_id,platform' }
-  );
+    };
+    console.log('LinkedIn upsert data:', JSON.stringify({ ...insertData, access_token: '[HIDDEN]' }));
+    const { error: insertErr } = await supabase.from('social_connections').upsert(
+      insertData,
+      { onConflict: 'user_id,platform' }
+    );
+    if (insertErr) {
+      console.error('LinkedIn upsert error:', JSON.stringify(insertErr));
+    }
 
   return Response.redirect(`${appUrl}/dashboard/connected-accounts?connected=linkedin`);
 }
