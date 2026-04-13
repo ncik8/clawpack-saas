@@ -255,6 +255,8 @@ export async function GET(request: Request) {
               
               const registerData = await registerRes.json();
               
+              console.log('LinkedIn asset register status:', registerRes.status, JSON.stringify(registerData));
+              
               if (!registerRes.ok || !registerData.value?.asset) {
                 console.error('LinkedIn asset registration failed:', JSON.stringify(registerData));
                 // Fallback to text-only
@@ -285,6 +287,7 @@ export async function GET(request: Request) {
                 const mediaAsset = registerData.value.asset;
                 
                 const imageRes = await fetch(post.image_url);
+                console.log('LinkedIn image download status:', imageRes.status, post.image_url);
                 const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
                 
                 const uploadRes = await fetch(uploadUrl, {
@@ -357,9 +360,12 @@ export async function GET(request: Request) {
               if (errorData.message?.includes('duplicate') || errorData.message?.includes('Duplicate')) {
                 console.log('LinkedIn: duplicate detected, post may have already gone through');
               } else {
-                errorMessages.push(`LinkedIn: ${errorData.message}`);
+                console.error('LinkedIn post failed:', JSON.stringify(errorData));
+                errorMessages.push(`LinkedIn: ${JSON.stringify(errorData)}`);
                 postSucceeded = false;
               }
+            } else {
+              console.log('LinkedIn post success:', linkedInRes.status);
             }
           } else if (basePlatform === 'bluesky') {
             const blueskyRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
