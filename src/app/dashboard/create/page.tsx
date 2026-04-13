@@ -783,13 +783,8 @@ export default function CreatePostPage() {
         Images: JPG, PNG, GIF (max 20MB) • Videos: MP4, MOV (max 100MB) {platforms.includes('bluesky') && '• Bluesky: images only (video coming soon)'}
       </div>
       
-      {/* Media Upload - hidden when Instagram is selected */}
-      {platforms.some(p => getBasePlatform(p) === 'instagram') ? (
-        <div style={{ marginBottom: '24px', fontSize: '12px', color: '#6b7280' }}>
-          📷 Instagram: Use URL field below for images (no file upload)
-        </div>
-      ) : (
-        <div>
+      {/* Image Upload - always visible, works for all platforms including Instagram */}
+      <div style={{ marginBottom: '24px' }}>
           <input
             type="file"
             accept="image/*"
