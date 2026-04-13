@@ -110,29 +110,41 @@ export async function GET(request: NextRequest) {
     .eq('id', tempToken.id);
 
   // Save final tokens to social_connections using upsert
-  const { error: upsertError } = await supabaseAdmin
+  // Save final tokens to social_connections
+  // Try insert first, fall back to update if constraint error
+  const { error: insertErr } = await supabaseAdmin
     .from('social_connections')
-    .upsert(
-      {
-        user_id: user.id,
-        platform: 'x',
+    .insert({
+      user_id: user.id,
+      platform: 'x',
+      platform_user_id: parsed.user_id,
+      platform_username: parsed.screen_name,
+      access_token: parsed.oauth_token,
+      refresh_token: parsed.oauth_token_secret,
+      expires_at: null,
+    });
+
+  if (insertErr) {
+    console.log('[x-callback] insert failed, trying update:', insertErr.code);
+    // Constraint error - update existing row instead
+    const { error: updateErr } = await supabaseAdmin
+      .from('social_connections')
+      .update({
         platform_user_id: parsed.user_id,
         platform_username: parsed.screen_name,
         access_token: parsed.oauth_token,
         refresh_token: parsed.oauth_token_secret,
-        expires_at: null,
-      },
-      {
-        onConflict: 'user_id,platform',
-      }
-    );
+      })
+      .eq('user_id', user.id)
+      .eq('platform', 'x');
 
-  if (upsertError) {
-    console.error('[x-callback] upsert failed:', upsertError);
-    return NextResponse.json(
-      { error: `Failed to save tokens: ${upsertError.message}` },
-      { status: 500 }
-    );
+    if (updateErr) {
+      console.error('[x-callback] update also failed:', updateErr);
+      return NextResponse.json(
+        { error: `Failed to save tokens: ${insertErr.message}` },
+        { status: 500 }
+      );
+    }
   }
 
   return NextResponse.redirect(new URL('/dashboard/connected-accounts?connected=x', request.url));
