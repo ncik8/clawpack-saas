@@ -51,13 +51,28 @@ export default function CreatePostPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
 
-      // Fetch ALL connected platforms from social_connections table
+      // Fetch connected platforms from social_connections (for X, LinkedIn, Bluesky)
       const { data: connections } = await supabase
         .from('social_connections')
-        .select('platform, platform_username, platform_user_id')
+        .select('platform, platform_username, platform_user_id, access_token')
         .eq('user_id', session.user.id);
 
-      const connected = connections || [];
+      // Fetch Facebook and Instagram pages from social_pages
+      const { data: fbPages } = await supabase
+        .from('social_pages')
+        .select('platform, platform_username, platform_user_id, access_token')
+        .eq('user_id', session.user.id)
+        .eq('platform', 'facebook');
+      
+      const { data: igAccounts } = await supabase
+        .from('social_pages')
+        .select('platform, platform_username, platform_user_id, access_token')
+        .eq('user_id', session.user.id)
+        .eq('platform', 'instagram');
+
+      // Combine connections with pages
+      const socialPages = [...(fbPages || []), ...(igAccounts || [])];
+      const connected = [...(connections || []), ...socialPages];
       
       const platformInfo: Record<string, { name: string; emoji: string }> = {
         'x': { name: 'X / Twitter', emoji: '🐦' },

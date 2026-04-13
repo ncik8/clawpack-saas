@@ -68,46 +68,44 @@ export async function GET(req: NextRequest) {
       })),
     });
 
-    // Save each Facebook Page
+    // Save each Facebook Page to social_pages
     let savedCount = 0;
     for (const page of pages) {
-      await supabase
-        .from('social_connections')
-        .delete()
-        .eq('user_id', oauthState.user_id)
-        .eq('platform', 'facebook')
-        .eq('platform_user_id', page.id);
-
-      const { error: insertError } = await supabase.from('social_connections').insert({
-        user_id: oauthState.user_id,
-        platform: 'facebook',
-        platform_user_id: page.id,
-        platform_username: page.name,
-        access_token: page.access_token || userAccessToken,
-        refresh_token: tokenData.refresh_token || null,
-        expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
-      });
+      // Upsert page to social_pages
+      const { error: insertError } = await supabase
+        .from('social_pages')
+        .upsert(
+          {
+            user_id: oauthState.user_id,
+            platform: 'facebook',
+            platform_user_id: page.id,
+            platform_username: page.name,
+            access_token: page.access_token || userAccessToken,
+            refresh_token: tokenData.refresh_token || null,
+            expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
+          },
+          { onConflict: 'user_id,platform,platform_user_id' }
+        );
 
       if (!insertError) savedCount++;
     }
 
-    // If no pages, save user token as fallback
+    // If no pages, save user as fallback to social_pages
     if (savedCount === 0) {
       await supabase
-        .from('social_connections')
-        .delete()
-        .eq('user_id', oauthState.user_id)
-        .eq('platform', 'facebook');
-
-      await supabase.from('social_connections').insert({
-        user_id: oauthState.user_id,
-        platform: 'facebook',
-        platform_user_id: me.id,
-        platform_username: me.name,
-        access_token: userAccessToken,
-        refresh_token: tokenData.refresh_token || null,
-        expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
-      });
+        .from('social_pages')
+        .upsert(
+          {
+            user_id: oauthState.user_id,
+            platform: 'facebook',
+            platform_user_id: me.id,
+            platform_username: me.name,
+            access_token: userAccessToken,
+            refresh_token: tokenData.refresh_token || null,
+            expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
+          },
+          { onConflict: 'user_id,platform,platform_user_id' }
+        );
       savedCount = 1;
     }
 

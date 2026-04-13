@@ -73,7 +73,7 @@ export async function GET(request: Request) {
         for (const igAccount of igDirectData.data) {
           const igUsername = igAccount.username || igAccount.name || igAccount.id;
           
-          await supabase.from('social_connections').upsert(
+          await supabase.from('social_pages').upsert(
             {
               user_id: oauthState.user_id,
               platform: 'instagram',
@@ -120,7 +120,7 @@ export async function GET(request: Request) {
 
           console.log('Storing IG via page link:', igAccountId, igUsername);
 
-          await supabase.from('social_connections').upsert(
+          await supabase.from('social_pages').upsert(
             {
               user_id: oauthState.user_id,
               platform: 'instagram',
@@ -158,7 +158,7 @@ export async function GET(request: Request) {
 
           console.log('Storing direct IG business account:', igAccount.id, igData.username);
 
-          await supabase.from('social_connections').upsert(
+          await supabase.from('social_pages').upsert(
             {
               user_id: oauthState.user_id,
               platform: 'instagram',

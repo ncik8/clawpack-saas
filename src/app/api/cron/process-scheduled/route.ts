@@ -426,88 +426,112 @@ export async function GET(request: Request) {
               postSucceeded = false;
             }
           } else if (basePlatform === 'facebook') {
-            // Post to Facebook Page (with optional image)
-            if (post.image_url) {
-              // Use Photos API for image posts
-              const fbPhotoRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/photos`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  url: post.image_url,
-                  caption: post.content,
-                }),
-              });
-              const fbPhotoData = await fbPhotoRes.json();
-              if (!fbPhotoRes.ok) {
-                errorMessages.push(`Facebook: ${fbPhotoData.error?.message || 'Unknown error'}`);
-                postSucceeded = false;
-              }
+            // Look up all Facebook pages from social_pages
+            const { data: fbPages } = await supabaseAdmin
+              .from('social_pages')
+              .select('*')
+              .eq('user_id', post.user_id)
+              .eq('platform', 'facebook');
+            
+            if (!fbPages || fbPages.length === 0) {
+              errorMessages.push('Facebook: No pages connected');
+              postSucceeded = false;
             } else {
-              // Text-only post - use Feed API
-              const fbRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/feed`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message: post.content }),
-              });
-              const fbData = await fbRes.json();
-              if (!fbRes.ok) {
-                errorMessages.push(`Facebook: ${fbData.error?.message || 'Unknown error'}`);
-                postSucceeded = false;
+              // Post to each Facebook page
+              for (const page of fbPages) {
+                if (post.image_url) {
+                  const fbPhotoRes = await fetch(`https://graph.facebook.com/v18.0/${page.platform_user_id}/photos`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${page.access_token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      url: post.image_url,
+                      caption: post.content,
+                    }),
+                  });
+                  const fbPhotoData = await fbPhotoRes.json();
+                  if (!fbPhotoRes.ok) {
+                    errorMessages.push(`Facebook (${page.platform_username}): ${fbPhotoData.error?.message || 'Unknown error'}`);
+                    postSucceeded = false;
+                  }
+                } else {
+                  const fbRes = await fetch(`https://graph.facebook.com/v18.0/${page.platform_user_id}/feed`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${page.access_token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: post.content }),
+                  });
+                  const fbData = await fbRes.json();
+                  if (!fbRes.ok) {
+                    errorMessages.push(`Facebook (${page.platform_username}): ${fbData.error?.message || 'Unknown error'}`);
+                    postSucceeded = false;
+                  }
+                }
               }
             }
           } else if (basePlatform === 'instagram') {
-            // Post to Instagram Business Account (with optional image)
-            // Instagram requires a Facebook Page linked to the IG account
-            // We use the page access token to post to IG via the Graph API
-            const igBody: Record<string, string> = { caption: post.content };
+            // Look up all Instagram accounts from social_pages
+            const { data: igAccounts } = await supabaseAdmin
+              .from('social_pages')
+              .select('*')
+              .eq('user_id', post.user_id)
+              .eq('platform', 'instagram');
             
-            if (post.image_url) {
-              // External image URL - use EXTERNAL_IMAGE media type
-              igBody['media_type'] = 'EXTERNAL_IMAGE';
-              igBody['external_url'] = post.image_url;
+            if (!igAccounts || igAccounts.length === 0) {
+              errorMessages.push('Instagram: No accounts connected');
+              postSucceeded = false;
             } else {
-              igBody['media_type'] = 'TEXT';
-            }
+              // Post to each Instagram account
+              for (const igAccount of igAccounts) {
+                const igBody: Record<string, string> = { caption: post.content };
+                
+                if (post.image_url) {
+                  igBody['media_type'] = 'EXTERNAL_IMAGE';
+                  igBody['image_url'] = post.image_url;
+                  igBody['external_url'] = post.image_url;
+                } else {
+                  igBody['media_type'] = 'TEXT';
+                }
 
-            const igRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/media`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(igBody),
-            });
+                const igRes = await fetch(`https://graph.facebook.com/v18.0/${igAccount.platform_user_id}/media`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${igAccount.access_token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify(igBody),
+                });
 
-            const igData = await igRes.json();
+                const igData = await igRes.json();
 
-            if (!igRes.ok) {
-              errorMessages.push(`Instagram: ${igData.error?.message || 'Unknown error'}`);
-              postSucceeded = false;
-              continue;
-            }
+                if (!igRes.ok) {
+                  errorMessages.push(`Instagram (${igAccount.platform_username}): ${igData.error?.message || 'Unknown error'}`);
+                  postSucceeded = false;
+                  continue;
+                }
 
-            // Publish the media item
-            const publishRes = await fetch(`https://graph.facebook.com/v18.0/${connection.platform_user_id}/media_publish`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ 
-                creation_id: igData.id,
-              }),
-            });
+                // Publish the media item
+                const publishRes = await fetch(`https://graph.facebook.com/v18.0/${igAccount.platform_user_id}/media_publish`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${igAccount.access_token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ 
+                    creation_id: igData.id,
+                  }),
+                });
 
-            if (!publishRes.ok) {
-              const publishData = await publishRes.json();
-              errorMessages.push(`Instagram: Failed to publish - ${publishData.error?.message || 'Unknown error'}`);
-              postSucceeded = false;
+                if (!publishRes.ok) {
+                  const publishData = await publishRes.json();
+                  errorMessages.push(`Instagram (${igAccount.platform_username}): Failed to publish - ${publishData.error?.message || 'Unknown error'}`);
+                  postSucceeded = false;
+                }
+              }
             }
           }
         } catch (err: any) {

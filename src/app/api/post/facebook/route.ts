@@ -16,12 +16,12 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Content or image required' }, { status: 400 });
     }
 
-    // Get FB page connections
+    // Get FB page connections from social_pages
     let query = supabase
-      .from('social_connections')
+      .from('social_pages')
       .select('*')
       .eq('user_id', user.id)
-      .eq('platform', 'facebook');
+      .eq('platform', 'facebook');;
     
     if (pageIds && pageIds.length > 0) {
       // Normalize page IDs (remove any prefix like 'facebook_' or 'facebook:')
