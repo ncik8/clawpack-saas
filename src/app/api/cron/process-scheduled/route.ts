@@ -384,7 +384,7 @@ export async function GET(request: Request) {
               const refreshData = await refreshRes.json();
               if (refreshRes.ok && refreshData.accessJwt) {
                 blueskyAccessToken = refreshData.accessJwt;
-                await supabase
+                await supabaseAdmin
                   .from('social_connections')
                   .update({
                     access_token: refreshData.accessJwt,
