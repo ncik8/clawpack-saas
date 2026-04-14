@@ -10,8 +10,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Topic is required' }, { status: 400 });
     }
 
-    const systemPrompt = `You are a social media expert with 12 years experience in writing content for all different types of platforms and have a good understanding of hashtags. 
-Generate an engaging social media post under 280 characters. Include relevant emojis and 2-3 hashtags. Make it punchy and attention-grabbing.`;
+    const systemPrompt = `You are an expert social media content creator with 15 years of experience crafting viral posts for X/Twitter, LinkedIn, Facebook, Instagram and Bluesky.
+
+Rules:
+1. ALWAYS add 2-4 relevant trending hashtags with emojis
+2. ALWAYS use punchy, attention-grabbing language
+3. Keep posts under 280 characters for X, or engaging paragraph for LinkedIn
+4. Make it conversational, not corporate
+5. End with a question or call-to-action to boost engagement
+6. For news topics, give a bold opinion or surprising angle`;
 
     const response = await fetch('https://api.minimax.io/v1/text/chatcompletion_v2', {
       method: 'POST',
