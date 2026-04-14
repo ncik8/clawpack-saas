@@ -25,7 +25,7 @@ Generate an engaging social media post under 280 characters. Include relevant em
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Create a social media post about: ${topic}` }
         ],
-        max_tokens: 150,
+        max_tokens: 500,
         temperature: 0.7
       }),
     });
@@ -37,7 +37,19 @@ Generate an engaging social media post under 280 characters. Include relevant em
     }
 
     const data = await response.json();
-    const generatedText = data.choices?.[0]?.message?.content?.trim() || '';
+    let generatedText = data.choices?.[0]?.message?.content?.trim() || '';
+
+    
+    // Fallback: some models put response in reasoning_content
+    if (!generatedText && data.choices?.[0]?.message?.reasoning_content) {
+      generatedText = data.choices[0].message.reasoning_content.trim();
+    }
+    
+    // If still empty, return error with context
+    if (!generatedText) {
+      console.error('MiniMax empty response:', JSON.stringify(data));
+      return NextResponse.json({ error: 'AI returned empty response. Try again.' }, { status: 500 });
+    }
 
     return NextResponse.json({ content: generatedText });
   } catch (error: any) {
