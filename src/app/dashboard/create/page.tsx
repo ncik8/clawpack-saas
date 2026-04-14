@@ -521,6 +521,7 @@ export default function CreatePostPage() {
       setVideoPreview(null);
       setScheduledFor('');
       setScheduling(false);
+      setPlatforms([]);
       
     } catch (error: any) {
       setResult({ success: false, message: error.message || 'Failed to schedule post' });
