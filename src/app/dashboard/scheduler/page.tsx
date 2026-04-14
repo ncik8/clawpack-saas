@@ -369,7 +369,7 @@ export default function SchedulerPage() {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="What's happening?"
-            maxLength={500}
+            maxLength={3000}
             style={{
               width: '100%',
               height: '100px',
@@ -384,7 +384,7 @@ export default function SchedulerPage() {
             }}
           />
           <div style={{ textAlign: 'right', fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-            {content.length}/500
+            {content.length}/3000
           </div>
         </div>
 
