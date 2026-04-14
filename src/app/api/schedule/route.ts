@@ -157,7 +157,7 @@ export async function POST(request: Request) {
         // Single-account platforms (x, linkedin, bluesky) - use connection directly
         const { data: connection } = await supabaseAdmin
           .from('social_connections')
-          .select('id')
+          .select('*')
           .eq('user_id', userId)
           .eq('platform', basePlatform)
           .single();
