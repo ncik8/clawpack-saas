@@ -34,6 +34,10 @@ export default function SchedulerPage() {
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [fbPages, setFbPages] = useState<any[]>([]);
+  const [igAccounts, setIgAccounts] = useState<any[]>([]);
+  const [imageUrl, setImageUrl] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -46,30 +50,27 @@ export default function SchedulerPage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return;
 
-    const { data } = await supabase
+    const { data: connData } = await supabase
       .from('social_connections')
       .select('platform, platform_user_id, platform_username')
       .eq('user_id', session.user.id);
 
-    if (data) {
-      setConnections(data);
-      // Pre-select first platform of each type
-      const defaultPlatforms = getDefaultPlatforms(data);
-      setPlatforms(defaultPlatforms);
-    }
-  };
+    const { data: pagesData } = await supabase
+      .from('social_pages')
+      .select('*')
+      .eq('is_active', true)
+      .eq('platform', 'facebook');
 
-  const getDefaultPlatforms = (conns: Connection[]): string[] => {
-    const platformTypes = ['x', 'linkedin', 'bluesky'];
-    const defaults: string[] = [];
-    
-    for (const type of platformTypes) {
-      const conn = conns.find(c => c.platform === type);
-      if (conn) {
-        defaults.push(`${type}:${conn.platform_user_id}`);
-      }
-    }
-    return defaults;
+    const { data: igData } = await supabase
+      .from('social_connections')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('platform', 'instagram');
+
+    if (connData) setConnections(connData);
+    if (pagesData) setFbPages(pagesData);
+    if (igData) setIgAccounts(igData);
+    // NO pre-selection - start with nothing
   };
 
   const getConnectionsByPlatform = (platform: string): Connection[] => {
@@ -163,6 +164,8 @@ export default function SchedulerPage() {
           content,
           platforms,
           scheduledFor,
+          imageUrl: imageUrl || undefined,
+          videoUrl: videoUrl || undefined,
         }),
       });
 
@@ -173,6 +176,9 @@ export default function SchedulerPage() {
         setContent('');
         setScheduleDate('');
         setScheduleTime('');
+        setPlatforms([]);
+        setImageUrl('');
+        setVideoUrl('');
         loadScheduledPosts();
       } else {
         setMessage({ type: 'error', text: result.error });
@@ -275,84 +281,81 @@ export default function SchedulerPage() {
             );
           })}
 
-          {/* Facebook - dropdown */}
-          {isPlatformConnected('facebook') && (
+          {/* Facebook - show all pages from social_pages */}
+          {fbPages.length > 0 && (
             <div style={{ marginTop: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <span style={{ fontSize: '18px' }}>🐘</span>
                 <span style={{ color: '#9ca3af', fontSize: '14px' }}>Facebook Pages</span>
               </div>
-              <select
-                multiple
-                value={getConnectionsByPlatform('facebook').filter(c => isPageSelected('facebook', c.platform_user_id)).map(c => `facebook:${c.platform_user_id}`)}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions).map(o => o.value);
-                  // Get all FB connections and set based on selection
-                  const fbConns = getConnectionsByPlatform('facebook');
-                  const newPlatforms = platforms.filter(p => !p.startsWith('facebook:'));
-                  selected.forEach(p => {
-                    if (!newPlatforms.includes(p)) newPlatforms.push(p);
-                  });
-                  setPlatforms(newPlatforms);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  borderRadius: '6px',
-                  border: '2px solid #374151',
-                  background: '#111827',
-                  color: 'white',
-                  fontSize: '14px',
-                  minHeight: '120px',
-                }}
-              >
-                {getConnectionsByPlatform('facebook').map(conn => (
-                  <option key={conn.platform_user_id} value={`facebook:${conn.platform_user_id}`}>
-                    {conn.platform_username}
-                  </option>
-                ))}
-              </select>
-              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>Hold Ctrl/Cmd to select multiple pages</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {fbPages.map(page => {
+                  const pageValue = `facebook:${page.page_id}`;
+                  const isSelected = platforms.includes(pageValue);
+                  return (
+                    <button
+                      key={page.page_id}
+                      onClick={() => togglePlatform(pageValue)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        borderRadius: '6px',
+                        border: isSelected ? '2px solid #10b981' : '2px solid #374151',
+                        background: isSelected ? '#064e3b' : '#374151',
+                        color: 'white',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span style={{ flex: 1 }}>{page.page_name}</span>
+                      {isSelected && <span style={{ color: '#10b981' }}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>Click to select/deselect pages</p>
             </div>
           )}
 
-          {/* Instagram - dropdown */}
-          {isPlatformConnected('instagram') && (
+          {/* Instagram - show all IG accounts from social_connections */}
+          {igAccounts.length > 0 && (
             <div style={{ marginTop: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <span style={{ fontSize: '18px' }}>📷</span>
                 <span style={{ color: '#9ca3af', fontSize: '14px' }}>Instagram Accounts</span>
               </div>
-              <select
-                multiple
-                value={getConnectionsByPlatform('instagram').filter(c => isPageSelected('instagram', c.platform_user_id)).map(c => `instagram:${c.platform_user_id}`)}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions).map(o => o.value);
-                  const igConns = getConnectionsByPlatform('instagram');
-                  const newPlatforms = platforms.filter(p => !p.startsWith('instagram:'));
-                  selected.forEach(p => {
-                    if (!newPlatforms.includes(p)) newPlatforms.push(p);
-                  });
-                  setPlatforms(newPlatforms);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  borderRadius: '6px',
-                  border: '2px solid #374151',
-                  background: '#111827',
-                  color: 'white',
-                  fontSize: '14px',
-                  minHeight: '80px',
-                }}
-              >
-                {getConnectionsByPlatform('instagram').map(conn => (
-                  <option key={conn.platform_user_id} value={`instagram:${conn.platform_user_id}`}>
-                    @{conn.platform_username}
-                  </option>
-                ))}
-              </select>
-              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>Hold Ctrl/Cmd to select multiple accounts</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {igAccounts.map(acc => {
+                  const accValue = `instagram:${acc.platform_user_id}`;
+                  const isSelected = platforms.includes(accValue);
+                  return (
+                    <button
+                      key={acc.platform_user_id}
+                      onClick={() => togglePlatform(accValue)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        borderRadius: '6px',
+                        border: isSelected ? '2px solid #10b981' : '2px solid #374151',
+                        background: isSelected ? '#064e3b' : '#374151',
+                        color: 'white',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span style={{ flex: 1 }}>@{acc.platform_username}</span>
+                      {isSelected && <span style={{ color: '#10b981' }}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>Click to select/deselect accounts</p>
             </div>
           )}
         </div>
@@ -383,6 +386,52 @@ export default function SchedulerPage() {
           <div style={{ textAlign: 'right', fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
             {content.length}/500
           </div>
+        </div>
+
+        {/* Image URL */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '14px', color: '#9ca3af', marginBottom: '8px' }}>
+            Image URL (optional)
+          </label>
+          <input
+            type="url"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="https://..."
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              borderRadius: '6px',
+              border: '2px solid #374151',
+              background: '#111827',
+              color: 'white',
+              fontSize: '14px',
+              outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* Video URL */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '14px', color: '#9ca3af', marginBottom: '8px' }}>
+            Video URL (optional)
+          </label>
+          <input
+            type="url"
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            placeholder="https://..."
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              borderRadius: '6px',
+              border: '2px solid #374151',
+              background: '#111827',
+              color: 'white',
+              fontSize: '14px',
+              outline: 'none',
+            }}
+          />
         </div>
 
         {/* Date & Time */}
