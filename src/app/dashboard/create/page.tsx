@@ -18,14 +18,12 @@ export default function CreatePostPage() {
   const [connectedPlatforms, setConnectedPlatforms] = useState<ConnectedPlatform[]>([]);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
-  const [scheduling, setScheduling] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [instagramImageUrl, setInstagramImageUrl] = useState<string>('');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
-  const [scheduledFor, setScheduledFor] = useState<string>('');
   const [userTimezone, setUserTimezone] = useState<string>('Asia/Hong_Kong');
   
   // AI Generate state
@@ -426,110 +424,6 @@ export default function CreatePostPage() {
     }
   };
 
-  const handleSchedule = async () => {
-    if (!content.trim()) {
-      setResult({ success: false, message: 'Please enter some content' });
-      return;
-    }
-
-    if (platforms.length === 0) {
-      setResult({ success: false, message: 'Please select at least one platform' });
-      return;
-    }
-
-    if (!scheduledFor) {
-      setResult({ success: false, message: 'Please select a date and time for scheduling' });
-      return;
-    }
-
-    setPosting(true);
-    setResult(null);
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setResult({ success: false, message: 'Not logged in' });
-        setPosting(false);
-        return;
-      }
-
-      // Handle video upload if present
-      let videoUrl: string | null = null;
-      if (videoFile) {
-        videoUrl = await uploadVideoToSupabaseBrowser(videoFile);
-        if (!videoUrl) {
-          setResult({ success: false, message: 'Failed to upload video' });
-          setPosting(false);
-          return;
-        }
-      }
-
-      // Handle image upload if present (for Facebook/Instagram which support images)
-      let imageUrl: string | null = null;
-      if (imageFile) {
-        imageUrl = await uploadImageToSupabaseBrowser(imageFile);
-        if (!imageUrl) {
-          setResult({ success: false, message: 'Failed to upload image' });
-          setPosting(false);
-          return;
-        }
-      }
-
-      // Create scheduled post
-      const response = await fetch('/api/schedule', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content,
-          platforms,
-          scheduledFor: (() => {
-            // datetime-local gives YYYY-MM-DDTHH:MM in browser's local timezone
-            // Parse manually to avoid Chrome parsing naive datetime as UTC
-            const [datePart, timePart] = scheduledFor.split('T');
-            const [year, month, day] = datePart.split('-').map(Number);
-            const [hour, minute] = timePart.split(':').map(Number);
-            const localDate = new Date(year, month - 1, day, hour, minute);
-            const tzOffsetMs = localDate.getTimezoneOffset() * 60 * 1000;
-            const utcDate = new Date(localDate.getTime() + tzOffsetMs);
-            return utcDate.toISOString();
-          })(),
-          videoUrl: videoUrl || undefined,
-          imageUrl: imageUrl || undefined,
-          timezone: userTimezone,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to schedule post');
-      }
-
-      setResult({ 
-        success: true, 
-        message: `Post scheduled for ${new Date(scheduledFor).toLocaleString()}!` 
-      });
-      
-      // Reset form
-      setContent('');
-      setImageFile(null);
-      setImagePreview(null);
-      setVideoFile(null);
-      setVideoPreview(null);
-      setScheduledFor('');
-      setScheduling(false);
-      setPlatforms([]);
-      
-    } catch (error: any) {
-      setResult({ success: false, message: error.message || 'Failed to schedule post' });
-    } finally {
-      setPosting(false);
-    }
-  };
-
   const charCount = content.length;
   
   // Character limits per platform
@@ -918,63 +812,23 @@ export default function CreatePostPage() {
       </div>
     )}
 
-      {/* Scheduling Option */}
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-          <input
-            type="checkbox"
-            id="schedule-toggle"
-            checked={scheduling}
-            onChange={(e) => setScheduling(e.target.checked)}
-            style={{ width: '20px', height: '20px' }}
-          />
-          <label htmlFor="schedule-toggle" style={{ color: 'white', cursor: 'pointer' }}>
-            Schedule for later
-          </label>
-        </div>
-        
-        {scheduling && (
-          <div style={{ marginTop: '8px' }}>
-            <label style={{ display: 'block', fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
-              Date & Time
-            </label>
-            <input
-              type="datetime-local"
-              value={scheduledFor}
-              onChange={(e) => setScheduledFor(e.target.value)}
-              min={new Date().toISOString().slice(0, 16)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                borderRadius: '6px',
-                border: '1px solid #374151',
-                background: 'white',
-                color: '#111',
-                fontSize: '14px',
-                outline: 'none',
-              }}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Post/Schedule Button */}
+      {/* Post Button */}
       <button
-        onClick={scheduling ? handleSchedule : handlePost}
-        disabled={posting || platforms.length === 0 || !content.trim() || (scheduling && !scheduledFor)}
+        onClick={handlePost}
+        disabled={posting || platforms.length === 0 || !content.trim()}
         style={{
           padding: '12px 32px',
           borderRadius: '8px',
           border: 'none',
-          background: platforms.length > 0 && content.trim() && (!scheduling || scheduledFor) ? '#3b82f6' : '#374151',
+          background: platforms.length > 0 && content.trim() ? '#3b82f6' : '#374151',
           color: 'white',
           fontSize: '16px',
           fontWeight: 'bold',
-          cursor: platforms.length > 0 && content.trim() && (!scheduling || scheduledFor) ? 'pointer' : 'not-allowed',
+          cursor: platforms.length > 0 && content.trim() ? 'pointer' : 'not-allowed',
           opacity: posting ? 0.7 : 1,
         }}
       >
-        {posting ? (scheduling ? 'Scheduling...' : 'Posting...') : (scheduling ? 'Schedule Post' : 'Post Now')}
+        {posting ? 'Posting...' : 'Post Now'}
       </button>
 
       {/* Result Message */}
