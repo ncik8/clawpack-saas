@@ -182,15 +182,6 @@ export async function POST(request: Request) {
       }
     }
 
-      embed = {
-        $type: 'app.bsky.embed.images',
-        images: [{
-          alt: text || 'Image',
-          image: blobData.blob,
-        }],
-      };
-    }
-
     // Upload video if provided - Bluesky requires service auth for video uploads
     if (videoFile) {
       console.log('Uploading video to Bluesky...');
@@ -248,6 +239,71 @@ export async function POST(request: Request) {
         video: videoData.blob || videoData,
         alt: text || 'Video',
       };
+    } else if (videoUrl) {
+      // Fetch video from URL and upload to Bluesky
+      console.log('Fetching video from URL for Bluesky:', videoUrl);
+      try {
+        // Get service auth token
+        const serviceAuthRes = await fetch(`${BLUESKY_API}/com.atproto.server.getServiceAuth`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            aud: 'did:web:video.bsky.app',
+            lxm: 'app.bsky.video.uploadVideo',
+            exp: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        });
+
+        const serviceAuthData = await serviceAuthRes.json();
+        console.log('Service auth response:', serviceAuthRes.status, JSON.stringify(serviceAuthData));
+
+        if (!serviceAuthRes.ok || !serviceAuthData.token) {
+          return NextResponse.json({ 
+            error: 'Failed to get service auth for video upload',
+            details: serviceAuthData 
+          }, { status: serviceAuthRes.status });
+        }
+
+        // Fetch video from URL
+        const videoRes = await fetch(videoUrl);
+        const videoBlob = await videoRes.blob();
+        const contentType = videoRes.headers.get('content-type') || 'video/mp4';
+
+        const uploadUrl = new URL(`https://video.bsky.app/xrpc/app.bsky.video.uploadVideo`);
+        uploadUrl.searchParams.append('did', connection.platform_user_id);
+        uploadUrl.searchParams.append('name', 'video.mp4');
+
+        const uploadRes = await fetch(uploadUrl.toString(), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceAuthData.token}`,
+            'Content-Type': contentType,
+          },
+          body: videoBlob,
+        });
+
+        const uploadData = await uploadRes.json();
+        console.log('Video upload from URL response:', uploadRes.status, JSON.stringify(uploadData));
+
+        if (!uploadRes.ok) {
+          return NextResponse.json({ 
+            error: 'Failed to upload video from URL to Bluesky',
+            details: uploadData 
+          }, { status: uploadRes.status });
+        }
+
+        embed = {
+          $type: 'app.bsky.embed.video',
+          video: uploadData.blob || uploadData,
+          alt: text || 'Video',
+        };
+      } catch (vidErr) {
+        console.error('Video URL fetch error:', vidErr);
+        return NextResponse.json({ error: 'Failed to fetch video from URL' }, { status: 400 });
+      }
     }
 
     // Build the post record
