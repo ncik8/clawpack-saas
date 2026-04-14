@@ -18,12 +18,26 @@ interface ScheduledPost {
   created_at: string;
 }
 
-const PLATFORM_INFO: Record<string, { name: string; emoji: string }> = {
-  'x': { name: 'X / Twitter', emoji: '🐦' },
-  'linkedin': { name: 'LinkedIn', emoji: '💼' },
-  'facebook': { name: 'Facebook', emoji: '🐘' },
-  'instagram': { name: 'Instagram', emoji: '📷' },
-  'bluesky': { name: 'Bluesky', emoji: '💙' },
+const PLATFORM_INFO: Record<string, { name: string; emoji: string; charLimit: number }> = {
+  'x': { name: 'X / Twitter', emoji: '🐦', charLimit: 280 },
+  'linkedin': { name: 'LinkedIn', emoji: '💼', charLimit: 3000 },
+  'facebook': { name: 'Facebook', emoji: '🐘', charLimit: 63206 },
+  'instagram': { name: 'Instagram', emoji: '📷', charLimit: 2200 },
+  'bluesky': { name: 'Bluesky', emoji: '💙', charLimit: 300 },
+};
+
+// Get the most restrictive character limit from selected platforms
+const getActiveCharLimit = (platforms: string[]): number => {
+  if (platforms.length === 0) return 3000;
+  let minLimit = 99999;
+  for (const p of platforms) {
+    const [platform] = p.split(':');
+    const info = PLATFORM_INFO[platform];
+    if (info && info.charLimit < minLimit) {
+      minLimit = info.charLimit;
+    }
+  }
+  return minLimit === 99999 ? 3000 : minLimit;
 };
 
 export default function SchedulerPage() {
@@ -228,6 +242,8 @@ export default function SchedulerPage() {
     return `${info.emoji} ${info.name}: ${username}`;
   };
 
+  const activeLimit = getActiveCharLimit(platforms);
+
   return (
     <div style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
       <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '24px' }}>
@@ -369,7 +385,6 @@ export default function SchedulerPage() {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="What's happening?"
-            maxLength={3000}
             style={{
               width: '100%',
               height: '100px',
@@ -383,8 +398,9 @@ export default function SchedulerPage() {
               outline: 'none',
             }}
           />
-          <div style={{ textAlign: 'right', fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-            {content.length}/3000
+          <div style={{ textAlign: 'right', fontSize: '12px', color: content.length > activeLimit ? '#ef4444' : '#6b7280', marginTop: '4px' }}>
+            {content.length}/{activeLimit}
+            {content.length > activeLimit && <span style={{ marginLeft: '8px' }}>⚠️ Exceeds limit for some platforms</span>}
           </div>
         </div>
 
@@ -481,7 +497,7 @@ export default function SchedulerPage() {
 
         <button
           onClick={handleSchedule}
-          disabled={submitting}
+          disabled={submitting || content.length > activeLimit}
           style={{
             width: '100%',
             padding: '12px',
