@@ -18,11 +18,11 @@ async function getSupabaseUser(request: Request): Promise<string | null> {
 }
 
 function parsePlatform(platformId: string): { basePlatform: string; pageId?: string } {
-  const parts = platformId.split('_');
+  const parts = platformId.split(':');
   if (parts.length === 1) {
     return { basePlatform: parts[0] };
   }
-  return { basePlatform: parts[0], pageId: parts.slice(1).join('_') };
+  return { basePlatform: parts[0], pageId: parts.slice(1).join(':') };
 }
 
 export async function GET(request: Request) {
