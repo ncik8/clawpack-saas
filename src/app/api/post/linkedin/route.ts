@@ -29,6 +29,8 @@ export async function POST(request: Request) {
     let text: string;
     let imageFile: File | null = null;
     let videoFile: File | null = null;
+    let imageUrl: string | null = null;
+    let videoUrl: string | null = null;
 
     const contentType = request.headers.get('content-type') || '';
     if (contentType.includes('multipart/form-data')) {
@@ -45,6 +47,8 @@ export async function POST(request: Request) {
     } else {
       const body = await request.json();
       text = body.text;
+      imageUrl = body.image_url || null;
+      videoUrl = body.video_url || null;
     }
 
     if (!text) return Response.json({ error: 'Missing text' }, { status: 400 });
@@ -95,8 +99,8 @@ export async function POST(request: Request) {
     let mediaAsset: string | null = null;
     let mediaType: string | null = null;
 
-    if (imageFile) {
-      // Register image asset - use ?action=registerUpload
+    // Handle URL-based image (from scheduler)
+    if (imageUrl) {
       const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
         method: 'POST',
         headers: {
@@ -109,16 +113,13 @@ export async function POST(request: Request) {
             recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
             owner: `urn:li:person:${connection.platform_user_id}`,
             serviceRelationships: [
-              {
-                relationshipType: 'OWNER',
-                identifier: 'urn:li:userGeneratedContent',
-              },
+              { relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' },
             ],
           },
         }),
       });
       const registerData = await registerRes.json();
-      console.log('LinkedIn image register status:', registerRes.status, JSON.stringify(registerData));
+      console.log('LinkedIn image URL register status:', registerRes.status, JSON.stringify(registerData));
 
       if (registerRes.ok && registerData.value?.asset) {
         const uploadUrl = registerData.value.uploadUrl ||
@@ -127,22 +128,19 @@ export async function POST(request: Request) {
         mediaType = 'IMAGE';
 
         if (uploadUrl) {
-          // Upload the image binary
-          const arrayBuffer = await imageFile.arrayBuffer();
-          const uploadRes = await fetch(uploadUrl, {
+          const imageRes = await fetch(imageUrl);
+          const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
+          const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+          await fetch(uploadUrl, {
             method: 'PUT',
-            headers: {
-              'Content-Type': imageFile.type || 'image/jpeg',
-            },
-            body: arrayBuffer,
+            headers: { 'Content-Type': contentType },
+            body: imageBuffer,
           });
-          console.log('LinkedIn image upload status:', uploadRes.status);
-        } else {
-          console.error('LinkedIn: no uploadUrl found in register response');
+          console.log('LinkedIn image URL upload status: success');
         }
       }
-    } else if (videoFile) {
-      // Register video asset - use ?action=registerUpload
+    } else if (videoUrl) {
+      // Handle URL-based video
       const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
         method: 'POST',
         headers: {
@@ -155,10 +153,7 @@ export async function POST(request: Request) {
             recipes: ['urn:li:digitalmediaRecipe:feedshare-video'],
             owner: `urn:li:person:${connection.platform_user_id}`,
             serviceRelationships: [
-              {
-                relationshipType: 'OWNER',
-                identifier: 'urn:li:userGeneratedContent',
-              },
+              { relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' },
             ],
           },
         }),
@@ -172,13 +167,87 @@ export async function POST(request: Request) {
         mediaType = 'VIDEO';
 
         if (uploadUrl) {
-          // Upload the video binary
+          const videoRes = await fetch(videoUrl);
+          const contentType = videoRes.headers.get('content-type') || 'video/mp4';
+          const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+          await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': contentType },
+            body: videoBuffer,
+          });
+          console.log('LinkedIn video URL upload status: success');
+        }
+      }
+    } else if (imageFile) {
+      // Handle file-based image (from Post Now page)
+      const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
+        body: JSON.stringify({
+          registerUploadRequest: {
+            recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+            owner: `urn:li:person:${connection.platform_user_id}`,
+            serviceRelationships: [
+              { relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' },
+            ],
+          },
+        }),
+      });
+      const registerData = await registerRes.json();
+      console.log('LinkedIn image file register status:', registerRes.status, JSON.stringify(registerData));
+
+      if (registerRes.ok && registerData.value?.asset) {
+        const uploadUrl = registerData.value.uploadUrl ||
+          registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
+        mediaAsset = registerData.value.asset;
+        mediaType = 'IMAGE';
+
+        if (uploadUrl) {
+          const arrayBuffer = await imageFile.arrayBuffer();
+          const uploadRes = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': imageFile.type || 'image/jpeg' },
+            body: arrayBuffer,
+          });
+          console.log('LinkedIn image file upload status:', uploadRes.status);
+        }
+      }
+    } else if (videoFile) {
+      // Handle file-based video (from Post Now page)
+      const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
+        body: JSON.stringify({
+          registerUploadRequest: {
+            recipes: ['urn:li:digitalmediaRecipe:feedshare-video'],
+            owner: `urn:li:person:${connection.platform_user_id}`,
+            serviceRelationships: [
+              { relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' },
+            ],
+          },
+        }),
+      });
+      const registerData = await registerRes.json();
+
+      if (registerRes.ok && registerData.value?.asset) {
+        const uploadUrl = registerData.value.uploadUrl ||
+          registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
+        mediaAsset = registerData.value.asset;
+        mediaType = 'VIDEO';
+
+        if (uploadUrl) {
           const arrayBuffer = await videoFile.arrayBuffer();
           await fetch(uploadUrl, {
             method: 'PUT',
-            headers: {
-              'Content-Type': videoFile.type || 'video/mp4',
-            },
+            headers: { 'Content-Type': videoFile.type || 'video/mp4' },
             body: arrayBuffer,
           });
         }
@@ -194,12 +263,7 @@ export async function POST(request: Request) {
           shareCommentary: { text },
           shareMediaCategory: mediaType || 'NONE',
           media: mediaAsset
-            ? [
-                {
-                  status: 'READY',
-                  media: mediaAsset,
-                },
-              ]
+            ? [{ status: 'READY', media: mediaAsset }]
             : [],
         },
       },

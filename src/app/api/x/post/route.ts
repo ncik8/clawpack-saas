@@ -132,10 +132,12 @@ export async function POST(request: Request) {
     const text = body.text as string;
     const mediaIds = body.media_ids as string[] | undefined;
     const videoUrl = body.video_url as string | undefined;
+    const imageUrl = body.image_url as string | undefined;
 
     console.log('Post text length:', text?.length);
     console.log('Media IDs:', mediaIds);
     console.log('Video URL:', videoUrl);
+    console.log('Image URL:', imageUrl);
 
     // If video URL provided, download and upload to Twitter
     let finalMediaIds = mediaIds || [];
@@ -147,6 +149,28 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Video upload to X failed' }, { status: 500 });
       }
       finalMediaIds = [mediaId];
+    }
+
+    // If image URL provided, download and upload to Twitter
+    if (imageUrl && !mediaIds?.length && finalMediaIds.length === 0) {
+      console.log('Downloading image from:', imageUrl);
+      try {
+        const imgRes = await fetch(imageUrl);
+        const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+        const { uploadXImage } = await import('@/lib/twitter-media');
+        const uploadedMediaId = await uploadXImage({
+          accessToken: connection.access_token,
+          accessTokenSecret: connection.refresh_token,
+          fileBuffer: imgBuffer,
+          mimeType: imgRes.headers.get('content-type') || 'image/jpeg',
+        });
+        if (uploadedMediaId) {
+          finalMediaIds = [uploadedMediaId];
+          console.log('Image uploaded, media ID:', uploadedMediaId);
+        }
+      } catch (imgErr) {
+        console.error('Image upload error:', imgErr);
+      }
     }
 
     const url = 'https://api.twitter.com/2/tweets';

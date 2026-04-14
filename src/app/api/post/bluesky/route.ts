@@ -84,6 +84,8 @@ export async function POST(request: Request) {
     let text = '';
     let imageFile: File | null = null;
     let videoFile: File | null = null;
+    let imageUrl: string | null = null;
+    let videoUrl: string | null = null;
     
     const contentType = request.headers.get('content-type') || '';
     
@@ -101,17 +103,19 @@ export async function POST(request: Request) {
     } else {
       const body = await request.json();
       text = body.text;
+      imageUrl = body.image_url || null;
+      videoUrl = body.video_url || null;
     }
 
-    if (!text && !imageFile && !videoFile) {
+    if (!text && !imageFile && !videoFile && !imageUrl && !videoUrl) {
       return NextResponse.json({ error: 'Missing content' }, { status: 400 });
     }
 
     let embed: any = undefined;
 
-    // Upload image if provided
+    // Upload image if provided (file from form or URL from scheduler)
     if (imageFile) {
-      console.log('Uploading image to Bluesky...');
+      console.log('Uploading image file to Bluesky...');
       
       const arrayBuffer = await imageFile.arrayBuffer();
       const blobRes = await fetch(`${BLUESKY_API}/com.atproto.repo.uploadBlob`, {
@@ -132,6 +136,51 @@ export async function POST(request: Request) {
           details: blobData 
         }, { status: blobRes.status });
       }
+
+      embed = {
+        $type: 'app.bsky.embed.images',
+        images: [{
+          alt: text || 'Image',
+          image: blobData.blob,
+        }],
+      };
+    } else if (imageUrl) {
+      // Fetch image from URL and upload to Bluesky
+      console.log('Fetching image from URL for Bluesky:', imageUrl);
+      try {
+        const imgRes = await fetch(imageUrl);
+        const blobParts = await imgRes.blob();
+        const blobRes = await fetch(`${BLUESKY_API}/com.atproto.repo.uploadBlob`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': imgRes.headers.get('content-type') || 'image/jpeg',
+          },
+          body: blobParts,
+        });
+
+        const uploadData = await blobRes.json();
+        console.log('Blob upload from URL response:', blobRes.status, JSON.stringify(uploadData));
+
+        if (!blobRes.ok) {
+          return NextResponse.json({ 
+            error: 'Failed to upload image from URL to Bluesky',
+            details: uploadData 
+          }, { status: blobRes.status });
+        }
+
+        embed = {
+          $type: 'app.bsky.embed.images',
+          images: [{
+            alt: text || 'Image',
+            image: uploadData.blob,
+          }],
+        };
+      } catch (imgErr) {
+        console.error('Image URL fetch error:', imgErr);
+        return NextResponse.json({ error: 'Failed to fetch image from URL' }, { status: 400 });
+      }
+    }
 
       embed = {
         $type: 'app.bsky.embed.images',
