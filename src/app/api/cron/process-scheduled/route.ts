@@ -494,7 +494,7 @@ export async function GET(request: Request) {
     
     const { data: targets, error: fetchError } = await supabaseAdmin
       .from('scheduled_post_targets')
-      .select('*, scheduled_posts(content, image_url, user_id)')
+      .select('*, scheduled_posts(content, image_url, linkedin_asset_urn, user_id)')
       .eq('status', 'pending')
       .lte('scheduled_for', now);
 
