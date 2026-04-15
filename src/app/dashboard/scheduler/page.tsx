@@ -226,7 +226,6 @@ export default function SchedulerPage() {
               method: 'PUT',
               headers: {
                 'Content-Type': contentType,
-                'Authorization': `Bearer ${preRegData.accessToken}`,
               },
               body: imageBuffer,
             });

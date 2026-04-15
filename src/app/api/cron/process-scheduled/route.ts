@@ -249,11 +249,9 @@ async function postToLinkedIn(content: string, imageUrl: string | null, linkedin
             registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
 
           if (uploadUrl) {
-            // LinkedIn upload URLs require oauth2_access_token as query param
-            const uploadUrlWithToken = `${uploadUrl}${uploadUrl.includes('?') ? '&' : '?'}oauth2_access_token=${accessToken}`;
-            const uploadRes = await fetch(uploadUrlWithToken, {
+            // Use exact uploadUrl as returned by LinkedIn - do NOT append token
+            const uploadRes = await fetch(uploadUrl, {
               method: 'PUT',
-              redirect: 'follow',
               headers: { 
                 'Content-Type': contentType,
               },
