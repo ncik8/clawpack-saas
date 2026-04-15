@@ -512,6 +512,14 @@ export async function GET(request: Request) {
 
     for (const target of targets) {
       const post = target.scheduled_posts;
+      
+      // Immediately mark as 'processing' to prevent duplicate processing by other cron instances
+      await supabaseAdmin
+        .from('scheduled_post_targets')
+        .update({ status: 'processing' })
+        .eq('id', target.id)
+        .eq('status', 'pending');
+      
       if (!post) {
         await supabaseAdmin
           .from('scheduled_post_targets')
