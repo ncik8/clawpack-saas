@@ -210,8 +210,9 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
             registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
 
           if (uploadUrl) {
-            // Upload binary directly - NO Authorization header on upload URL
-            const uploadRes = await fetch(uploadUrl, {
+            // LinkedIn upload URLs require oauth2_access_token as query param
+            const uploadUrlWithToken = `${uploadUrl}${uploadUrl.includes('?') ? '&' : '?'}oauth2_access_token=${accessToken}`;
+            const uploadRes = await fetch(uploadUrlWithToken, {
               method: 'PUT',
               headers: { 
                 'Content-Type': contentType,
