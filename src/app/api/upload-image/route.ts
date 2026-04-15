@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dcyifihwvqxtpypphpef.supabase.co';
@@ -24,28 +24,29 @@ export async function POST(request: Request) {
     const ext = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
 
-    const supabase = createServerClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     
     // Try uploading to images bucket
-    let result = await supabase.storage
+    let { data, error } = await supabase.storage
       .from('images')
       .upload(fileName, buffer, { contentType, upsert: false });
 
     // If images bucket doesn't exist, try videos bucket
-    if (result.error) {
-      console.log('Images bucket not found, trying videos bucket');
-      result = await supabase.storage
+    if (error) {
+      console.log('Images bucket error, trying videos bucket:', error.message);
+      const result = await supabase.storage
         .from('videos')
         .upload(fileName, buffer, { contentType, upsert: false });
+      data = result.data;
+      error = result.error;
     }
 
-    if (result.error) {
-      console.error('Upload error:', result.error);
-      return NextResponse.json({ error: result.error.message }, { status: 500 });
+    if (error) {
+      console.error('Upload error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const bucket = result.data.path.startsWith('images/') ? 'images' : 'videos';
-    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(result.data.path);
+    const { data: urlData } = supabase.storage.from('images').getPublicUrl(data!.path);
     
     console.log('Uploaded to Supabase, URL:', urlData.publicUrl);
     return NextResponse.json({ url: urlData.publicUrl });
