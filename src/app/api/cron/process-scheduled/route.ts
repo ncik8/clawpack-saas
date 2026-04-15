@@ -248,6 +248,7 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
             const uploadUrlWithToken = `${uploadUrl}${uploadUrl.includes('?') ? '&' : '?'}oauth2_access_token=${accessToken}`;
             const uploadRes = await fetch(uploadUrlWithToken, {
               method: 'PUT',
+              redirect: 'follow',
               headers: { 
                 'Content-Type': contentType,
               },
