@@ -16,6 +16,15 @@ interface ScheduledPost {
   scheduled_for: string;
   status: 'pending' | 'sent' | 'failed';
   created_at: string;
+  image_url?: string | null;
+  video_url?: string | null;
+  scheduled_post_targets?: {
+    id: string;
+    platform: string;
+    status: string;
+    social_connection_id?: string;
+    social_page_id?: string;
+  }[];
 }
 
 const PLATFORM_INFO: Record<string, { name: string; emoji: string; charLimit: number }> = {
