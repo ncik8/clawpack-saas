@@ -277,7 +277,6 @@ export default function ConnectedAccountsPage() {
     { id: 'bluesky', name: 'Bluesky', emoji: '☁️', color: '#1185FE', comingSoon: false },
     { id: 'facebook', name: 'Facebook', emoji: '📘', color: '#1877F2', comingSoon: false },
     { id: 'instagram-business', name: 'Instagram', emoji: '📸', color: '#E4405F', comingSoon: false },
-    { id: 'linkedin-page', name: 'LinkedIn Page', emoji: '🏢', color: '#0A66C2', comingSoon: false },
   ];
 
   // Coming soon platforms
