@@ -202,6 +202,7 @@ export default function SchedulerPage() {
       // If LinkedIn is selected and image exists, pre-register with LinkedIn from browser
       let linkedinAssetUrn: string | undefined;
       const hasLinkedIn = platforms.some(p => p.startsWith('linkedin'));
+      console.log('LinkedIn pre-register check: hasLinkedIn=', hasLinkedIn, 'finalImageUrl=', finalImageUrl ? 'yes' : 'no');
       if (hasLinkedIn && finalImageUrl) {
         console.log('Pre-registering LinkedIn image from browser...');
         try {
@@ -215,11 +216,12 @@ export default function SchedulerPage() {
           });
           const preRegData = await preRegRes.json();
           if (preRegData.assetUrn && preRegData.uploadUrl && preRegData.accessToken) {
-            console.log('Got LinkedIn upload URL, uploading from browser...');
+            console.log('Got LinkedIn upload URL, uploading from browser...', { uploadUrl: preRegData.uploadUrl, asset: preRegData.assetUrn });
             // Fetch image and PUT directly from browser to LinkedIn
             const imageRes = await fetch(finalImageUrl);
             const contentType = imageRes.headers.get('content-type') || 'image/png';
             const imageBuffer = await imageRes.arrayBuffer();
+            console.log('LinkedIn: starting browser PUT to', preRegData.uploadUrl.substring(0, 80));
             const uploadRes = await fetch(preRegData.uploadUrl, {
               method: 'PUT',
               headers: {
@@ -228,7 +230,7 @@ export default function SchedulerPage() {
               },
               body: imageBuffer,
             });
-            console.log('LinkedIn browser upload status:', uploadRes.status);
+            console.log('LinkedIn browser upload status:', uploadRes.status, uploadRes.statusText);
             if (uploadRes.ok) {
               linkedinAssetUrn = preRegData.assetUrn;
               console.log('LinkedIn image uploaded from browser, asset:', linkedinAssetUrn);
