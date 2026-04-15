@@ -11,6 +11,14 @@ const nextConfig = {
         protocol: 'https',
         hostname: '**.licdn.com',
       },
+      {
+        protocol: 'https',
+        hostname: '**.twimg.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.twitter.com',
+      },
     ],
   },
 }
