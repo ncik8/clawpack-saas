@@ -355,7 +355,7 @@ async function postToBluesky(content: string, imageUrl: string | null, connectio
   let embed: any = undefined;
 
   if (imageUrl) {
-    const imageRes = await fetch(imageUrl);
+    const imageRes = await fetch(imageUrl, { cache: 'no-store' });
     const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
     const blobRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.uploadBlob', {
       method: 'POST',
@@ -364,6 +364,7 @@ async function postToBluesky(content: string, imageUrl: string | null, connectio
         'Content-Type': 'image/jpeg',
       },
       body: imageBuffer,
+      cache: 'no-store',
     });
     const blobData = await blobRes.json();
     if (blobRes.ok && blobData.blob) {
