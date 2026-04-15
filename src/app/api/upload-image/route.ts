@@ -19,9 +19,20 @@ export async function POST(request: Request) {
     }
 
     const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
+    // Override content-type if it's wrong (image2url returns application/octet-stream)
+    // Detect from file magic bytes or URL extension
+    const urlExt = imageUrl.split('.').pop()?.toLowerCase().split('?')[0];
+    const extToMime: Record<string, string> = {
+      'png': 'image/png',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+    };
+    const correctMime = extToMime[urlExt || ''] || (contentType.startsWith('image/') ? contentType : 'image/jpeg');
     const buffer = Buffer.from(await imageRes.arrayBuffer());
     
-    const ext = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+    const ext = correctMime.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -29,14 +40,14 @@ export async function POST(request: Request) {
     // Try uploading to images bucket
     let { data, error } = await supabase.storage
       .from('images')
-      .upload(fileName, buffer, { contentType, upsert: false });
+      .upload(fileName, buffer, { contentType: correctMime, upsert: false });
 
-    // If images bucket doesn't exist, try videos bucket
+    // If images bucket doesn't exist or rejects, try videos bucket
     if (error) {
       console.log('Images bucket error, trying videos bucket:', error.message);
       const result = await supabase.storage
         .from('videos')
-        .upload(fileName, buffer, { contentType, upsert: false });
+        .upload(fileName, buffer, { contentType: correctMime, upsert: false });
       data = result.data;
       error = result.error;
     }
