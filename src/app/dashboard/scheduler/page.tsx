@@ -130,7 +130,7 @@ export default function SchedulerPage() {
 
       const { data, error } = await supabase
         .from('scheduled_posts')
-        .select('*')
+        .select('*, scheduled_post_targets(*)')
         .eq('user_id', session.user.id)
         .order('scheduled_for', { ascending: true });
 
@@ -553,18 +553,18 @@ export default function SchedulerPage() {
             >
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                  {post.platforms.map(p => (
-                    <span key={p} style={{ fontSize: '12px', background: '#374151', padding: '2px 8px', borderRadius: '4px' }}>
-                      {getPlatformDisplay(p)}
+                  {post.scheduled_post_targets?.map((p: any) => (
+                    <span key={p.platform} style={{ fontSize: '12px', background: '#374151', padding: '2px 8px', borderRadius: '4px' }}>
+                      {getPlatformDisplay(p.platform)}
                     </span>
                   ))}
                   <span style={{
                     fontSize: '12px',
                     padding: '2px 8px',
                     borderRadius: '4px',
-                    background: post.status === 'pending' ? '#1e40af' : post.status === 'sent' ? '#065f46' : '#7f1d1d',
+                    background: post.scheduled_post_targets?.[0]?.status === 'pending' ? '#1e40af' : post.scheduled_post_targets?.[0]?.status === 'sent' ? '#065f46' : '#7f1d1d',
                   }}>
-                    {post.status}
+                    {post.scheduled_post_targets?.[0]?.status || 'pending'}
                   </span>
                 </div>
                 <p style={{ color: 'white', marginBottom: '8px' }}>{post.content}</p>
