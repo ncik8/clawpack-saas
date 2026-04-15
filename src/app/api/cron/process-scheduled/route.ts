@@ -175,6 +175,7 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
 
   // Image post - register and upload
   if (imageUrl) {
+    console.log(`LinkedIn: attempting to upload image from: ${imageUrl}`);
     const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
       method: 'POST',
       headers: {
@@ -201,13 +202,17 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
 
       if (uploadUrl) {
         const imageRes = await fetch(imageUrl);
+        const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
         const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
         await fetch(uploadUrl, {
           method: 'PUT',
-          headers: { 'Content-Type': 'image/jpeg' },
+          headers: { 'Content-Type': contentType },
           body: imageBuffer,
         });
         mediaType = 'IMAGE';
+        console.log(`LinkedIn: uploaded image (${contentType}, ${imageBuffer.length} bytes)`);
+      } else {
+        console.log('LinkedIn: no upload URL from register, skipping image');
       }
     }
   }
