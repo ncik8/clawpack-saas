@@ -216,7 +216,7 @@ async function postToLinkedIn(content: string, imageUrl: string | null, linkedin
     // Fallback: try to upload from server (may fail due to Vercel blocking LinkedIn DMS endpoint)
     console.log(`LinkedIn: no pre-uploaded URN, attempting server-side upload from: ${imageUrl}`);
     try {
-      const imageRes = await fetch(imageUrl);
+      const imageRes = await fetch(imageUrl, { cache: 'no-store' });
       if (!imageRes.ok) {
         console.log(`LinkedIn: failed to fetch image: ${imageRes.status}`);
       } else {
@@ -256,6 +256,7 @@ async function postToLinkedIn(content: string, imageUrl: string | null, linkedin
                 'Content-Type': contentType,
               },
               body: imageBuffer,
+              cache: 'no-store',
             });
             console.log(`LinkedIn image PUT response: ${uploadRes.status}`);
             
