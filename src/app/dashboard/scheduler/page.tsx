@@ -199,6 +199,50 @@ export default function SchedulerPage() {
         }
       }
 
+      // If LinkedIn is selected and image exists, pre-register with LinkedIn from browser
+      let linkedinAssetUrn: string | undefined;
+      const hasLinkedIn = platforms.some(p => p.startsWith('linkedin'));
+      if (hasLinkedIn && finalImageUrl) {
+        console.log('Pre-registering LinkedIn image from browser...');
+        try {
+          const preRegRes = await fetch('/api/linkedin/pre-register-image', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ imageUrl: finalImageUrl }),
+          });
+          const preRegData = await preRegRes.json();
+          if (preRegData.assetUrn && preRegData.uploadUrl && preRegData.accessToken) {
+            console.log('Got LinkedIn upload URL, uploading from browser...');
+            // Fetch image and PUT directly from browser to LinkedIn
+            const imageRes = await fetch(finalImageUrl);
+            const contentType = imageRes.headers.get('content-type') || 'image/png';
+            const imageBuffer = await imageRes.arrayBuffer();
+            const uploadRes = await fetch(preRegData.uploadUrl, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': contentType,
+                'Authorization': `Bearer ${preRegData.accessToken}`,
+              },
+              body: imageBuffer,
+            });
+            console.log('LinkedIn browser upload status:', uploadRes.status);
+            if (uploadRes.ok) {
+              linkedinAssetUrn = preRegData.assetUrn;
+              console.log('LinkedIn image uploaded from browser, asset:', linkedinAssetUrn);
+            } else {
+              console.warn('LinkedIn browser upload failed, will try cron approach');
+            }
+          } else {
+            console.warn('LinkedIn pre-register failed:', preRegData.error);
+          }
+        } catch (preRegErr) {
+          console.warn('LinkedIn pre-register error:', preRegErr);
+        }
+      }
+
       const response = await fetch('/api/schedule', {
         method: 'POST',
         headers: {
@@ -211,6 +255,7 @@ export default function SchedulerPage() {
           scheduledFor,
           imageUrl: finalImageUrl || undefined,
           videoUrl: videoUrl || undefined,
+          linkedinAssetUrn,
         }),
       });
 

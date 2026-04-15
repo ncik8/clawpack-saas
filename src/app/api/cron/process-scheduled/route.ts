@@ -162,7 +162,7 @@ async function postToX(content: string, imageUrl: string | null, connection: any
   return tweetData.data?.id;
 }
 
-async function postToLinkedIn(content: string, imageUrl: string | null, connection: any) {
+async function postToLinkedIn(content: string, imageUrl: string | null, linkedinAssetUrn: string | null, connection: any) {
   let accessToken = connection.access_token;
   
   console.log(`LinkedIn CRON: conn_id=${connection.id}, user_id=${connection.user_id}, platform_user_id=${connection.platform_user_id}, token_prefix=${accessToken?.substring(0, 8)}, expires_at=${connection.expires_at}`);
@@ -207,9 +207,14 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
   let mediaAsset: string | null = null;
   let mediaType = 'NONE';
 
-  // Image post - fetch image and upload
-  if (imageUrl) {
-    console.log(`LinkedIn: attempting to upload image from: ${imageUrl}`);
+  // Use pre-uploaded asset URN if available (browser already uploaded it at schedule time)
+  if (linkedinAssetUrn) {
+    console.log(`LinkedIn: using pre-uploaded asset URN: ${linkedinAssetUrn}`);
+    mediaAsset = linkedinAssetUrn;
+    mediaType = 'IMAGE';
+  } else if (imageUrl) {
+    // Fallback: try to upload from server (may fail due to Vercel blocking LinkedIn DMS endpoint)
+    console.log(`LinkedIn: no pre-uploaded URN, attempting server-side upload from: ${imageUrl}`);
     try {
       const imageRes = await fetch(imageUrl);
       if (!imageRes.ok) {
@@ -558,7 +563,7 @@ export async function GET(request: Request) {
         if (target.platform === 'x') {
           externalPostId = await postToX(post.content, post.image_url, connection);
         } else if (target.platform === 'linkedin') {
-          externalPostId = await postToLinkedIn(post.content, post.image_url, connection);
+          externalPostId = await postToLinkedIn(post.content, post.image_url, post.linkedin_asset_urn, connection);
         } else if (target.platform === 'bluesky') {
           externalPostId = await postToBluesky(post.content, post.image_url, connection);
         } else if (target.platform === 'facebook') {

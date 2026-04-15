@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { content, platforms, scheduledFor, videoUrl, imageUrl, timezone } = await request.json();
+    const { content, platforms, scheduledFor, videoUrl, imageUrl, timezone, linkedinAssetUrn } = await request.json();
 
     if (!content || !platforms || !scheduledFor) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -187,6 +187,7 @@ export async function POST(request: Request) {
         video_url: videoUrl || null,
         image_url: imageUrl || null,
         timezone: timezone || 'Asia/Hong_Kong',
+        linkedin_asset_urn: linkedinAssetUrn || null,
       })
       .select()
       .single();
