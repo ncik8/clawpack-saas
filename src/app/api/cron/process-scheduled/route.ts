@@ -194,29 +194,41 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
       }),
     });
     const registerData = await registerRes.json();
+    console.log(`LinkedIn register response: ${registerRes.status}`, JSON.stringify(registerData));
 
     if (registerRes.ok && registerData.value?.asset) {
       const uploadUrl = registerData.value.uploadUrl ||
         registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
       mediaAsset = registerData.value.asset;
+      console.log(`LinkedIn: mediaAsset registered: ${mediaAsset}, uploadUrl: ${uploadUrl}`);
 
       if (uploadUrl) {
         const imageRes = await fetch(imageUrl);
         const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
         const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
-        await fetch(uploadUrl, {
+        const uploadRes = await fetch(uploadUrl, {
           method: 'PUT',
           headers: { 'Content-Type': contentType },
           body: imageBuffer,
         });
-        mediaType = 'IMAGE';
-        console.log(`LinkedIn: uploaded image (${contentType}, ${imageBuffer.length} bytes)`);
+        console.log(`LinkedIn image PUT response: ${uploadRes.status}`);
+        if (uploadRes.ok) {
+          mediaType = 'IMAGE';
+          console.log(`LinkedIn: uploaded image (${contentType}, ${imageBuffer.length} bytes)`);
+        } else {
+          console.log(`LinkedIn: image upload failed, status: ${uploadRes.status}`);
+        }
       } else {
-        console.log('LinkedIn: no upload URL from register, skipping image');
+        console.log('LinkedIn: no upload URL from register response');
       }
+    } else {
+      console.log(`LinkedIn: register failed or no asset. ok=${registerRes.ok}, asset=${registerData.value?.asset}`);
     }
+  } else {
+    console.log('LinkedIn: no imageUrl provided');
   }
 
+  console.log(`LinkedIn postBody media: type=${mediaType}, asset=${mediaAsset}`);
   const postBody = {
     author: authorUrn,
     lifecycleState: 'PUBLISHED',
@@ -240,8 +252,11 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
     body: JSON.stringify(postBody),
   });
 
+  const postData = await postRes.json();
+  console.log(`LinkedIn ugcPosts response: ${postRes.status}`, JSON.stringify(postData));
+
   if (!postRes.ok) {
-    const errorData = await postRes.json();
+    const errorData = postData;
     // LinkedIn deduplication
     if (!errorData.message?.includes('duplicate') && !errorData.message?.includes('Duplicate')) {
       throw new Error(`LinkedIn: ${errorData.message}`);
