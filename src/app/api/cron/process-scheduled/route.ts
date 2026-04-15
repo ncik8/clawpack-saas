@@ -165,9 +165,11 @@ async function postToX(content: string, imageUrl: string | null, connection: any
 async function postToLinkedIn(content: string, imageUrl: string | null, connection: any) {
   let accessToken = connection.access_token;
   
+  console.log(`LinkedIn CRON: conn_id=${connection.id}, user_id=${connection.user_id}, platform_user_id=${connection.platform_user_id}, token_prefix=${accessToken?.substring(0, 8)}, expires_at=${connection.expires_at}`);
+  
   // Refresh token if expired (LinkedIn tokens can expire)
   if (connection.refresh_token && connection.expires_at && new Date(connection.expires_at) < new Date()) {
-    console.log('LinkedIn: token expired, refreshing...');
+    console.log('LinkedIn: token expired, refreshing...');;
     const refreshRes = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
