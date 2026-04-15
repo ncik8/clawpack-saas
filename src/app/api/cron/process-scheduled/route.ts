@@ -173,7 +173,7 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
   let mediaAsset: string | null = null;
   let mediaType = 'NONE';
 
-  // Image post - fetch image and upload as base64
+  // Image post - fetch image and upload
   if (imageUrl) {
     console.log(`LinkedIn: attempting to upload image from: ${imageUrl}`);
     try {
@@ -182,7 +182,7 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
         console.log(`LinkedIn: failed to fetch image: ${imageRes.status}`);
       } else {
         const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
-        const base64Image = imageBuffer.toString('base64');
+        const contentType = imageRes.headers.get('content-type') || 'image/png';
         
         // Register upload and get asset URN
         const registerRes = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
@@ -208,33 +208,46 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
         if (registerRes.ok && registerData.value?.asset) {
           const uploadUrl = registerData.value.uploadUrl ||
             registerData.value.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
-          mediaAsset = registerData.value.asset;
 
           if (uploadUrl) {
-            // Try uploading directly with the access token as query param (LinkedIn sometimes requires this)
-            const uploadRes = await fetch(`${uploadUrl}${uploadUrl.includes('?') ? '&' : '?'}oauth2_access_token=${accessToken}`, {
+            // Upload binary directly - NO Authorization header on upload URL
+            const uploadRes = await fetch(uploadUrl, {
               method: 'PUT',
               headers: { 
-                'Content-Type': 'application/octet-stream',
+                'Content-Type': contentType,
               },
               body: imageBuffer,
             });
             console.log(`LinkedIn image PUT response: ${uploadRes.status}`);
+            
             if (uploadRes.ok) {
+              mediaAsset = registerData.value.asset;
               mediaType = 'IMAGE';
-              console.log(`LinkedIn: uploaded image (${imageBuffer.length} bytes)`);
+              console.log(`LinkedIn: uploaded image (${contentType}, ${imageBuffer.length} bytes)`);
             } else {
               const errText = await uploadRes.text();
-              console.log(`LinkedIn: image upload failed, status: ${uploadRes.status}, body: ${errText.substring(0, 200)}`);
+              console.log(`LinkedIn: image upload failed, aborting post. status: ${uploadRes.status}, body: ${errText.substring(0, 200)}`);
+              // ABORT - do not proceed with post if image upload failed
+              return;
             }
+          } else {
+            console.log('LinkedIn: no upload URL from register response, aborting');
+            return;
           }
+        } else {
+          console.log(`LinkedIn: register failed, aborting. ok=${registerRes.ok}`);
+          return;
         }
       }
     } catch (err) {
-      console.log(`LinkedIn: image upload error: ${err}`);
+      console.log(`LinkedIn: image upload error: ${err}, aborting`);
+      return;
     }
+  } else {
+    console.log('LinkedIn: no imageUrl provided, posting text-only');
   }
 
+  console.log(`LinkedIn: building post with mediaType=${mediaType}, asset=${mediaAsset}`);
   const postBody = {
     author: authorUrn,
     lifecycleState: 'PUBLISHED',
@@ -248,7 +261,6 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
     visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
   };
 
-  console.log(`LinkedIn postBody: mediaType=${mediaType}, asset=${mediaAsset}`);
   const postRes = await fetch('https://api.linkedin.com/v2/ugcPosts', {
     method: 'POST',
     headers: {
