@@ -163,8 +163,40 @@ async function postToX(content: string, imageUrl: string | null, connection: any
 }
 
 async function postToLinkedIn(content: string, imageUrl: string | null, connection: any) {
-  const accessToken = connection.access_token;
+  let accessToken = connection.access_token;
+  
+  // Refresh token if expired (LinkedIn tokens can expire)
+  if (connection.refresh_token && connection.expires_at && new Date(connection.expires_at) < new Date()) {
+    console.log('LinkedIn: token expired, refreshing...');
+    const refreshRes = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: connection.refresh_token,
+        client_id: process.env.LINKEDIN_CLIENT_ID || '',
+        client_secret: process.env.LINKEDIN_CLIENT_SECRET || '',
+      }),
+    });
+    const refreshData = await refreshRes.json();
+    if (refreshRes.ok && refreshData.access_token) {
+      accessToken = refreshData.access_token;
+      // Update stored token
+      await supabaseAdmin
+        .from('social_connections')
+        .update({
+          access_token: refreshData.access_token,
+          expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
+        })
+        .eq('id', connection.id);
+      console.log('LinkedIn: token refreshed successfully');
+    } else {
+      console.log('LinkedIn: token refresh failed:', JSON.stringify(refreshData));
+    }
+  }
+  
   const authorUrn = connection.platform_user_id ? `urn:li:person:${connection.platform_user_id}` : null;
+  console.log(`LinkedIn: using connection ${connection.id}, token prefix: ${accessToken?.substring(0, 10)}..., platform_user_id: ${connection.platform_user_id}`);
 
   if (!authorUrn) {
     throw new Error('LinkedIn: missing user ID');
