@@ -157,7 +157,7 @@ export async function POST(request: Request) {
       try {
         const imgRes = await fetch(imageUrl);
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
-        const { uploadXImage } = await import('@/lib/twitter-media');
+        const { uploadXImage } = await import('@/lib/x-oauth');
         const uploadedMediaId = await uploadXImage({
           accessToken: connection.access_token,
           accessTokenSecret: connection.refresh_token,
