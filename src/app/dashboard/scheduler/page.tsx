@@ -168,6 +168,28 @@ export default function SchedulerPage() {
         return;
       }
 
+      // If image URL provided, upload to Supabase first to get a clean URL
+      let finalImageUrl = imageUrl;
+      if (imageUrl && !imageUrl.includes('supabase.co/storage')) {
+        setMessage({ type: 'info', text: 'Uploading image...' });
+        try {
+          const uploadRes = await fetch('/api/upload-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageUrl }),
+          });
+          const uploadData = await uploadRes.json();
+          if (uploadData.url) {
+            finalImageUrl = uploadData.url;
+            setMessage({ type: 'info', text: 'Image uploaded, scheduling...' });
+          } else {
+            console.warn('Image upload failed, using original URL:', uploadData.error);
+          }
+        } catch (uploadErr) {
+          console.warn('Image upload error, using original URL:', uploadErr);
+        }
+      }
+
       const response = await fetch('/api/schedule', {
         method: 'POST',
         headers: {
@@ -178,7 +200,7 @@ export default function SchedulerPage() {
           content,
           platforms,
           scheduledFor,
-          imageUrl: imageUrl || undefined,
+          imageUrl: finalImageUrl || undefined,
           videoUrl: videoUrl || undefined,
         }),
       });
