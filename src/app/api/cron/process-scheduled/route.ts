@@ -447,16 +447,10 @@ async function postToInstagram(content: string, imageUrl: string | null, connect
     throw new Error('Instagram: missing access token or user ID');
   }
 
-  // Create media container with FormData (Instagram API requires FormData for image_url)
+  // Create media container with FormData (same approach as "Post Now" which works)
   const formData = new FormData();
+  formData.append('image_url', imageUrl);
   formData.append('caption', content);
-  
-  if (imageUrl) {
-    formData.append('media_type', 'EXTERNAL_IMAGE');
-    formData.append('image_url', imageUrl);
-  } else {
-    formData.append('media_type', 'TEXT');
-  }
 
   const igRes = await fetch(`https://graph.facebook.com/v18.0/${igUserId}/media?access_token=${accessToken}`, {
     method: 'POST',
