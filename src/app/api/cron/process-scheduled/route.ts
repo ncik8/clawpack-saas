@@ -208,7 +208,10 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
         const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
         const uploadRes = await fetch(uploadUrl, {
           method: 'PUT',
-          headers: { 'Content-Type': contentType },
+          headers: { 
+            'Content-Type': contentType,
+            'Authorization': `Bearer ${accessToken}`,
+          },
           body: imageBuffer,
         });
         console.log(`LinkedIn image PUT response: ${uploadRes.status}`);
@@ -216,7 +219,8 @@ async function postToLinkedIn(content: string, imageUrl: string | null, connecti
           mediaType = 'IMAGE';
           console.log(`LinkedIn: uploaded image (${contentType}, ${imageBuffer.length} bytes)`);
         } else {
-          console.log(`LinkedIn: image upload failed, status: ${uploadRes.status}`);
+          const errText = await uploadRes.text();
+          console.log(`LinkedIn: image upload failed, status: ${uploadRes.status}, body: ${errText}`);
         }
       } else {
         console.log('LinkedIn: no upload URL from register response');
