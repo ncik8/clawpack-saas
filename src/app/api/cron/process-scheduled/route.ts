@@ -468,8 +468,9 @@ async function postToInstagram(content: string, imageUrl: string | null, connect
     throw new Error(igData.error?.message || 'Instagram media creation failed');
   }
 
-  // Wait for processing
-  await new Promise(resolve => setTimeout(resolve, 5000));
+  // Wait for processing (Instagram needs time to fetch/validate external images)
+  console.log(`Instagram: waiting 10s for media processing, container id: ${igData.id}`);
+  await new Promise(resolve => setTimeout(resolve, 10000));
 
   // Publish media
   const publishRes = await fetch(`https://graph.facebook.com/v18.0/${igUserId}/media_publish?access_token=${accessToken}`, {
