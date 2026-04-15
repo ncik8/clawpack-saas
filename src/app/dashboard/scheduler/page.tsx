@@ -171,7 +171,7 @@ export default function SchedulerPage() {
       // If image URL provided, upload to Supabase first to get a clean URL
       let finalImageUrl = imageUrl;
       if (imageUrl && !imageUrl.includes('supabase.co/storage')) {
-        setMessage({ type: 'info', text: 'Uploading image...' });
+        console.log('Uploading image to Supabase...');
         try {
           const uploadRes = await fetch('/api/upload-image', {
             method: 'POST',
@@ -181,9 +181,9 @@ export default function SchedulerPage() {
           const uploadData = await uploadRes.json();
           if (uploadData.url) {
             finalImageUrl = uploadData.url;
-            setMessage({ type: 'info', text: 'Image uploaded, scheduling...' });
+            console.log('Image uploaded to:', finalImageUrl);
           } else {
-            console.warn('Image upload failed, using original URL:', uploadData.error);
+            console.warn('Image upload failed:', uploadData.error, '- using original URL');
           }
         } catch (uploadErr) {
           console.warn('Image upload error, using original URL:', uploadErr);
