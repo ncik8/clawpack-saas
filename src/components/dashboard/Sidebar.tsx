@@ -98,8 +98,12 @@ export default function Sidebar() {
           </div>
           <button
             onClick={async () => {
+              // Clear server-side cookies first
+              await fetch('/api/auth/logout', { method: 'POST' });
+              // Clear client-side session
               await supabase.auth.signOut();
-              window.location.href = '/';
+              // Redirect to login
+              window.location.href = '/login';
             }}
             className="p-2 text-[#6b7280] hover:text-white hover:bg-white/10 rounded-md transition-colors"
             title="Logout"
