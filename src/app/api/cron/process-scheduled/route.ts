@@ -458,7 +458,7 @@ async function postToInstagram(content: string, imageUrl: string | null, connect
     formData.append('media_type', 'TEXT');
   }
 
-  const igRes = await fetch(`https://graph.facebook.com/v18.0/${igUserId}/media`, {
+  const igRes = await fetch(`https://graph.facebook.com/v18.0/${igUserId}/media?access_token=${accessToken}`, {
     method: 'POST',
     body: formData,
   });
@@ -472,7 +472,7 @@ async function postToInstagram(content: string, imageUrl: string | null, connect
   await new Promise(resolve => setTimeout(resolve, 5000));
 
   // Publish media
-  const publishRes = await fetch(`https://graph.facebook.com/v18.0/${igUserId}/media_publish`, {
+  const publishRes = await fetch(`https://graph.facebook.com/v18.0/${igUserId}/media_publish?access_token=${accessToken}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ creation_id: igData.id }),
