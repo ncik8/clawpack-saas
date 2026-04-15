@@ -270,26 +270,25 @@ export default function ConnectedAccountsPage() {
     }
   };
 
-  const platforms = [
+  // Active platforms
+  const activePlatforms = [
     { id: 'x', name: 'X / Twitter', emoji: '🐦', color: '#1DA1F2', comingSoon: false },
     { id: 'linkedin', name: 'LinkedIn', emoji: '💼', color: '#0A66C2', comingSoon: false },
     { id: 'bluesky', name: 'Bluesky', emoji: '☁️', color: '#1185FE', comingSoon: false },
-    { id: 'mastodon', name: 'Mastodon', emoji: '🐘', color: '#6364FF', comingSoon: true },
-    { id: 'nostr', name: 'Nostr', emoji: '⚡', color: '#FFD700', comingSoon: true },
-    { id: 'threads', name: 'Threads', emoji: '🧵', color: '#000000', comingSoon: true },
-    { id: 'facebook', name: 'Facebook Page', emoji: '📘', color: '#1877F2', comingSoon: false },
-    { id: 'instagram-business', name: 'Instagram Business', emoji: '📸', color: '#E4405F', comingSoon: false },
+    { id: 'facebook', name: 'Facebook', emoji: '📘', color: '#1877F2', comingSoon: false },
+    { id: 'instagram-business', name: 'Instagram', emoji: '📸', color: '#E4405F', comingSoon: false },
+    { id: 'linkedin-page', name: 'LinkedIn Page', emoji: '🏢', color: '#0A66C2', comingSoon: false },
+  ];
+
+  // Coming soon platforms
+  const comingSoonPlatforms = [
     { id: 'tiktok', name: 'TikTok', emoji: '🎵', color: '#000000', comingSoon: true },
-    { id: 'youtube', name: 'YouTube', emoji: '▶️', color: '#FF0000', comingSoon: true },
-    { id: 'pinterest', name: 'Pinterest', emoji: '📌', color: '#BD081C', comingSoon: true },
-    { id: 'dribbble', name: 'Dribbble', emoji: '🏀', color: '#EA4C89', comingSoon: true },
     { id: 'discord', name: 'Discord', emoji: '🎮', color: '#5865F2', comingSoon: true },
     { id: 'telegram', name: 'Telegram', emoji: '✈️', color: '#0088CC', comingSoon: true },
     { id: 'wordpress', name: 'WordPress', emoji: '📝', color: '#21759B', comingSoon: true },
-    { id: 'reddit', name: 'Reddit', emoji: '🤖', color: '#FF4500', comingSoon: true },
-    { id: 'slack', name: 'Slack', emoji: '💬', color: '#4A154B', comingSoon: true },
-    { id: 'linkedin-page', name: 'LinkedIn Page', emoji: '💼', color: '#0A66C2', comingSoon: true },
   ];
+
+  const platforms = [...activePlatforms, ...comingSoonPlatforms];
 
   const isConnected = (platformId: string) => {
     // Handle instagram-business → instagram for channel lookup
@@ -314,8 +313,8 @@ export default function ConnectedAccountsPage() {
         <p className="text-[#9ca3af] text-sm">Connect your social media accounts to start posting</p>
       </div>
 
-      {/* Platform grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+      {/* Platform grid - active platforms larger */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 gap-4">
         {platforms.map((platform) => {
           const connected = isConnected(platform.id);
           const isConnecting = connecting === platform.id;
@@ -357,7 +356,7 @@ export default function ConnectedAccountsPage() {
               <p className="text-white text-xs font-medium truncate">{platform.name}</p>
 
               {/* Action */}
-              {platform.comingSoon ? (
+              {platform.comingSoon === true ? (
                 <button 
                   className="mt-2 w-full text-[10px] py-1 bg-[#4b5563] text-[#9ca3af] rounded cursor-not-allowed"
                   disabled
