@@ -105,11 +105,16 @@ export default function SchedulerPage() {
   };
 
   const togglePlatform = (platformWithId: string) => {
-    setPlatforms(prev =>
-      prev.includes(platformWithId)
-        ? prev.filter(p => p !== platformWithId)
-        : [...prev, platformWithId]
-    );
+    setPlatforms(prev => {
+      const isCurrentlySelected = prev.includes(platformWithId);
+      if (isCurrentlySelected) {
+        // Deselect — clear the single selection
+        return prev.filter(p => p !== platformWithId);
+      } else {
+        // Replace ALL selections with just this one (single-platform only)
+        return [platformWithId];
+      }
+    });
   };
 
   const toggleAllPages = (platform: string, connected: boolean, pageIds: string[]) => {
@@ -117,9 +122,9 @@ export default function SchedulerPage() {
       // Remove all pages of this platform
       setPlatforms(prev => prev.filter(p => !pageIds.some(id => p === `${platform}:${id}`)));
     } else {
-      // Add all pages of this platform
+      // Replace ALL selections with just these pages (single-platform only)
       const newPages = pageIds.map(id => `${platform}:${id}`);
-      setPlatforms(prev => [...new Set([...prev, ...newPages])]);
+      setPlatforms(newPages);
     }
   };
 
